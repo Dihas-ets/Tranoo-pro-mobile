@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:http/http.dart' as http;
 import 'movie.dart';
-import 'package:tranoo/services/user_service.dart'; // Importer UserService pour gérer les rôles
-import 'package:tranoo/utils/role_redirect.dart'; // Importer RoleRedirect pour la redirection basée sur le rôle
-import 'package:tranoo/data/screens/succes_vente.dart'; // Importer SuccesVenteScreen
+import 'package:tranoo_pro/services/user_service.dart'; // Importer UserService pour gérer les rôles
+import 'package:tranoo_pro/utils/role_redirect.dart'; // Importer RoleRedirect pour la redirection basée sur le rôle
+import 'package:tranoo_pro/data/screens/succes_vente.dart'; // Importer SuccesVenteScreen
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -12,7 +12,7 @@ import 'package:confetti/confetti.dart';
 import 'une.dart'; // Import pour la page de demande de pub
 import 'dart:developer';
 import 'verification_payment.dart'; // Import pour la page de vérification de paiement
-import 'package:tranoo/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class CarsInfo extends StatefulWidget {
@@ -250,9 +250,8 @@ class _CarsinfoState extends State<CarsInfo> {
   @override
   Widget build(BuildContext context) {
     final userService = UserService(); // Instance du service utilisateur
-    final isAcheteurOuChauffeur =
-        userService.currentRole == UserRole.acheteur ||
-            userService.currentRole == UserRole.chauffeur;
+    final isChauffeur =
+        userService.currentRole == UserRole.chauffeur || userService.currentRole == UserRole.livreur;
 
     // Récupération des dimensions de l'écran pour la responsivité
     final mediaQuery = MediaQuery.of(context);
@@ -273,7 +272,7 @@ class _CarsinfoState extends State<CarsInfo> {
         physics: const BouncingScrollPhysics(),
         children: [
           _buildImageSection(screenWidth, screenHeight),
-          _buildContentSection(screenWidth, isAcheteurOuChauffeur),
+          _buildContentSection(screenWidth, isChauffeur),
         ],
       ),
     );
@@ -613,9 +612,9 @@ class _CarsinfoState extends State<CarsInfo> {
   }
 
   // Section des détails et spécifications
-  Widget _buildContentSection(double screenWidth, bool isAcheteur) {
+  Widget _buildContentSection(double screenWidth, bool isChauffeur) {
     final bool shouldShowDeliveryOptions =
-        isAcheteur || (widget.fromPub == true);
+        isChauffeur || (widget.fromPub == true);
     return Padding(
       padding: EdgeInsets.all(screenWidth * 0.04), // Espacement ajusté
       child: Column(
@@ -632,7 +631,7 @@ class _CarsinfoState extends State<CarsInfo> {
             shouldShowDeliveryOptions,
           ), // Cases à cocher (si applicable)
           const SizedBox(height: 24),
-          _buildActionButton(isAcheteur), // Bouton d'action dynamique
+          _buildActionButton(isChauffeur), // Bouton d'action dynamique
         ],
       ),
     );
@@ -1001,11 +1000,11 @@ class _CarsinfoState extends State<CarsInfo> {
   }
 
   // Bouton d'action dynamique
-  Widget _buildActionButton(bool isAcheteurOuChauffeur) {
+  Widget _buildActionButton(bool isChauffeur) {
     final userService = UserService();
     final isVendeur = userService.currentRole == UserRole.vendeur;
 
-    // Nouveaux boutons pour les non-vendeurs : vérification + contact WhatsApp
+    // Nouveaux boutons pour les non-vendeurs (chauffeurs) : vérification + contact WhatsApp
     if (widget.fromPub == true || !isVendeur) {
       return Row(
         children: [
@@ -1389,7 +1388,7 @@ class _CarsinfoState extends State<CarsInfo> {
       );
     }
     if (!isVendeur) {
-      // Pour les acheteurs/chauffeurs, un seul bouton
+      // Pour les chauffeurs, un seul bouton
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton(

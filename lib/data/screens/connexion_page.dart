@@ -1,5 +1,5 @@
 // import 'package:flutter/material.dart';
-// import 'package:tranoo/data/screens/avant_home.dart';
+// import 'package:tranoo_pro/data/screens/avant_home.dart';
 
 // import 'inscription_page.dart';
 
@@ -243,15 +243,15 @@
 // ... existing code ...
 
 import 'package:flutter/material.dart';
-import 'package:tranoo/data/screens/avant_home.dart';
-import 'package:tranoo/services/user_service.dart';
-import 'package:tranoo/utils/role_redirect.dart';
+import 'package:tranoo_pro/data/screens/avant_home.dart';
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
-import 'package:tranoo/providers/auth_provider.dart' as myauth;
+import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 
 import 'inscription_page.dart';
 
@@ -516,20 +516,50 @@ class _ConnexionPageState extends State<ConnexionPage> {
                               );
 
                               if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Connexion réussie !'),
-                                ),
-                              );
-
-                              if (!mounted) return;
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const AvantHome(),
-                                ),
-                                (route) => false,
-                              );
+                              
+                              // Vérifier si livreur/chauffeur sans photo de profil
+                              final userRole = auth.user?['role']?.toString();
+                              final userPhoto = auth.user?['photo']?.toString();
+                              final needsPhotoUpload = (userRole == 'livreur' || userRole == 'chauffeur') &&
+                                  (userPhoto == null || userPhoto.isEmpty);
+                              
+                              if (needsPhotoUpload) {
+                                // Rediriger vers le profil pour upload photo obligatoire
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Veuillez uploader votre photo de profil pour continuer.'),
+                                    duration: Duration(seconds: 4),
+                                  ),
+                                );
+                                if (!mounted) return;
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AvantHome(),
+                                  ),
+                                  (route) => false,
+                                );
+                                // Naviguer vers l'onglet profil après un court délai
+                                Future.delayed(const Duration(milliseconds: 500), () {
+                                  if (mounted) {
+                                    // Le profil sera affiché avec l'animation d'alerte
+                                  }
+                                });
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Connexion réussie !'),
+                                  ),
+                                );
+                                if (!mounted) return;
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AvantHome(),
+                                  ),
+                                  (route) => false,
+                                );
+                              }
                             } catch (e) {
                               _logger.warning(
                                 'Erreur lors de la connexion Firebase: ${e.toString()}',
@@ -626,14 +656,16 @@ class _ConnexionPageState extends State<ConnexionPage> {
     switch (role) {
       case 'vendeur':
         return UserRole.vendeur;
-      case 'acheteur':
-        return UserRole.acheteur;
       case 'transitaire':
         return UserRole.transitaire;
       case 'chauffeur':
         return UserRole.chauffeur;
+      case 'agentCommercial':
+        return UserRole.agentCommercial;
+      case 'livreur':
+        return UserRole.livreur;
       default:
-        return UserRole.acheteur;
+        return UserRole.vendeur; // Par défaut vendeur pour l'app Pro
     }
   }
 }

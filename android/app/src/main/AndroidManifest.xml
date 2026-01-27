@@ -3,6 +3,8 @@
 
     <!-- Permissions nécessaires -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32"/>
@@ -17,7 +19,7 @@
         android:maxSdkVersion="28"/>
 
     <application
-        android:label="tranoo"
+        android:label="Tranoo Pro"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
@@ -45,6 +47,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="YOUR_GOOGLE_MAPS_API_KEY" />       <!-- Requis pour PROCESS_TEX:T (utile pour certains plugins Flutter) -->
     </application>
 
     <!-- Requis pour PROCESS_TEXT (utile pour certains plugins Flutter) -->

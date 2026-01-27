@@ -6,10 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; // Importer la bibliothèque pour la sélection d'image
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
-import 'package:tranoo/services/user_service.dart';
-import 'package:tranoo/utils/cloudinary_upload.dart'; // Importer le composant d'upload Cloudinary
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/cloudinary_upload.dart'; // Importer le composant d'upload Cloudinary
 import 'package:provider/provider.dart';
-import 'package:tranoo/providers/auth_provider.dart' as local_auth;
+import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -18,7 +18,7 @@ class Profile extends StatefulWidget {
   State<Profile> createState() => _ProfileState();
 }
 
-class _ProfileState extends State<Profile> {
+class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   String? selectedGender;
   String? selectedCountry;
   File? _image; // Pour stocker l'image sélectionnée
@@ -36,6 +36,10 @@ class _ProfileState extends State<Profile> {
   String? editedPhone;
   String? newPassword;
   bool isSaving = false;
+  
+  // Animation pour alerte photo manquante
+  late AnimationController _alertController;
+  late Animation<double> _pulseAnimation;
 
   final List<Map<String, String>> countries = [
     {"name": "Bénin", "flag": "assets/flags/benin.svg"},
@@ -48,6 +52,33 @@ class _ProfileState extends State<Profile> {
   void initState() {
     super.initState();
     fetchUser();
+    
+    // Initialiser l'animation d'alerte
+    _alertController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(
+        parent: _alertController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _alertController.dispose();
+    super.dispose();
+  }
+  
+  bool get _needsPhotoAlert {
+    if (userData == null) return false;
+    final role = userData!['role']?.toString();
+    final hasPhoto = userData!['photo'] != null && 
+                     userData!['photo'].toString().isNotEmpty;
+    return (role == 'livreur' || role == 'chauffeur') && !hasPhoto;
   }
 
   Future<void> fetchUser() async {
@@ -234,50 +265,122 @@ class _ProfileState extends State<Profile> {
                     children: [
                       GestureDetector(
                         onTap: _pickImage,
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 60,
-                              backgroundColor: Colors.grey[300],
-                              backgroundImage:
-                                  _image != null
-                                      ? FileImage(_image!) as ImageProvider
-                                      : (userData != null &&
-                                          userData!["photo"] != null &&
-                                          userData!["photo"]
-                                              .toString()
-                                              .isNotEmpty)
-                                      ? NetworkImage(userData!["photo"].toString()) as ImageProvider
-                                      : null,
-                              child: (_image == null && 
-                                      (userData == null || 
-                                       userData!["photo"] == null || 
-                                       userData!["photo"].toString().isEmpty))
-                                  ? Icon(Icons.person, size: 60, color: Colors.grey[600])
-                                  : null,
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white,
-                                  border: Border.all(
-                                    color: Colors.grey,
-                                    width: 1,
+                        child: AnimatedBuilder(
+                          animation: _pulseAnimation,
+                          builder: (context, child) {
+                            return Stack(
+                              children: [
+                                Transform.scale(
+                                  scale: _needsPhotoAlert ? _pulseAnimation.value : 1.0,
+                                  child: Container(
+                                    decoration: _needsPhotoAlert
+                                        ? BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.red,
+                                              width: 3,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.red.withOpacity(0.5),
+                                                blurRadius: 15,
+                                                spreadRadius: 2,
+                                              ),
+                                            ],
+                                          )
+                                        : null,
+                                    child: CircleAvatar(
+                                      radius: 60,
+                                      backgroundColor: Colors.grey[300],
+                                      backgroundImage:
+                                          _image != null
+                                              ? FileImage(_image!) as ImageProvider
+                                              : (userData != null &&
+                                                  userData!["photo"] != null &&
+                                                  userData!["photo"]
+                                                      .toString()
+                                                      .isNotEmpty)
+                                              ? NetworkImage(userData!["photo"].toString()) as ImageProvider
+                                              : null,
+                                      child: (_image == null && 
+                                              (userData == null || 
+                                               userData!["photo"] == null || 
+                                               userData!["photo"].toString().isEmpty))
+                                          ? Icon(Icons.person, size: 60, color: Colors.grey[600])
+                                          : null,
+                                    ),
                                   ),
                                 ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  size: 24,
-                                  color: Colors.black,
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                      border: Border.all(
+                                        color: Colors.grey,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt,
+                                      size: 24,
+                                      color: Colors.black,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
+                                // Badge d'alerte si photo manquante (livreur/chauffeur)
+                                if (_needsPhotoAlert)
+                                  Positioned(
+                                    top: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.warning,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                       ),
+                      // Message d'alerte si photo manquante
+                      if (_needsPhotoAlert) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.shade300, width: 2),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: Colors.red.shade700),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '⚠️ Photo de profil obligatoire pour ${userData!['role'] == 'livreur' ? 'les livreurs' : 'les chauffeurs'}. Veuillez uploader une photo claire.',
+                                  style: TextStyle(
+                                    color: Colors.red.shade900,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
                       // Nom
                       Row(

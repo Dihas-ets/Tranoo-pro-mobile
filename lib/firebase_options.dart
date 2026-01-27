@@ -55,7 +55,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBGyKoZRckr8JoRvyDN-pMJ0e3UJY7a4h8',
-    appId: '1:532909089194:android:a17e023f3043ef51148bd3',
+    appId: '1:532909089194:android:94a79ca6d802ec29148bd3',
     messagingSenderId: '532909089194',
     projectId: 'tranoo',
     storageBucket: 'tranoo.firebasestorage.app',
@@ -67,7 +67,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '532909089194',
     projectId: 'tranoo',
     storageBucket: 'tranoo.firebasestorage.app',
-    iosBundleId: 'com.example.tranoo',
+    iosBundleId: 'tech.dihas.tramoo_pro',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

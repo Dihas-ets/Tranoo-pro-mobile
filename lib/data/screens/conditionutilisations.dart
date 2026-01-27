@@ -37,7 +37,7 @@ Conditions d'Utilisation de l'Application Tranoo
 Bienvenue sur Tranoo, votre application de vente de voitures importées. En utilisant cette application, vous acceptez les conditions suivantes :
 
 1. **Objet de l'Application**
-   Tranoo est une plateforme facilitant l'achat et la vente de voitures importées. Nous mettons en relation les vendeurs et les acheteurs.
+   Tranoo Pro est une plateforme pour les professionnels (vendeurs, transitaires, chauffeurs, livreurs) facilitant la vente et la gestion de voitures importées.
 
 2. **Inscription et Compte**
    - Vous devez fournir des informations exactes lors de votre inscription.

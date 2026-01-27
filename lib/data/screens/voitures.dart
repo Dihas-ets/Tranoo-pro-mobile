@@ -6,11 +6,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'cars_info.dart';
-import 'package:tranoo/services/user_service.dart';
-import 'package:tranoo/utils/role_redirect.dart';
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'create_sell.dart';
 import 'movie.dart';
-import 'package:tranoo/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 
 class VoituresPage extends StatefulWidget {
   const VoituresPage({super.key});

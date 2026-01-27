@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:tranoo/services/user_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'mastervacpage.dart';
 import 'create_sell2.dart';
-import 'package:tranoo/utils/role_redirect.dart';
-import 'package:tranoo/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/utils/role_redirect.dart';
+import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 
 class Piece extends StatefulWidget {
   const Piece({super.key});
@@ -678,6 +678,7 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final userService = UserService();
     final isVendeur = userService.currentRole == UserRole.vendeur;
+    final isChauffeur = userService.currentRole == UserRole.chauffeur || userService.currentRole == UserRole.livreur;
 
     final filteredPieces = _applyFilters(pieces).where((p) {
       final title = (p['titre'] ?? '').toString().toLowerCase();
@@ -819,7 +820,7 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                                           piece['Id'] ??
                                                           piece['article'])
                                                       ?.toString(),
-                                                  isAcheteur: !isVendeur,
+                                                  isAcheteur: isChauffeur,
                                                   title: piece['titre'] ?? '',
                                                   year: piece['annee'] ?? '',
                                                   description:

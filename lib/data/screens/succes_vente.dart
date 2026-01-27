@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
-import 'package:tranoo/data/screens/avant_home.dart';
+import 'package:tranoo_pro/data/screens/avant_home.dart';
 
 class SuccesVenteScreen extends StatefulWidget {
   const SuccesVenteScreen({super.key});

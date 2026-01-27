@@ -2,17 +2,17 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:tranoo/data/screens/wallet_screen.dart';
-import 'package:tranoo/data/screens/connexion_page.dart';
-import 'package:tranoo/data/screens/notifications.dart';
-import 'package:tranoo/data/screens/profile2.dart';
-import 'package:tranoo/data/screens/historique_transit.dart';
+import 'package:tranoo_pro/data/screens/wallet_screen.dart';
+import 'package:tranoo_pro/data/screens/connexion_page.dart';
+import 'package:tranoo_pro/data/screens/notifications.dart';
+import 'package:tranoo_pro/data/screens/profile2.dart';
+import 'package:tranoo_pro/data/screens/historique_transit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
-import 'package:tranoo/services/user_service.dart';
-import 'package:tranoo/utils/cloudinary_upload.dart';
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'package:provider/provider.dart';
-import 'package:tranoo/providers/auth_provider.dart' as local_auth;
+import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
 
 class ProfilUtilisateur2 extends StatefulWidget {
   const ProfilUtilisateur2({super.key});

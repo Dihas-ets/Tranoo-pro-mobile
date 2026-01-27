@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tranoo/services/user_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 import 'package:logging/logging.dart';
 
 import 'connexion_page.dart'; // Assurez-vous que ce fichier existe
@@ -28,6 +28,13 @@ class _InscriptionPageState extends State<InscriptionPage> {
   final TextEditingController _entrepriseProvenanceController =
       TextEditingController();
   final TextEditingController _referralController = TextEditingController();
+  // Contrôleurs pour les champs véhicule (livreur/chauffeur)
+  final TextEditingController _immatriculationController = TextEditingController();
+  final TextEditingController _vehiculeTypeController = TextEditingController();
+  final TextEditingController _vehiculeMarqueController = TextEditingController();
+  final TextEditingController _vehiculeModeleController = TextEditingController();
+  final TextEditingController _vehiculeAnneeController = TextEditingController();
+  final TextEditingController _vehiculeCouleurController = TextEditingController();
   final UserService _userService = UserService();
   final _logger = Logger('InscriptionPage');
 
@@ -90,9 +97,9 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
   final List<String> roles = [
     'Transitaire',
-    'Acheteur',
     'Vendeur',
     'Chauffeur',
+    'Livreur',
   ];
   final TextEditingController _entrepriseController = TextEditingController();
   bool _isLoading = false;
@@ -614,8 +621,103 @@ class _InscriptionPageState extends State<InscriptionPage> {
                   isPortrait: isPortrait,
                 ),
               ],
-              SizedBox(height: screenHeight * 0.02),
-
+              // Champs spécifiques Livreur/Chauffeur - Informations véhicule
+              if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
+                SizedBox(height: screenHeight * 0.02),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE3F2FD), // Bleu clair
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2196F3)),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.info_outline, color: Color(0xFF1976D2)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Informations de votre véhicule (obligatoire pour la sécurité)',
+                          style: TextStyle(
+                            color: Color(0xFF1976D2),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: screenHeight * 0.02),
+                buildTextFieldWithController(
+                  controller: _immatriculationController,
+                  label: "Numéro d'immatriculation",
+                  icon: Icons.confirmation_number,
+                  placeholder: "Ex: 1234-AB-01",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
+                ),
+                SizedBox(height: screenHeight * 0.02),
+                buildTextFieldWithController(
+                  controller: _vehiculeTypeController,
+                  label: "Type de véhicule",
+                  icon: Icons.directions_car,
+                  placeholder: "Ex: Moto, Voiture, Camion",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
+                ),
+                SizedBox(height: screenHeight * 0.02),
+                buildTextFieldWithController(
+                  controller: _vehiculeMarqueController,
+                  label: "Marque du véhicule",
+                  icon: Icons.branding_watermark,
+                  placeholder: "Ex: Yamaha, Toyota, Peugeot",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
+                ),
+                SizedBox(height: screenHeight * 0.02),
+                buildTextFieldWithController(
+                  controller: _vehiculeModeleController,
+                  label: "Modèle du véhicule",
+                  icon: Icons.description,
+                  placeholder: "Ex: YBR 125, Corolla, 206",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
+                ),
+                SizedBox(height: screenHeight * 0.02),
+                Row(
+                  children: [
+                    Expanded(
+                      child: buildTextFieldWithController(
+                        controller: _vehiculeAnneeController,
+                        label: "Année",
+                        icon: Icons.calendar_today,
+                        placeholder: "Ex: 2020",
+                        screenWidth: screenWidth,
+                        screenHeight: screenHeight,
+                        isPortrait: isPortrait,
+                      ),
+                    ),
+                    SizedBox(width: screenWidth * 0.02),
+                    Expanded(
+                      child: buildTextFieldWithController(
+                        controller: _vehiculeCouleurController,
+                        label: "Couleur",
+                        icon: Icons.color_lens,
+                        placeholder: "Ex: Rouge, Bleu",
+                        screenWidth: screenWidth,
+                        screenHeight: screenHeight,
+                        isPortrait: isPortrait,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               SizedBox(height: screenHeight * 0.02),
               buildTextFieldWithController(
                 controller: _maisonController,
@@ -681,6 +783,24 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   content: Text(
                                     'Veuillez remplir tous les champs vendeur (Registre de commerce, IFU, Entreprise de provenance).',
                                   ),
+                                ),
+                              );
+                              return;
+                            }
+                          }
+
+                          // Vérification des champs spécifiques aux livreurs/chauffeurs
+                          if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') {
+                            if (_immatriculationController.text.trim().isEmpty ||
+                                _vehiculeTypeController.text.trim().isEmpty ||
+                                _vehiculeMarqueController.text.trim().isEmpty ||
+                                _vehiculeModeleController.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Veuillez remplir les informations obligatoires de votre véhicule (Immatriculation, Type, Marque, Modèle).',
+                                  ),
+                                  backgroundColor: Colors.orange,
                                 ),
                               );
                               return;
@@ -769,6 +889,25 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   ? _entrepriseProvenanceController.text.trim()
                                   : null,
                               referralCode: pendingReferral,
+                              // Données véhicule (livreur/chauffeur)
+                              vehiculeImmatriculation: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
+                                  ? _immatriculationController.text.trim()
+                                  : null,
+                              vehiculeType: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
+                                  ? _vehiculeTypeController.text.trim()
+                                  : null,
+                              vehiculeMarque: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
+                                  ? _vehiculeMarqueController.text.trim()
+                                  : null,
+                              vehiculeModele: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
+                                  ? _vehiculeModeleController.text.trim()
+                                  : null,
+                              vehiculeAnnee: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
+                                  ? _vehiculeAnneeController.text.trim()
+                                  : null,
+                              vehiculeCouleur: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
+                                  ? _vehiculeCouleurController.text.trim()
+                                  : null,
                               // fcmToken: ... (à ajouter si dispo)
                             );
 

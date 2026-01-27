@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:logging/logging.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:tranoo/config/backend_config.dart';
+import 'package:tranoo_pro/config/backend_config.dart';
 
 final _logger = Logger('CloudinaryUpload');
 

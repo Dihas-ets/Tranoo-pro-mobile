@@ -1,27 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:tranoo/services/push_otp_service.dart';
+import 'package:tranoo_pro/services/push_otp_service.dart';
 
 class CreateNewPasswordPage extends StatefulWidget {
-  final String telephone;
-  final String otpCode;
+  final String requestId;
+  final String deviceId;
 
   const CreateNewPasswordPage({
     super.key,
-    required this.telephone,
-    required this.otpCode,
+    required this.requestId,
+    required this.deviceId,
   });
 
   @override
   State<CreateNewPasswordPage> createState() => _CreateNewPasswordPageState();
 }
 
-class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
+class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _loading = false;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _slideAnimation;
 
   // Critères de validation du mot de passe
   bool _hasDigit = false;
@@ -34,10 +38,33 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
   void initState() {
     super.initState();
     _newPasswordController.addListener(_updatePasswordStrength);
+    
+    // Initialiser les animations
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeIn,
+      ),
+    );
+    
+    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    
+    _animationController.forward();
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -81,22 +108,36 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
     setState(() => _loading = true);
 
     try {
-      final result = await PushOTPService.verifyOTPAndResetPassword(
-        telephone: widget.telephone,
-        code: widget.otpCode,
+      final result = await PushOTPService.resetPassword(
+        requestId: widget.requestId,
+        deviceId: widget.deviceId,
         newPassword: _newPasswordController.text,
       );
 
       if (!mounted) return;
 
       if (result['success']) {
+        // Animation de succès
+        _animationController.reverse().then((_) {
+          if (mounted) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message']),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(result['message'])),
+              ],
+            ),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -129,28 +170,57 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
         elevation: 0,
       ),
       backgroundColor: const Color(0xFFF9FAFB),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Titre principal
-              const Text(
-                'Créez un nouveau mot de passe',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Entrez et confirmez votre nouveau mot de passe',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              const SizedBox(height: 32),
+      body: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Opacity(
+              opacity: _fadeAnimation.value,
+              child: Transform.translate(
+                offset: Offset(0, _slideAnimation.value),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header avec icône animée
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8BF13).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.lock_reset,
+                            size: 48,
+                            color: Color(0xFFF8BF13),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Titre principal
+                      const Center(
+                        child: Text(
+                          'Créez un nouveau mot de passe',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Center(
+                        child: Text(
+                          'Entrez et confirmez votre nouveau mot de passe',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
 
               // Nouveau mot de passe
               TextFormField(
@@ -308,9 +378,13 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
                           ),
                 ),
               ),
-            ],
-          ),
-        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

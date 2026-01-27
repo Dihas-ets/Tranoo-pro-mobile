@@ -2,16 +2,16 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:tranoo/data/screens/wallet_screen.dart';
-import 'package:tranoo/data/screens/connexion_page.dart';
-import 'package:tranoo/data/screens/notifications.dart';
-import 'package:tranoo/data/screens/profile.dart';
-import 'package:tranoo/data/screens/parrainage_page.dart';
+import 'package:tranoo_pro/data/screens/wallet_screen.dart';
+import 'package:tranoo_pro/data/screens/connexion_page.dart';
+import 'package:tranoo_pro/data/screens/notifications.dart';
+import 'package:tranoo_pro/data/screens/profile.dart';
+import 'package:tranoo_pro/data/screens/parrainage_page.dart';
 import 'package:provider/provider.dart';
-import 'package:tranoo/providers/auth_provider.dart' as myauth;
+import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
-import 'package:tranoo/services/user_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 
 void main() {
   runApp(const MyApp());

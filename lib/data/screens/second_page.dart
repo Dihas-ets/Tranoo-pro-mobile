@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tranoo/data/screens/connexion_page.dart';
+import 'package:tranoo_pro/data/screens/connexion_page.dart';
 
 class SecondPage extends StatefulWidget {
   const SecondPage({super.key});

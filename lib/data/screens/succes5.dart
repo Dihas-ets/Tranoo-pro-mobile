@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tranoo/data/screens/paymentscreen.dart';
+import 'package:tranoo_pro/data/screens/paymentscreen.dart';
 
 class SuccesScreen5 extends StatelessWidget {
   const SuccesScreen5({super.key});

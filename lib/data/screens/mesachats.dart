@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:tranoo/services/user_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 
 class MesAchatsPage extends StatefulWidget {
   MesAchatsPage({super.key});

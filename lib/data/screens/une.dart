@@ -7,14 +7,14 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 // import 'package:permission_handler/permission_handler.dart';
-import 'package:tranoo/data/screens/paymentscreen.dart';
+import 'package:tranoo_pro/data/screens/paymentscreen.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:tranoo/utils/cloudinary_upload.dart';
+import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'dart:developer';
-import 'package:tranoo/services/user_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 
 class Une extends StatefulWidget {
   final String? articleId; // ID de l'article existant (optionnel)

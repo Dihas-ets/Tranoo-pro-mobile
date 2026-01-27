@@ -4,7 +4,7 @@ import 'dart:io';
 import '../../utils/cloudinary_upload.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:tranoo/services/user_service.dart'; // Ajout pour getBaseUrl
+import 'package:tranoo_pro/services/user_service.dart'; // Ajout pour getBaseUrl
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;

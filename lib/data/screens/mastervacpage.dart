@@ -3,20 +3,20 @@
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 // import 'payement.dart'; // Plus utilisé
-import 'package:tranoo/services/user_service.dart'; // Importez UserService pour gérer les rôles
-import 'package:tranoo/services/cart_service.dart';
+import 'package:tranoo_pro/services/user_service.dart'; // Importez UserService pour gérer les rôles
+import 'package:tranoo_pro/services/cart_service.dart';
 import 'cart_page.dart';
-import 'package:tranoo/utils/role_redirect.dart';
-// import 'package:tranoo/data/screens/paymentscreen.dart';
+import 'package:tranoo_pro/utils/role_redirect.dart';
+// import 'package:tranoo_pro/data/screens/paymentscreen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:tranoo/data/screens/succes6.dart';
+import 'package:tranoo_pro/data/screens/succes6.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:developer';
 import 'une.dart'; // Import pour la page de demande de pub
 // import 'verification_payment.dart';
-import 'package:tranoo/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MastervacPage extends StatefulWidget {
@@ -604,7 +604,7 @@ class _MastervacPageState extends State<MastervacPage> {
       );
     }
     if (!isVendeur) {
-      // Acheteur ou chauffeur : bouton acheter
+      // Chauffeur : bouton acheter
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton(

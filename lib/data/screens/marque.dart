@@ -1,22 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:tranoo/data/screens/cars_info.dart';
-import 'package:tranoo/data/screens/voitures.dart';
-import 'package:tranoo/data/screens/piece.dart';
-import 'package:tranoo/data/screens/mastervacpage.dart';
-import 'package:tranoo/utils/role_redirect.dart';
-import 'package:tranoo/services/user_service.dart';
-import 'package:tranoo/data/screens/tarif.dart';
-import 'package:tranoo/data/screens/transit.dart';
+import 'package:tranoo_pro/data/screens/cars_info.dart';
+import 'package:tranoo_pro/data/screens/voitures.dart';
+import 'package:tranoo_pro/data/screens/piece.dart';
+import 'package:tranoo_pro/data/screens/mastervacpage.dart';
+import 'package:tranoo_pro/utils/role_redirect.dart';
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/data/screens/transit.dart';
 import 'package:logging/logging.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tranoo/widgets/video_preview_placeholder.dart';
-import 'package:tranoo/data/screens/movie.dart';
+import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/data/screens/movie.dart';
 
 class Article {
   final String id;
@@ -1244,7 +1243,7 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
                     MaterialPageRoute(
                       builder: (context) => MastervacPage(
                         id: piece.id,
-                        isAcheteur: true,
+                        isAcheteur: false,
                         title: piece.title,
                         year: piece.year,
                         description: piece.description,
@@ -1788,7 +1787,7 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
                             MaterialPageRoute(
                               builder: (context) => MastervacPage(
                                 id: piece.id,
-                                isAcheteur: true,
+                                isAcheteur: false,
                                 title: piece.title,
                                 year: piece.year,
                                 description: piece.description,
@@ -2062,7 +2061,7 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => MastervacPage(
-                                    isAcheteur: true,
+                                    isAcheteur: false,
                                     title: article['titre'] ?? '',
                                     year: article['annee'] ?? '',
                                     description: article['description'] ?? '',
@@ -2532,12 +2531,12 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
       {
         "name": "Souscrire",
         "icon": "assets/images/souscrire.png",
-        "route": Tarif(),
+        "route": null,
       },
       {
         "name": "Soumettre",
         "icon": "assets/images/soumis.png",
-        "route": Tarif(),
+        "route": null,
       },
       {
         "name": "En Transit",

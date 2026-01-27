@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
-import 'package:tranoo/services/user_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 
 import 'RetraitScreen.dart'; // Assure-toi que ce fichier existe bien
 
@@ -19,7 +19,6 @@ class WalletScreenState extends State<WalletScreen> {
   String _currency = 'XOF';
   List<Map<String, dynamic>> _transactions = [];
   bool _loading = true;
-  String? _error;
 
   // (supprimé) ancien enregistrement local d'un retrait
 
@@ -37,12 +36,6 @@ class WalletScreenState extends State<WalletScreen> {
           "Mon portefeuille",
           style: TextStyle(color: Colors.black),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.black),
-            onPressed: () {}, // Ajoute ton action ici
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -247,7 +240,6 @@ class WalletScreenState extends State<WalletScreen> {
   Future<void> _loadWallet() async {
     setState(() {
       _loading = true;
-      _error = null;
     });
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -273,7 +265,7 @@ class WalletScreenState extends State<WalletScreen> {
         _transactions = list.cast<Map<String, dynamic>>();
       }
     } catch (e) {
-      _error = e.toString();
+      print('Erreur chargement portefeuille: $e');
     } finally {
       if (mounted)
         setState(() {

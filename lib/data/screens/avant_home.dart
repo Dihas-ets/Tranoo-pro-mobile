@@ -1,28 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tranoo/data/screens/wallet_screen.dart';
-import 'package:tranoo/data/screens/marque.dart';
-import 'package:tranoo/data/screens/notifications.dart';
-import 'package:tranoo/data/screens/piece.dart';
-import 'package:tranoo/data/screens/cart_page.dart';
-import 'package:tranoo/services/cart_service.dart';
-import 'package:tranoo/data/screens/profil3.dart';
-import 'package:tranoo/data/screens/profile.dart';
-import 'package:tranoo/data/screens/tarif.dart';
-import 'package:tranoo/data/screens/transit.dart';
-// import 'package:tranoo/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
-import 'package:tranoo/data/screens/vendre.dart';
-import 'package:tranoo/data/screens/voitures.dart';
+import 'package:tranoo_pro/data/screens/wallet_screen.dart';
+import 'package:tranoo_pro/data/screens/marque.dart';
+import 'package:tranoo_pro/data/screens/notifications.dart';
+import 'package:tranoo_pro/data/screens/piece.dart';
+import 'package:tranoo_pro/data/screens/cart_page.dart';
+import 'package:tranoo_pro/services/cart_service.dart';
+import 'package:tranoo_pro/data/screens/profile.dart';
+import 'package:tranoo_pro/data/screens/transit.dart';
+// import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
+import 'package:tranoo_pro/data/screens/vendre.dart';
+import 'package:tranoo_pro/data/screens/voitures.dart';
 
 import 'package:provider/provider.dart';
-import 'package:tranoo/providers/auth_provider.dart' as myauth;
-import 'package:tranoo/providers/counter_provider.dart';
+import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
+import 'package:tranoo_pro/providers/counter_provider.dart';
 
 import 'connexion_page.dart';
-import 'chat.dart';
-import 'package:tranoo/data/screens/driver_certified.dart';
-import 'package:tranoo/data/screens/second_page.dart';
-import 'package:tranoo/data/screens/une.dart';
+import 'package:tranoo_pro/data/screens/driver_certified.dart';
+import 'package:tranoo_pro/data/screens/second_page.dart';
+import 'package:tranoo_pro/data/screens/une.dart';
+import 'package:tranoo_pro/data/screens/livreur_home.dart';
 
 class AvantHome extends StatefulWidget {
   const AvantHome({super.key});
@@ -81,22 +79,18 @@ class _AvantHomeState extends State<AvantHome> {
     setState(() {
       _selectedIndex = index;
     });
-    // Chat est maintenant intégré dans les onglets, pas besoin de Navigator.push
     if (role == 'chauffeur' && index == 3) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const DriverCertifiedPage()),
       );
+    } else if (role == 'livreur' && index == 3) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const Profile()),
+      );
     }
-    // Les transitaires et vendeurs accèdent à Chat via les onglets directement
   }
-
-  final List<Widget> _pagesAcheteur = [
-    Marque(),
-    VoituresPage(),
-    Piece(),
-    Profil3(),
-  ];
 
   final List<Widget> _pagesChauffeur = [
     Marque(),
@@ -105,11 +99,16 @@ class _AvantHomeState extends State<AvantHome> {
     DriverCertifiedPage(),
   ];
 
+  final List<Widget> _pagesLivreur = [
+    const LivreurHomePage(),
+    VoituresPage(),
+    Piece(),
+    const Profile(),
+  ];
+
   final List<Widget> _pagesTransitaire = [
     Marque(),
-    Tarif(),
     Transit(),
-    ChatListPage(),
   ];
 
   final List<Widget> _pagesVendeur = [
@@ -117,7 +116,6 @@ class _AvantHomeState extends State<AvantHome> {
     const Une(isStandalone: true),
     Vendre(),
     Piece(),
-    ChatListPage(),
   ];
 
   double responsiveSize(
@@ -170,10 +168,10 @@ class _AvantHomeState extends State<AvantHome> {
   }
 
   Widget getCurrentPage(String? role) {
-    if (role == 'acheteur') {
-      return _selectedIndex < _pagesAcheteur.length
-          ? _pagesAcheteur[_selectedIndex]
-          : _pagesAcheteur[0];
+    if (role == 'livreur') {
+      return _selectedIndex < _pagesLivreur.length
+          ? _pagesLivreur[_selectedIndex]
+          : _pagesLivreur[0];
     } else if (role == 'chauffeur') {
       return _selectedIndex < _pagesChauffeur.length
           ? _pagesChauffeur[_selectedIndex]
@@ -233,11 +231,11 @@ class _AvantHomeState extends State<AvantHome> {
           _updateLastLoginTime();
         }
 
-        // Ajusté pour 5 onglets (Accueil, Vendre, Pièces, Chat, Profil)
-        if (role == 'vendeur' && _selectedIndex > 4) {
+        // Ajusté pour 4 onglets (Accueil, Publicité, Vendre, Pièces)
+        if (role == 'vendeur' && _selectedIndex > 3) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             setState(() {
-              _selectedIndex = 4;
+              _selectedIndex = 3;
             });
           });
         }
@@ -528,29 +526,7 @@ class _AvantHomeState extends State<AvantHome> {
                   unselectedItemColor: Colors.black,
                   currentIndex: _selectedIndex,
                   onTap: (i) => _onItemTapped(i, role),
-                  items: role == 'acheteur'
-                      ? [
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.home, size: iconSize),
-                            label: 'Accueil',
-                          ),
-                          BottomNavigationBarItem(
-                            icon: Icon(
-                              Icons.directions_car,
-                              size: iconSize,
-                            ),
-                            label: 'Voitures',
-                          ),
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.build, size: iconSize),
-                            label: 'Pièces',
-                          ),
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.person, size: iconSize),
-                            label: 'Profil',
-                          ),
-                        ]
-                      : role == 'vendeur'
+                  items: role == 'vendeur'
                           ? [
                               BottomNavigationBarItem(
                                 icon: Icon(Icons.home, size: iconSize),
@@ -568,10 +544,6 @@ class _AvantHomeState extends State<AvantHome> {
                                 icon: Icon(Icons.build, size: iconSize),
                                 label: 'Pièces',
                               ),
-                              BottomNavigationBarItem(
-                                icon: Icon(Icons.chat, size: iconSize),
-                                label: 'Chat',
-                              ),
                             ]
                           : role == 'transitaire'
                               ? [
@@ -580,18 +552,31 @@ class _AvantHomeState extends State<AvantHome> {
                                     label: 'Accueil',
                                   ),
                                   BottomNavigationBarItem(
-                                    icon: Icon(Icons.workspace_premium,
-                                        size: iconSize),
-                                    label: 'Abonnement',
-                                  ),
-                                  BottomNavigationBarItem(
                                     icon: Icon(Icons.local_shipping,
                                         size: iconSize),
                                     label: 'Transits',
                                   ),
-                                  BottomNavigationBarItem(
-                                    icon: Icon(Icons.chat, size: iconSize),
-                                    label: 'Chat',
+                                ]
+                              : role == 'livreur'
+                                  ? [
+                                      BottomNavigationBarItem(
+                                        icon: Icon(Icons.home, size: iconSize),
+                                        label: 'Accueil',
+                                      ),
+                                      BottomNavigationBarItem(
+                                        icon: Icon(
+                                          Icons.directions_car,
+                                          size: iconSize,
+                                        ),
+                                        label: 'Voitures',
+                                      ),
+                                      BottomNavigationBarItem(
+                                        icon: Icon(Icons.build, size: iconSize),
+                                        label: 'Pièces',
+                                      ),
+                                      BottomNavigationBarItem(
+                                        icon: Icon(Icons.person, size: iconSize),
+                                        label: 'Profil',
                                   ),
                                 ]
                               : [

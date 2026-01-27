@@ -3,13 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:developer';
-import 'package:tranoo/services/user_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 import 'package:feexpay_flutter/feexpay_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:random_string/random_string.dart';
-import 'package:tranoo/data/screens/succes6.dart';
-import 'package:tranoo/data/screens/payment_success.dart';
-import 'package:tranoo/data/screens/payment_error.dart';
+import 'package:tranoo_pro/data/screens/succes6.dart';
+import 'package:tranoo_pro/data/screens/payment_success.dart';
+import 'package:tranoo_pro/data/screens/payment_error.dart';
 
 final fpToken = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
 final idUser = dotenv.env['ID_USER_FEEXPAY'] ?? '';

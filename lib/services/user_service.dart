@@ -52,8 +52,9 @@ class UserService extends ChangeNotifier {
   UserRole? get currentRole => _currentRole;
   bool get isTransitaire => _currentRole == UserRole.transitaire;
   bool get isVendeur => _currentRole == UserRole.vendeur;
-  bool get isAcheteur => _currentRole == UserRole.acheteur;
   bool get isChauffeur => _currentRole == UserRole.chauffeur;
+  bool get isAgentCommercial => _currentRole == UserRole.agentCommercial;
+  bool get isLivreur => _currentRole == UserRole.livreur;
 
   void setRole(UserRole role) {
     _currentRole = role;
@@ -81,6 +82,13 @@ class UserService extends ChangeNotifier {
     String? numeroIFU,
     String? entrepriseProvenance,
     String? referralCode,
+    // Champs véhicule (livreur/chauffeur)
+    String? vehiculeImmatriculation,
+    String? vehiculeType,
+    String? vehiculeMarque,
+    String? vehiculeModele,
+    String? vehiculeAnnee,
+    String? vehiculeCouleur,
   }) async {
     UserCredential? credential;
     try {
@@ -108,6 +116,18 @@ class UserService extends ChangeNotifier {
       if (entrepriseProvenance != null)
         data['entrepriseProvenance'] = entrepriseProvenance;
       if (referralCode != null) data['referralCode'] = referralCode;
+      
+      // Ajouter les données véhicule (livreur/chauffeur)
+      if (vehiculeImmatriculation != null || vehiculeType != null || vehiculeMarque != null) {
+        data['vehicule'] = {
+          if (vehiculeImmatriculation != null) 'immatriculation': vehiculeImmatriculation,
+          if (vehiculeType != null) 'type': vehiculeType,
+          if (vehiculeMarque != null) 'marque': vehiculeMarque,
+          if (vehiculeModele != null) 'modele': vehiculeModele,
+          if (vehiculeAnnee != null) 'annee': int.tryParse(vehiculeAnnee),
+          if (vehiculeCouleur != null) 'couleur': vehiculeCouleur,
+        };
+      }
 
       final response = await _dio.post(
         '/auth/register',

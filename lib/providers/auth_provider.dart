@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
-import 'package:tranoo/services/user_service.dart';
-import 'package:tranoo/utils/role_redirect.dart';
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/role_redirect.dart';
 // import 'package:flutter/foundation.dart' show kIsWeb; // unused
 import 'dart:io' show Platform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:logging/logging.dart';
-import 'package:tranoo/services/chat_service.dart';
-import 'package:tranoo/services/blocked_user_service.dart';
+import 'package:tranoo_pro/services/blocked_user_service.dart';
 
 class AuthProvider with ChangeNotifier {
   String? _token;
@@ -123,10 +122,6 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
     debugPrint('[AuthProvider] notifyListeners() après cache');
 
-    // Initialiser le WebSocket si l'utilisateur est connecté
-    if (_user != null) {
-      await ChatService().initializeSocket();
-    }
 
     // 2. Ensuite, écouter FirebaseAuth pour les changements d'état
     FirebaseAuth.instance.authStateChanges().listen((firebaseUser) async {
@@ -159,9 +154,6 @@ class AuthProvider with ChangeNotifier {
             debugPrint('[AuthProvider] _user après /protected/me: \n${_user}');
             await saveUserToPrefs(_token, _user);
             await _sendFcmTokenToBackend();
-
-            // Initialiser le WebSocket après connexion réussie
-            await ChatService().initializeSocket();
 
             if (_user != null && _user!['role'] != null) {
               final role = stringToUserRole(_user!['role']);
@@ -217,9 +209,6 @@ class AuthProvider with ChangeNotifier {
         await clearUserFromPrefs();
         UserService().clearRole();
 
-        // Déconnecter le WebSocket
-        ChatService().disconnect();
-
         _loading = false;
         debugPrint('[AuthProvider] _loading: $_loading, _user: $_user');
         notifyListeners();
@@ -244,9 +233,6 @@ class AuthProvider with ChangeNotifier {
     _user = null;
     await clearUserFromPrefs();
     UserService().clearRole();
-
-    // Déconnecter le WebSocket
-    ChatService().disconnect();
 
     notifyListeners();
   }
@@ -316,7 +302,6 @@ class AuthProvider with ChangeNotifier {
       _loading = false;
       
       UserService().clearRole();
-      ChatService().disconnect();
       
       notifyListeners();
       

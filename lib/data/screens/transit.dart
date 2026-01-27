@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import '../../services/user_service.dart';
-import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'discussion.dart';
 
 class Transit extends StatefulWidget {
   const Transit({super.key});
@@ -15,7 +13,6 @@ class Transit extends StatefulWidget {
 class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final UserService _userService = UserService();
-  final ChatService _chatService = ChatService();
   String? currentUserId;
   Map<String, dynamic>? currentUserData;
 
@@ -131,85 +128,6 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
     return parts.where((e) => e.toString().trim().isNotEmpty).join(', ');
   }
 
-  void _openDiscussion(Map<String, dynamic> article) async {
-    if (currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erreur: Utilisateur non connecté'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      print('DEBUG: Article data: $article');
-      print('DEBUG: Current user ID: $currentUserId');
-
-      // Vérifier que l'article a un ID (peut être 'id' ou '_id')
-      final articleId = article['_id'] ?? article['id'];
-      print('DEBUG: Article ID found: $articleId');
-
-      if (articleId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur: Article sans ID'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Récupérer l'ID du vendeur de l'article
-      final vendeurId =
-          article['vendeur']?['_id'] ??
-          article['vendeurId'] ??
-          article['vendeur'];
-      print('DEBUG: Vendeur ID: $vendeurId');
-
-      if (vendeurId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Erreur: Impossible de récupérer les informations du vendeur',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Créer ou récupérer la room de discussion
-      final room = await _chatService.createOrGetRoom(
-        user1Id: currentUserId!,
-        user2Id: vendeurId,
-        articleId: articleId,
-      );
-
-      if (room != null) {
-        // Naviguer vers la discussion
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => Discussion(roomId: room['_id'], roomData: room),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur lors de la création de la discussion'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Erreur lors de l\'ouverture de la discussion: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
 
   @override
   void dispose() {
@@ -310,27 +228,6 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
                   ),
                 ),
               ],
-            ),
-            trailing: ElevatedButton(
-              onPressed: () => _openDiscussion(item),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Discuter',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
             ),
             isThreeLine: true,
           ),

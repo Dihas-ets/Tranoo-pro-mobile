@@ -8,7 +8,6 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/user_service.dart';
-import 'payement.dart' show PayementScreen;
 
 // --------- HELPERS SÉCURISÉS ----------
 List<String> getNotifImages(Map notif) {
@@ -298,11 +297,9 @@ class VerificationDetailPage extends StatelessWidget {
                           _safeGetStringLocal(notification, 'relatedId');
                       if (articleId != null && articleId.isNotEmpty) {
                         // ignore: use_build_context_synchronously
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (ctx) =>
-                                PayementScreen(article: {'_id': articleId}),
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Cette fonctionnalité n\'est plus disponible'),
                           ),
                         );
                       } else {
@@ -894,13 +891,10 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                             _safeGetString(notification, 'relatedId');
                   }
                   if (articleId != null && articleId.isNotEmpty) {
-                    // Aller vers l'écran de paiement avec l'article minimal
                     // ignore: use_build_context_synchronously
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (ctx) =>
-                            PayementScreen(article: {'_id': articleId}),
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Cette fonctionnalité n\'est plus disponible'),
                       ),
                     );
                   } else {

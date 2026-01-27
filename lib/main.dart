@@ -13,21 +13,22 @@ import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart' as flutter_html;
-import 'package:tranoo/data/screens/avant_home.dart';
-import 'package:tranoo/services/user_service.dart';
-import 'package:tranoo/services/blocked_user_service.dart';
-import 'package:tranoo/services/push_otp_service.dart';
+import 'package:tranoo_pro/data/screens/avant_home.dart';
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/services/blocked_user_service.dart';
+import 'package:tranoo_pro/services/push_otp_service.dart';
+import 'package:tranoo_pro/utils/local_notification_service.dart';
 
 // import 'package:flutter/services.dart';
-import 'data/screens/marque.dart';
-import 'data/screens/tarif.dart';
-import 'firebase_options.dart';
-import 'providers/auth_provider.dart' as myauth;
-import 'providers/counter_provider.dart';
-import 'services/cart_service.dart';
-import 'package:tranoo/data/screens/reset/forgot_password_page.dart';
-import 'package:tranoo/data/screens/reset/verify_code_page.dart';
-import 'package:tranoo/data/screens/reset/create_new_password_page.dart';
+import 'package:tranoo_pro/config/backend_config.dart';
+import 'package:tranoo_pro/data/screens/marque.dart';
+import 'package:tranoo_pro/firebase_options.dart';
+import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
+import 'package:tranoo_pro/providers/counter_provider.dart';
+import 'package:tranoo_pro/services/cart_service.dart';
+import 'package:tranoo_pro/data/screens/reset/forgot_password_page.dart';
+import 'package:tranoo_pro/data/screens/reset/verify_code_page.dart';
+import 'package:tranoo_pro/data/screens/reset/create_new_password_page.dart';
 
 // Gestionnaire pour les notifications en arrière-plan
 @pragma('vm:entry-point')
@@ -106,7 +107,7 @@ class NotificationService {
 
       final idToken = await user.getIdToken();
       final response = await http.post(
-        Uri.parse('${getBaseUrl().replaceAll('/api', '')}/api/users/fcm-token'),
+        Uri.parse('${getBackendBaseUrl()}/api/users/fcm-token'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
@@ -127,11 +128,27 @@ class NotificationService {
   }
 
   void _showLocalNotification(RemoteMessage message) {
-    // Améliorer l'affichage des notifications locales
     _logger.info('Notification locale: ${message.notification?.title}');
-
-    // Ici tu peux ajouter une notification locale avec flutter_local_notifications
-    // si tu veux afficher des notifications même quand l'app est en premier plan
+    
+    // Afficher une notification locale visible même en foreground
+    if (message.data['type'] == 'otp') {
+      final code = message.data['code'] as String?;
+      if (code != null && code.isNotEmpty) {
+        LocalNotificationService.showOTPNotification(code);
+      } else {
+        // Fallback: extraire depuis body
+        final body = message.notification?.body ?? '';
+        final match = RegExp(r'(\d{6})').firstMatch(body);
+        if (match != null) {
+          LocalNotificationService.showOTPNotification(match.group(1)!);
+        }
+      }
+    } else {
+      LocalNotificationService.showNotification(
+        message.notification?.title ?? 'Tranoo',
+        message.notification?.body ?? '',
+      );
+    }
   }
 
   void _handleNotificationTap(RemoteMessage message) {
@@ -143,10 +160,6 @@ class NotificationService {
     // Exemple de navigation selon le type de notification
     if (message.data.containsKey('type')) {
       switch (message.data['type']) {
-        case 'chat':
-          // Naviguer vers la page de chat spécifique
-          _logger.info('Navigation vers chat: ${message.data['roomId']}');
-          break;
         case 'publicite':
           // Naviguer vers la page des publicités
           _logger.info('Navigation vers publicités');
@@ -170,19 +183,68 @@ class NotificationService {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  try {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  } catch (e) {
+    print('Erreur SystemChrome: $e');
+  }
+
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    print('Firebase initialisé avec succès');
+  } catch (e, stackTrace) {
+    print('ERREUR Firebase initialization: $e');
+    print('Stack trace: $stackTrace');
+    // Continuer même si Firebase échoue pour voir où ça bloque
+  }
+
   // Charger les variables d'environnement
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+    print('Fichier .env chargé');
+  } catch (e) {
+    print('Avertissement: Fichier .env non trouvé ou erreur: $e');
+    // Continuer sans .env si ce n'est pas critique
+  }
+
+  // Initialiser le service de notifications locales
+  try {
+    await LocalNotificationService.initialize();
+    print('LocalNotificationService initialisé');
+  } catch (e) {
+    print('Erreur LocalNotificationService: $e');
+  }
+
   // Initialiser le service de notifications
-  await NotificationService().initialize();
+  try {
+    await NotificationService().initialize();
+    print('NotificationService initialisé');
+  } catch (e) {
+    print('Erreur NotificationService: $e');
+    // Continuer même si les notifications échouent
+  }
 
   // Initialiser le service OTP Push
-  await PushOTPService.initialize();
+  try {
+    await PushOTPService.initialize();
+    print('PushOTPService initialisé');
+  } catch (e) {
+    print('Erreur PushOTPService: $e');
+    // Continuer même si OTP Push échoue
+  }
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => myauth.AuthProvider()),
+        ChangeNotifierProvider(create: (_) {
+          try {
+            return myauth.AuthProvider();
+          } catch (e) {
+            print('ERREUR AuthProvider: $e');
+            rethrow;
+          }
+        }),
         ChangeNotifierProvider(create: (_) => CounterProvider()),
         ChangeNotifierProvider(create: (_) => CartService()),
       ],
@@ -217,34 +279,21 @@ class MyApp extends StatelessWidget {
       home: const AppInitializer(),
       routes: {
         '/marque': (context) => const Marque(),
-        '/subscription-success': (context) => _buildSubscriptionSuccessPage(),
-        '/subscription-error': (context) => _buildSubscriptionErrorPage(),
         '/verification-success': (context) => _buildVerificationSuccessPage(),
         '/verification-error': (context) => _buildVerificationErrorPage(),
-        '/tarif': (context) => const Tarif(),
         '/auth/forgot-password': (context) => const ForgotPasswordPage(),
         '/auth/verify-reset': (context) => const VerifyResetCodePage(),
         '/auth/create-password': (context) {
           final args = ModalRoute.of(context)?.settings.arguments
               as Map<String, dynamic>?;
           return CreateNewPasswordPage(
-            telephone: args?['telephone'] ?? '',
-            otpCode: args?['otpCode'] ?? '',
+            requestId: args?['requestId'] ?? '',
+            deviceId: args?['deviceId'] ?? '',
           );
         },
       },
     );
   }
-}
-
-// Gestion du succès de paiement d'abonnement
-Widget _buildSubscriptionSuccessPage() {
-  return SubscriptionSuccessPage();
-}
-
-// Gestion de l'échec de paiement d'abonnement
-Widget _buildSubscriptionErrorPage() {
-  return SubscriptionErrorPage();
 }
 
 // Gestion du succès de paiement de vérification
@@ -255,119 +304,6 @@ Widget _buildVerificationSuccessPage() {
 // Gestion de l'échec de paiement de vérification
 Widget _buildVerificationErrorPage() {
   return VerificationErrorPage();
-}
-
-class SubscriptionSuccessPage extends StatefulWidget {
-  @override
-  _SubscriptionSuccessPageState createState() =>
-      _SubscriptionSuccessPageState();
-}
-
-class _SubscriptionSuccessPageState extends State<SubscriptionSuccessPage> {
-  @override
-  void initState() {
-    super.initState();
-    _handleSubscriptionSuccess();
-  }
-
-  Future<void> _handleSubscriptionSuccess() async {
-    try {
-      final user = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final token = await user.getIdToken();
-
-      // 1. Enregistrer le paiement
-      final paymentResponse = await http.post(
-        Uri.parse('${getBaseUrl()}/payments/feexpay/flutter/record'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'transKey': 'SUBSCRIPTION_${DateTime.now().millisecondsSinceEpoch}',
-          'amount': 5,
-          'description': 'Abonnement Premium Transitaire - 1 mois',
-          'type': 'subscription',
-          'status': 'success',
-        }),
-      );
-      print(
-        'Paiement enregistré: ${paymentResponse.statusCode} - ${paymentResponse.body}',
-      );
-
-      // 2. Activer l'abonnement
-      final response = await http.post(
-        Uri.parse('${getBaseUrl()}/subscription/subscribe'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'plan': 'monthly'}),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Abonnement activé avec succès');
-      }
-    } catch (e) {
-      print('Erreur activation abonnement: $e');
-    }
-
-    // Redirection après 2 secondes
-    await Future.delayed(Duration(seconds: 2));
-    if (mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil('/tarif', (route) => false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Color(0xFFFFCC00)),
-            SizedBox(height: 16),
-            Text('Activation de votre abonnement...'),
-            SizedBox(height: 8),
-            Text(
-              'Redirection automatique vers vos tarifs',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class SubscriptionErrorPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error, color: Colors.red, size: 64),
-            SizedBox(height: 16),
-            Text(
-              'Paiement échoué',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => Navigator.of(
-                context,
-              ).pushNamedAndRemoveUntil('/tarif', (route) => false),
-              child: Text('Retourner aux tarifs'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class VerificationSuccessPage extends StatefulWidget {
@@ -487,11 +423,29 @@ class AppInitializer extends StatefulWidget {
   State<AppInitializer> createState() => _AppInitializerState();
 }
 
-class _AppInitializerState extends State<AppInitializer> {
+class _AppInitializerState extends State<AppInitializer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _carController;
+  late final Animation<double> _carOffset;
+
   @override
   void initState() {
     super.initState();
+    _carController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _carOffset = Tween<double>(begin: -0.3, end: 0.3).animate(
+      CurvedAnimation(parent: _carController, curve: Curves.easeInOut),
+    );
+    _carController.repeat(reverse: true);
     _checkUserStatus();
+  }
+
+  @override
+  void dispose() {
+    _carController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkUserStatus() async {
@@ -652,7 +606,73 @@ class _AppInitializerState extends State<AppInitializer> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final size = MediaQuery.of(context).size;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  color: Colors.white,
+                  child: Image.asset(
+                    'assets/images/logo_tramoo.png',
+                    width: size.width * 0.4,
+                    cacheWidth: (size.width * 0.4).toInt(),
+                    filterQuality: FilterQuality.low,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Tranoo Pro',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: size.height * 0.18,
+            left: 0,
+            right: 0,
+            child: SizedBox(
+              height: size.height * 0.16,
+              child: AnimatedBuilder(
+                animation: _carController,
+                builder: (context, _) {
+                  return Transform.translate(
+                    offset: Offset(_carOffset.value * size.width, 0),
+                    child: Icon(
+                      Icons.directions_car,
+                      size: size.width * 0.2,
+                      color: Colors.black,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: size.height * 0.08,
+            left: size.width * 0.2,
+            right: size.width * 0.2,
+            child: const LinearProgressIndicator(
+              backgroundColor: Colors.grey,
+              color: Colors.black87,
+              minHeight: 4,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
