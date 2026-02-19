@@ -10,17 +10,16 @@ import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
 import 'package:tranoo_pro/data/screens/vendre.dart';
-import 'package:tranoo_pro/data/screens/voitures.dart';
 
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/providers/counter_provider.dart';
 
 import 'connexion_page.dart';
-import 'package:tranoo_pro/data/screens/driver_certified.dart';
 import 'package:tranoo_pro/data/screens/second_page.dart';
 import 'package:tranoo_pro/data/screens/une.dart';
 import 'package:tranoo_pro/data/screens/livreur_home.dart';
+import 'package:tranoo_pro/data/screens/chauffeur_home.dart';
 
 class AvantHome extends StatefulWidget {
   const AvantHome({super.key});
@@ -79,12 +78,12 @@ class _AvantHomeState extends State<AvantHome> {
     setState(() {
       _selectedIndex = index;
     });
-    if (role == 'chauffeur' && index == 3) {
+    if (role == 'chauffeur' && index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const DriverCertifiedPage()),
+        MaterialPageRoute(builder: (context) => const Profile()),
       );
-    } else if (role == 'livreur' && index == 3) {
+    } else if (role == 'livreur' && index == 1) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const Profile()),
@@ -93,16 +92,12 @@ class _AvantHomeState extends State<AvantHome> {
   }
 
   final List<Widget> _pagesChauffeur = [
-    Marque(),
-    VoituresPage(),
-    Piece(),
-    DriverCertifiedPage(),
+    const ChauffeurHomePage(),
+    const Profile(),
   ];
 
   final List<Widget> _pagesLivreur = [
     const LivreurHomePage(),
-    VoituresPage(),
-    Piece(),
     const Profile(),
   ];
 
@@ -141,8 +136,7 @@ class _AvantHomeState extends State<AvantHome> {
                 CircleAvatar(
                   radius: 70,
                   backgroundColor: Colors.grey[300],
-                  backgroundImage:
-                      hasPhoto ? NetworkImage(photoUrl) : null,
+                  backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
                   child: hasPhoto
                       ? null
                       : const Icon(
@@ -389,12 +383,13 @@ class _AvantHomeState extends State<AvantHome> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Builder(builder: (context) {
-                                  final photoUrl = (user['photo'] as String?) ?? '';
+                                  final photoUrl =
+                                      (user['photo'] as String?) ?? '';
                                   final hasPhoto = photoUrl.isNotEmpty;
                                   return GestureDetector(
                                     onTap: () => _showAvatarDialog(photoUrl),
-                                  child: CircleAvatar(
-                                    radius: avatarRadius,
+                                    child: CircleAvatar(
+                                      radius: avatarRadius,
                                       backgroundColor: Colors.grey[300],
                                       backgroundImage: hasPhoto
                                           ? NetworkImage(photoUrl)
@@ -404,9 +399,9 @@ class _AvantHomeState extends State<AvantHome> {
                                               Icons.person_outline,
                                               size: avatarRadius * 0.9,
                                               color: Colors.grey[700],
-                                          )
+                                            )
                                           : null,
-                                  ),
+                                    ),
                                   );
                                 }),
                                 SizedBox(height: spacing),
@@ -527,80 +522,68 @@ class _AvantHomeState extends State<AvantHome> {
                   currentIndex: _selectedIndex,
                   onTap: (i) => _onItemTapped(i, role),
                   items: role == 'vendeur'
+                      ? [
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.home, size: iconSize),
+                            label: 'Accueil',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.campaign, size: iconSize),
+                            label: 'Publicité',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.sell, size: iconSize),
+                            label: 'Vendre',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.build, size: iconSize),
+                            label: 'Pièces',
+                          ),
+                        ]
+                      : role == 'transitaire'
                           ? [
                               BottomNavigationBarItem(
                                 icon: Icon(Icons.home, size: iconSize),
                                 label: 'Accueil',
                               ),
                               BottomNavigationBarItem(
-                                icon: Icon(Icons.campaign, size: iconSize),
-                                label: 'Publicité',
-                              ),
-                              BottomNavigationBarItem(
-                                icon: Icon(Icons.sell, size: iconSize),
-                                label: 'Vendre',
-                              ),
-                              BottomNavigationBarItem(
-                                icon: Icon(Icons.build, size: iconSize),
-                                label: 'Pièces',
+                                icon:
+                                    Icon(Icons.local_shipping, size: iconSize),
+                                label: 'Transits',
                               ),
                             ]
-                          : role == 'transitaire'
+                          : role == 'livreur'
                               ? [
                                   BottomNavigationBarItem(
                                     icon: Icon(Icons.home, size: iconSize),
                                     label: 'Accueil',
                                   ),
                                   BottomNavigationBarItem(
-                                    icon: Icon(Icons.local_shipping,
-                                        size: iconSize),
-                                    label: 'Transits',
+                                    icon: Icon(Icons.person, size: iconSize),
+                                    label: 'Profil',
                                   ),
                                 ]
-                              : role == 'livreur'
+                              : role == 'chauffeur'
                                   ? [
                                       BottomNavigationBarItem(
                                         icon: Icon(Icons.home, size: iconSize),
                                         label: 'Accueil',
                                       ),
                                       BottomNavigationBarItem(
-                                        icon: Icon(
-                                          Icons.directions_car,
-                                          size: iconSize,
-                                        ),
-                                        label: 'Voitures',
+                                        icon: Icon(Icons.person, size: iconSize),
+                                        label: 'Profil',
                                       ),
+                                    ]
+                                  : [
                                       BottomNavigationBarItem(
-                                        icon: Icon(Icons.build, size: iconSize),
-                                        label: 'Pièces',
+                                        icon: Icon(Icons.home, size: iconSize),
+                                        label: 'Accueil',
                                       ),
                                       BottomNavigationBarItem(
                                         icon: Icon(Icons.person, size: iconSize),
                                         label: 'Profil',
-                                  ),
-                                ]
-                              : [
-                                  // Chauffeurs et autres rôles
-                                  BottomNavigationBarItem(
-                                    icon: Icon(Icons.home, size: iconSize),
-                                    label: 'Accueil',
-                                  ),
-                                  BottomNavigationBarItem(
-                                    icon: Icon(
-                                      Icons.directions_car,
-                                      size: iconSize,
-                                    ),
-                                    label: 'Voitures',
-                                  ),
-                                  BottomNavigationBarItem(
-                                    icon: Icon(Icons.build, size: iconSize),
-                                    label: 'Pièces',
-                                  ),
-                                  BottomNavigationBarItem(
-                                    icon: Icon(Icons.person, size: iconSize),
-                                    label: 'Profil',
-                                  ),
-                                ],
+                                      ),
+                                    ],
                 ),
         );
       },

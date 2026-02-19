@@ -54,9 +54,9 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
         headers: {'Authorization': 'Bearer $idToken'},
       );
 
-      // Charger les livraisons complétées
+      // Charger l'historique des livraisons (terminées / refusées / annulées)
       final completedRes = await http.get(
-        Uri.parse('$baseUrl/api/livreurs/deliveries/completed'),
+        Uri.parse('$baseUrl/api/livreurs/deliveries/history'),
         headers: {'Authorization': 'Bearer $idToken'},
       );
 

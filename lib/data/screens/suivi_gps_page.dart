@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+// ——— Google Maps (grisé — réactiver si clé API) ———
+// import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:latlong2/latlong.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
+import 'package:tranoo_pro/data/screens/osm_map_widget.dart';
 
 class SuiviGpsPage extends StatefulWidget {
   const SuiviGpsPage({super.key});
@@ -14,13 +17,13 @@ class SuiviGpsPage extends StatefulWidget {
 }
 
 class _SuiviGpsPageState extends State<SuiviGpsPage> {
-  GoogleMapController? _mapController;
+  // ——— Google Maps (grisé) ———
+  // GoogleMapController? _mapController;
   Position? _currentPosition;
   List<Map<String, dynamic>> _activeDeliveries = [];
-  Set<Polyline> _polylines = {};
-  Set<Marker> _markers = {};
+  List<OsmMarkerData> _osmMarkers = [];
+  List<LatLng>? _polylinePoints;
   bool _loading = true;
-  bool _isTracking = false;
 
   @override
   void initState() {
@@ -76,135 +79,59 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
   }
 
   void _setupMap() {
-    if (_currentPosition == null) return;
+    final list = <OsmMarkerData>[];
+    List<LatLng>? poly;
 
-    // Marqueur position actuelle
-    _markers.add(
-      Marker(
-        markerId: const MarkerId('current_position'),
-        position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        infoWindow: const InfoWindow(title: 'Ma position'),
-      ),
-    );
-
-    // Marqueurs et tracés pour chaque livraison active
-    for (var delivery in _activeDeliveries) {
-      final lieuDepart = delivery['lieuDepart'] ?? {};
-      final lieuDestination = delivery['lieuDestination'] ?? {};
-      final locationHistory = delivery['locationHistory'] ?? [];
-
-      // Marqueur départ
-      if (lieuDepart['latitude'] != null && lieuDepart['longitude'] != null) {
-        _markers.add(
-          Marker(
-            markerId: MarkerId('depart_${delivery['_id']}'),
-            position: LatLng(
-              lieuDepart['latitude'].toDouble(),
-              lieuDepart['longitude'].toDouble(),
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-            infoWindow: InfoWindow(
-              title: 'Départ',
-              snippet: lieuDepart['adresse'] ?? '',
-            ),
-          ),
-        );
-      }
-
-      // Marqueur destination
-      if (lieuDestination['latitude'] != null &&
-          lieuDestination['longitude'] != null) {
-        _markers.add(
-          Marker(
-            markerId: MarkerId('destination_${delivery['_id']}'),
-            position: LatLng(
-              lieuDestination['latitude'].toDouble(),
-              lieuDestination['longitude'].toDouble(),
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            infoWindow: InfoWindow(
-              title: 'Destination',
-              snippet: lieuDestination['adresse'] ?? '',
-            ),
-          ),
-        );
-
-        // Tracé jaune du départ à la destination
-        if (lieuDepart['latitude'] != null &&
-            lieuDepart['longitude'] != null) {
-          _polylines.add(
-            Polyline(
-              polylineId: PolylineId('route_${delivery['_id']}'),
-              points: [
-                LatLng(
-                  lieuDepart['latitude'].toDouble(),
-                  lieuDepart['longitude'].toDouble(),
-                ),
-                LatLng(
-                  lieuDestination['latitude'].toDouble(),
-                  lieuDestination['longitude'].toDouble(),
-                ),
-              ],
-              color: const Color(0xFFF8BF13), // Jaune Tranoo
-              width: 5,
-              patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-            ),
-          );
-        }
-      }
-
-      // Tracé de l'historique GPS (jaune continu)
-      if (locationHistory.isNotEmpty) {
-        List<LatLng> historyPoints = [];
-        for (var location in locationHistory) {
-          if (location['latitude'] != null && location['longitude'] != null) {
-            historyPoints.add(
-              LatLng(
-                location['latitude'].toDouble(),
-                location['longitude'].toDouble(),
-              ),
-            );
-          }
-        }
-        if (historyPoints.length > 1) {
-          _polylines.add(
-            Polyline(
-              polylineId: PolylineId('history_${delivery['_id']}'),
-              points: historyPoints,
-              color: const Color(0xFFF8BF13), // Jaune Tranoo
-              width: 4,
-            ),
-          );
-        }
-      }
-    }
-
-    setState(() {});
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
     if (_currentPosition != null) {
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          14.0,
-        ),
-      );
+      list.add(OsmMarkerData(
+        point: positionToLatLng(_currentPosition!),
+        iconData: Icons.my_location,
+        color: Colors.blue,
+      ));
     }
+
+    for (var delivery in _activeDeliveries) {
+      final lieuDepart = delivery['lieuDepart'] as Map<String, dynamic>?;
+      final lieuDestination =
+          delivery['lieuDestination'] as Map<String, dynamic>?;
+      final locationHistory = delivery['locationHistory'] as List? ?? [];
+
+      final p1 = latLngFromMap(lieuDepart);
+      final p2 = latLngFromMap(lieuDestination);
+      if (p1 != null) {
+        list.add(OsmMarkerData(
+            point: p1, iconData: Icons.store, color: Colors.green));
+      }
+      if (p2 != null) {
+        list.add(OsmMarkerData(
+            point: p2, iconData: Icons.person_pin, color: Colors.red));
+      }
+      if (poly == null && p1 != null && p2 != null) {
+        poly = [p1, p2];
+      }
+      if (poly == null && locationHistory.isNotEmpty) {
+        final pts = <LatLng>[];
+        for (var loc in locationHistory) {
+          final ll = latLngFromMap(loc as Map<String, dynamic>?);
+          if (ll != null) pts.add(ll);
+        }
+        if (pts.length > 1) poly = pts;
+      }
+    }
+
+    setState(() {
+      _osmMarkers = list;
+      _polylinePoints = poly;
+    });
   }
+
+  // ——— Google Maps (grisé) ———
+  // void _onMapCreated(GoogleMapController controller) { ... }
+  // Future<void> _centerOnCurrentLocation() async { ... }
 
   Future<void> _centerOnCurrentLocation() async {
     await _getCurrentLocation();
-    if (_currentPosition != null && _mapController != null) {
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          15.0,
-        ),
-      );
-    }
+    _setupMap();
   }
 
   @override
@@ -239,20 +166,15 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
       ),
       body: Stack(
         children: [
-          GoogleMap(
-            onMapCreated: _onMapCreated,
-            initialCameraPosition: CameraPosition(
-              target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-              zoom: 14.0,
-            ),
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            markers: _markers,
-            polylines: _polylines,
-            mapType: MapType.normal,
-            zoomControlsEnabled: false,
-            compassEnabled: true,
+          OsmMapWidget(
+            center: positionToLatLng(_currentPosition!),
+            zoom: 14,
+            markers: _osmMarkers,
+            polylinePoints: _polylinePoints,
+            onTapMyLocation: _centerOnCurrentLocation,
           ),
+          // ——— Google Maps (grisé) ———
+          // GoogleMap( ... ),
           // Légende
           Positioned(
             top: 16,
@@ -457,7 +379,7 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
 
   @override
   void dispose() {
-    _mapController?.dispose();
+    // _mapController?.dispose(); ——— Google Maps (grisé)
     super.dispose();
   }
 }

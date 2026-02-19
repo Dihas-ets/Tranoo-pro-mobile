@@ -14,7 +14,10 @@ import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/mes_livraisons_page.dart';
 import 'package:tranoo_pro/data/screens/suivi_gps_page.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
+import 'package:tranoo_pro/data/screens/delivery_notification_banner.dart';
+import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
+import 'dart:async';
 
 class LivreurHomePage extends StatefulWidget {
   const LivreurHomePage({super.key});
@@ -34,11 +37,76 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   bool _loading = true;
   int _unreadNotifications = 0;
   Map<String, dynamic>? _userData;
+  Map<String, dynamic>? _currentDeliveryNotification;
+  Timer? _notificationPollTimer;
+  StreamSubscription<Position>? _locationSubscription;
+  DateTime? _lastDeliveryLocationSentAt;
+  // État pour le glissement du bouton "Compléter" par livraison
+  Map<String, double> _swipeCompleteValues = {};
+  final Set<String> _openingDeliveryFlowIds = <String>{};
+
+  Future<Map<String, dynamic>?> _fetchDeliveryDetails(String deliveryId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      if (idToken == null) return null;
+
+      final baseUrl = getBackendBaseUrl();
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/deliveries/$deliveryId'),
+        headers: {'Authorization': 'Bearer $idToken'},
+      );
+      if (res.statusCode != 200) return null;
+
+      final data = jsonDecode(res.body);
+      if (data is Map<String, dynamic>) {
+        final delivery = data['delivery'];
+        if (delivery is Map<String, dynamic>) return delivery;
+        if (delivery is Map) return Map<String, dynamic>.from(delivery);
+        return data;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _openDeliveryMap(dynamic maybeIdOrDelivery) async {
+    // maybeIdOrDelivery peut être un String id ou une Map delivery
+    String? id;
+    Map<String, dynamic>? delivery;
+    if (maybeIdOrDelivery is Map<String, dynamic>) {
+      delivery = maybeIdOrDelivery;
+      id = maybeIdOrDelivery['_id']?.toString() ?? maybeIdOrDelivery['id']?.toString();
+    } else if (maybeIdOrDelivery != null) {
+      id = maybeIdOrDelivery.toString();
+    }
+
+    if (id != null && id.trim().isNotEmpty) {
+      final fetched = await _fetchDeliveryDetails(id);
+      if (fetched != null) delivery = fetched;
+    }
+
+    if (!mounted || delivery == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DeliveryMapScreen(delivery: delivery!),
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _initializePage();
+  }
+
+  @override
+  void dispose() {
+    _notificationPollTimer?.cancel();
+    _locationSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializePage() async {
@@ -97,18 +165,68 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
           'timestamp': DateTime.now().toIso8601String(),
         }),
       );
+
+      // IMPORTANT: si le livreur a une livraison active (assigné/en_cours),
+      // on pousse aussi la localisation sur la Delivery pour le tracking acheteur.
+      await _updateActiveDeliveryLocation(position, idToken, baseUrl);
     } catch (e) {
       print('Erreur mise à jour localisation: $e');
     }
   }
 
+  Future<void> _updateActiveDeliveryLocation(
+    Position position,
+    String idToken,
+    String baseUrl,
+  ) async {
+    try {
+      // Throttle pour éviter le spam réseau
+      final now = DateTime.now();
+      if (_lastDeliveryLocationSentAt != null &&
+          now.difference(_lastDeliveryLocationSentAt!) <
+              const Duration(seconds: 5)) {
+        return;
+      }
+
+      if (_activeDeliveries.isEmpty) return;
+
+      // On prend la première livraison active (souvent une seule)
+      final delivery = _activeDeliveries.first;
+      final rawId = delivery['_id']?.toString() ?? delivery['id']?.toString();
+      if (rawId == null || rawId.trim().isEmpty) return;
+      final deliveryId = rawId.replaceAll('"', '').replaceAll("'", '').trim();
+
+      final url = Uri.parse('$baseUrl/api/deliveries/$deliveryId/location');
+      final res = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          // Address optionnelle (pas toujours disponible ici)
+        }),
+      );
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        _lastDeliveryLocationSentAt = now;
+      }
+    } catch (e) {
+      // Ne pas bloquer l'app si tracking échoue
+      print('Erreur update delivery location: $e');
+    }
+  }
+
   void _startLocationTracking() {
-    Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
+    _locationSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10, // Mettre à jour tous les 10 mètres
       ),
     ).listen((position) {
+      if (!mounted) return;
       setState(() {
         _currentPosition = position;
       });
@@ -163,9 +281,16 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
       if (pendingRes.statusCode == 200) {
         final data = jsonDecode(pendingRes.body);
+        final pending =
+            List<Map<String, dynamic>>.from(data['deliveries'] ?? []);
         setState(() {
-          _pendingDeliveries =
-              List<Map<String, dynamic>>.from(data['deliveries'] ?? []);
+          _pendingDeliveries = pending;
+          // Afficher le cadran de notification avec la première livraison en attente (par le bas)
+          if (_isOnline &&
+              pending.isNotEmpty &&
+              _currentDeliveryNotification == null) {
+            _currentDeliveryNotification = pending.first;
+          }
         });
       }
 
@@ -288,29 +413,37 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     }
   }
 
-  Future<void> _completeDelivery(String deliveryId) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      final idToken = await user?.getIdToken();
-      if (idToken == null) return;
+  Future<void> _completeDelivery(
+    String deliveryId,
+    Map<String, dynamic> delivery,
+    double screenW,
+  ) async {
+    // Ici "Compléter" = ouvrir la suite (GPS + overlay fournisseur/acheteur + swipe),
+    // déjà implémentée dans DeliveryMapScreen + delivery_flow_screens.dart.
+    if (_openingDeliveryFlowIds.contains(deliveryId)) return;
+    _openingDeliveryFlowIds.add(deliveryId);
 
-      final baseUrl = getBackendBaseUrl();
-      final res = await http.post(
-        Uri.parse('$baseUrl/api/livreurs/deliveries/$deliveryId/complete'),
-        headers: {'Authorization': 'Bearer $idToken'},
-      );
-
-      if (res.statusCode == 200) {
-        await _loadData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Livraison complétée avec succès')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: ${e.toString()}')),
-      );
+    if (mounted) {
+      setState(() {
+        _swipeCompleteValues[deliveryId] = screenW; // passe en vert avant redirection
+      });
     }
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DeliveryMapScreen(delivery: delivery),
+      ),
+    );
+
+    // Reset UI après retour
+    if (mounted) {
+      setState(() {
+        _swipeCompleteValues[deliveryId] = 0.0;
+      });
+    }
+    _openingDeliveryFlowIds.remove(deliveryId);
   }
 
   @override
@@ -331,25 +464,51 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF5F5F5),
-          body: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildHeader(size, isPortrait),
-                        _buildQuickActions(size, isPortrait),
-                        _buildStatsCards(size, isPortrait),
-                        _buildServicesGrid(size, isPortrait),
-                        _buildActiveDeliveries(size, isPortrait),
-                        _buildPendingDeliveries(size, isPortrait),
-                        const SizedBox(height: 20),
-                      ],
+          body: Stack(
+            children: [
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _loadData,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          children: [
+                            _buildHeader(size, isPortrait),
+                            _buildQuickActions(size, isPortrait),
+                            _buildStatsCards(size, isPortrait),
+                            _buildServicesGrid(size, isPortrait),
+                            _buildActiveDeliveries(size, isPortrait),
+                            _buildPendingDeliveries(size, isPortrait),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+              // Bannière de notification de livraison (affichée même hors ligne, mais bouton désactivé)
+              if (_currentDeliveryNotification != null)
+                DeliveryNotificationBanner(
+                  delivery: _currentDeliveryNotification!,
+                  isOnline: _isOnline,
+                  currentPosition: _currentPosition,
+                  onAccepted: (acceptedDelivery) {
+                    final fallbackId = _currentDeliveryNotification?['_id'] ??
+                        _currentDeliveryNotification?['id'];
+                    setState(() {
+                      _currentDeliveryNotification = null;
+                    });
+                    _loadData();
+                    // Ouvrir directement la page GPS + overlay (toujours avec une livraison "complète")
+                    _openDeliveryMap(acceptedDelivery ?? fallbackId);
+                  },
+                  onDismissed: () {
+                    setState(() {
+                      _currentDeliveryNotification = null;
+                    });
+                  },
                 ),
+            ],
+          ),
           floatingActionButton: FloatingActionButton(
             onPressed: _toggleOnlineStatus,
             backgroundColor: _isOnline ? Colors.green : Colors.grey,
@@ -392,27 +551,49 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
               ),
               GestureDetector(
                 onTap: () {
-                  // Naviguer vers le profil
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const Profile()),
                   );
                 },
-                child: CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey[300],
-                  backgroundImage: _userData?['photo'] != null &&
-                          (_userData!['photo'] as String).isNotEmpty
-                      ? NetworkImage(_userData!['photo'] as String)
-                      : null,
-                  child: _userData?['photo'] == null ||
-                          (_userData!['photo'] as String).isEmpty
-                      ? const Icon(
-                          Icons.person_outline,
-                          color: Colors.white,
-                          size: 24,
-                        )
-                      : null,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: _userData?['photo'] != null &&
+                              (_userData!['photo'] as String).isNotEmpty
+                          ? NetworkImage(_userData!['photo'] as String)
+                          : null,
+                      child: _userData?['photo'] == null ||
+                              (_userData!['photo'] as String).isEmpty
+                          ? const Icon(
+                              Icons.person_outline,
+                              color: Colors.white,
+                              size: 24,
+                            )
+                          : null,
+                    ),
+                    if (_userData?['photo'] == null ||
+                        (_userData!['photo'] as String).isEmpty)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.error_outline,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -431,7 +612,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Solde Principal',
+                        'Portefeuille',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 14,
@@ -508,12 +689,20 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildQuickActionIcon(
-                Icons.qr_code_scanner,
-                'Scanner QR',
-                const Color(0xFFF8BF13),
-                () => _scanQRCode(),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WalletScreen(),
+                      ),
+                    );
+                  },
+                  child: _buildBalanceVisibilityCard(),
+                ),
               ),
+              const SizedBox(width: 8),
               _buildQuickActionIcon(
                 Icons.local_shipping,
                 'Mes Livraisons',
@@ -543,12 +732,58 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     );
   }
 
-  Future<void> _scanQRCode() async {
-    // TODO: Implémenter le scanner QR
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Scanner QR - Fonctionnalité à venir'),
-        backgroundColor: Color(0xFFF8BF13),
+  bool _isBalanceHidden = false;
+
+  Widget _buildBalanceVisibilityCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.purple.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.purple.withOpacity(0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.account_balance_wallet_outlined,
+            color: Colors.purple,
+            size: 24,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Portefeuille',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _balance != null
+                ? NumberFormat.currency(
+                    locale: 'fr_FR',
+                    symbol: '$_currency ',
+                  ).format(_balance)
+                : '--',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.purple,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -681,26 +916,12 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         'label': 'Notifications',
         'color': Colors.red
       },
-      {'icon': Icons.check_circle, 'label': 'Valider', 'color': Colors.green},
-      {'icon': Icons.map, 'label': 'Géolocalisation', 'color': Colors.blue},
-      {
-        'icon': Icons.track_changes,
-        'label': 'Suivi',
-        'color': const Color(0xFFF8BF13)
-      },
       {
         'icon': Icons.local_shipping,
         'label': 'Livraisons',
         'color': Colors.orange
       },
       {'icon': Icons.history, 'label': 'Historique', 'color': Colors.purple},
-      {'icon': Icons.qr_code, 'label': 'Scanner', 'color': Colors.teal},
-      {
-        'icon': Icons.account_balance_wallet,
-        'label': 'Portefeuille',
-        'color': Colors.indigo
-      },
-      {'icon': Icons.settings, 'label': 'Paramètres', 'color': Colors.grey},
     ];
 
     return Container(
@@ -761,6 +982,13 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
             context,
             MaterialPageRoute(builder: (context) => const Notifications()),
           );
+        } else if (label == 'Tricycle') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ChauffeurTricycleHomePage(),
+            ),
+          );
         }
         // Ajouter d'autres navigations selon les besoins
       },
@@ -810,7 +1038,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Livraisons Actives',
+            'Livraisons actives',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -845,7 +1073,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Livraisons en Attente',
+            'Livraisons en attente',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -860,6 +1088,9 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   }
 
   Widget _buildDeliveryCard(Map<String, dynamic> delivery, bool isActive) {
+    final lieuDestination = delivery['lieuDestination'] ?? {};
+    final distanceKm = delivery['distanceKm'] ?? 0;
+    final fraisLivraison = delivery['fraisLivraison'] ?? 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -880,7 +1111,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Livraison #${delivery['id'] ?? 'N/A'}',
+                'Livraison #${delivery['_id']?.toString().substring(0, 8) ?? 'N/A'}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -904,8 +1135,10 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
             ],
           ),
           const SizedBox(height: 8),
-          Text('Destination: ${delivery['destination'] ?? 'N/A'}'),
-          Text('Montant: ${delivery['amount'] ?? 0} ${_currency}'),
+          Text(
+              'Destination: ${lieuDestination['adresse'] ?? 'Non renseignée'}'),
+          Text('Distance: ${distanceKm.toStringAsFixed(1)} km'),
+          Text('Frais livraison: $fraisLivraison $_currency'),
           const SizedBox(height: 8),
           if (!isActive)
             ElevatedButton(
@@ -917,15 +1150,96 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
               child: const Text('Accepter'),
             )
           else
-            ElevatedButton(
-              onPressed: () => _completeDelivery(delivery['id'] ?? ''),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Compléter'),
-            ),
+            _buildSwipeCompleteButton(delivery),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSwipeCompleteButton(Map<String, dynamic> delivery) {
+    final deliveryId = delivery['_id']?.toString() ?? delivery['id']?.toString() ?? '';
+    final swipeValue = _swipeCompleteValues[deliveryId] ?? 0.0;
+    final screenW = MediaQuery.of(context).size.width - 32;
+    final threshold = screenW * 0.85;
+    final reached = swipeValue >= threshold;
+
+    return GestureDetector(
+      onHorizontalDragUpdate: (d) {
+        final newVal = (swipeValue + d.delta.dx).clamp(0.0, screenW);
+        setState(() {
+          _swipeCompleteValues[deliveryId] = newVal;
+        });
+        if (newVal >= threshold) {
+          _completeDelivery(deliveryId, delivery, screenW);
+        }
+      },
+      onHorizontalDragEnd: (_) {
+        if (swipeValue < threshold * 0.5) {
+          setState(() {
+            _swipeCompleteValues[deliveryId] = 0.0;
+          });
+        } else if (swipeValue >= threshold * 0.5 && swipeValue < threshold) {
+          // Si glissé à mi-chemin, compléter quand même
+          _completeDelivery(deliveryId, delivery, screenW);
+        }
+      },
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          color: Colors.grey[800], // Fond gris foncé
+        ),
+        child: Stack(
+          children: [
+            // Partie verte qui grandit quand on glisse
+            if (swipeValue > 0 || reached)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: reached ? screenW : swipeValue.clamp(0.0, screenW),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: reached
+                        ? const Color(0xFF2E7D32) // Vert après complétion
+                        : const Color(0xFFFFC107), // Jaune pendant le glissement
+                    borderRadius: BorderRadius.circular(32),
+                  ),
+                ),
+              ),
+            // Texte toujours centré
+            Positioned.fill(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      reached ? 'COMPLÉTÉ' : 'Compléter',
+                      style: TextStyle(
+                        color: reached
+                            ? Colors.white
+                            : swipeValue > 0
+                                ? Colors.white
+                                : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: reached ? 16 : 17,
+                      ),
+                    ),
+                    if (!reached) const SizedBox(height: 2),
+                    if (!reached)
+                      Text(
+                        'Glisser pour compléter',
+                        style: TextStyle(
+                          color: swipeValue > 0 ? Colors.white70 : Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -13,11 +13,13 @@ import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart' as flutter_html;
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/services/blocked_user_service.dart';
 import 'package:tranoo_pro/services/push_otp_service.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
+import 'package:tranoo_pro/providers/locale_provider.dart';
 
 // import 'package:flutter/services.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
@@ -247,6 +249,7 @@ void main() async {
         }),
         ChangeNotifierProvider(create: (_) => CounterProvider()),
         ChangeNotifierProvider(create: (_) => CartService()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],
       child: const MyApp(),
     ),
@@ -258,10 +261,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localeProvider = Provider.of<LocaleProvider>(context);
     return MaterialApp(
       title: 'Tranoo',
       debugShowCheckedModeBanner: false,
-      locale: DevicePreview.locale(context),
+      locale: localeProvider.locale ?? DevicePreview.locale(context),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       builder: (context, child) {
         // Définir le contexte pour BlockedUserService
         WidgetsBinding.instance.addPostFrameCallback((_) {

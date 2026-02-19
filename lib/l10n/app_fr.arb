@@ -1,0 +1,13 @@
+{
+  "@@locale": "fr",
+  "language": "Langue",
+  "validate": "Valider",
+  "french": "Français",
+  "english": "Anglais",
+
+  "services": "Services",
+  "service_sales_cars": "Vente (Voitures)",
+  "service_delivery_parts": "Livraison (Pièces)",
+  "service_tricycle": "Tricycle"
+}
+
