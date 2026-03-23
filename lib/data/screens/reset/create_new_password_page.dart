@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/services/push_otp_service.dart';
+import 'package:tranoo_pro/widgets/auth_message_popup.dart';
 
 class CreateNewPasswordPage extends StatefulWidget {
   final String requestId;
@@ -94,13 +95,11 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
     if (!_formKey.currentState!.validate()) return;
 
     if (!_isPasswordValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le mot de passe ne respecte pas tous les critères requis',
-          ),
-          backgroundColor: Colors.red,
-        ),
+      AuthMessagePopup.showError(
+        context,
+        title: 'Mot de passe trop faible.',
+        subtitle: 'Vérifiez les critères affichés et réessayez.',
+        buttonText: 'OK',
       );
       return;
     }
@@ -124,35 +123,24 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
           }
         });
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(child: Text(result['message'])),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+        AuthMessagePopup.showSuccess(
+          context,
+          title: result['message']?.toString() ?? 'Mot de passe modifié avec succès.',
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: Colors.red,
-          ),
+        AuthMessagePopup.showError(
+          context,
+          title: result['message']?.toString() ?? 'Une erreur est survenue.',
+          buttonText: 'Réessayer',
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+      AuthMessagePopup.showError(
+        context,
+        title: 'Une erreur est survenue.',
+        subtitle: 'Vérifiez votre connexion et réessayez.',
+        buttonText: 'Réessayer',
       );
     } finally {
       if (mounted) setState(() => _loading = false);

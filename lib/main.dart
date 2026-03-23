@@ -27,6 +27,7 @@ import 'package:tranoo_pro/data/screens/marque.dart';
 import 'package:tranoo_pro/firebase_options.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/providers/counter_provider.dart';
+import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
 import 'package:tranoo_pro/services/cart_service.dart';
 import 'package:tranoo_pro/data/screens/reset/forgot_password_page.dart';
 import 'package:tranoo_pro/data/screens/reset/verify_code_page.dart';
@@ -47,6 +48,9 @@ class NotificationService {
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final Logger _logger = Logger('NotificationService');
+
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   Future<void> initialize() async {
     try {
@@ -74,6 +78,20 @@ class NotificationService {
           'Message reçu en premier plan: ${message.notification?.title}',
         );
         _showLocalNotification(message);
+
+        // Tricycle: ouvrir automatiquement le popup (via écran chauffeur)
+        if (message.data['type'] == 'tricycle') {
+          final contactId = message.data['contactId'];
+          if (contactId != null && contactId.toString().isNotEmpty) {
+            NotificationService.navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => ChauffeurTricycleHomePage(
+                  initialContactId: contactId.toString(),
+                ),
+              ),
+            );
+          }
+        }
       });
 
       // Gestionnaire pour les notifications cliquées
@@ -81,6 +99,13 @@ class NotificationService {
         _logger.info('Notification cliquée: ${message.notification?.title}');
         _handleNotificationTap(message);
       });
+
+      // Cas app fermée/tuée: notification cliquée
+      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        _logger.info('Initial message (app lancée via notif): ${initialMessage.messageId}');
+        _handleNotificationTap(initialMessage);
+      }
 
       // Récupérer le token FCM
       String? token = await _messaging.getToken();
@@ -159,23 +184,30 @@ class NotificationService {
       'Gestion du tap sur notification: ${message.notification?.title}',
     );
 
-    // Exemple de navigation selon le type de notification
+    // Navigation selon le type de notification
     if (message.data.containsKey('type')) {
       switch (message.data['type']) {
+        case 'tricycle':
+          // Ouvrir la page chauffeur tricycle, avec le contact concerné
+          final contactId = message.data['contactId'];
+          _logger.info('Navigation vers ChauffeurTricycleHome pour contact $contactId');
+          NotificationService.navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  ChauffeurTricycleHomePage(initialContactId: contactId),
+            ),
+          );
+          break;
         case 'publicite':
-          // Naviguer vers la page des publicités
           _logger.info('Navigation vers publicités');
           break;
         case 'article':
-          // Naviguer vers la page des articles
           _logger.info('Navigation vers articles');
           break;
         case 'system':
-          // Notification système
           _logger.info('Notification système: ${message.notification?.body}');
           break;
         default:
-          // Navigation par défaut
           _logger.info('Navigation par défaut');
           break;
       }
@@ -265,6 +297,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Tranoo',
       debugShowCheckedModeBanner: false,
+      navigatorKey: NotificationService.navigatorKey,
       locale: localeProvider.locale ?? DevicePreview.locale(context),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,

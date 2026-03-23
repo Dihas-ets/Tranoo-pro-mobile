@@ -47,6 +47,117 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     return <String, dynamic>{};
   }
 
+  String _cleanId(String? raw) {
+    final s = raw?.replaceAll('"', '').replaceAll("'", '').trim();
+    return (s == null || s.isEmpty) ? '—' : s;
+  }
+
+  bool _looksLikeMongoId(String s) {
+    final clean = _cleanId(s);
+    return RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(clean);
+  }
+
+  String _formatOrderNumber(String? raw) {
+    final clean = _cleanId(raw);
+    if (clean == '—') return clean;
+    if (_looksLikeMongoId(clean)) {
+      return 'CMD #${clean.substring(0, 8).toUpperCase()}';
+    }
+    return clean;
+  }
+
+  /// Récupère le "numéro de commande" de façon robuste.
+  /// Selon le backend, `orderId` peut être un id (String) OU un objet peuplé (Map).
+  String _extractOrderNumberFromDelivery() {
+    // Champs directs éventuels
+    final direct = delivery['orderNumber'] ??
+        delivery['numeroCommande'] ??
+        delivery['numero_commande'] ??
+        delivery['referenceCommande'] ??
+        delivery['reference_commande'];
+    if (direct != null && direct.toString().trim().isNotEmpty) {
+      return _formatOrderNumber(direct.toString());
+    }
+
+    // Champs "order" / "commande" / "orderId" (peut être Map ou String)
+    final ref = delivery['order'] ?? delivery['commande'] ?? delivery['orderId'];
+    if (ref is Map) {
+      final m = _asMap(ref);
+      final code = m['orderNumber'] ??
+          m['numeroCommande'] ??
+          m['numero_commande'] ??
+          m['reference'] ??
+          m['code'];
+      if (code != null && code.toString().trim().isNotEmpty) {
+        return _formatOrderNumber(code.toString());
+      }
+      final id = m['_id'] ?? m['id'];
+      if (id != null && id.toString().trim().isNotEmpty) {
+        return _formatOrderNumber(id.toString());
+      }
+    } else if (ref != null && ref.toString().trim().isNotEmpty) {
+      return _formatOrderNumber(ref.toString());
+    }
+
+    return '—';
+  }
+
+  Widget _cardSection({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+    Color? tint,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: (tint ?? Colors.transparent).withOpacity(0.10),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: (tint ?? const Color(0xFFF8BF13)).withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 20, color: tint ?? const Color(0xFFF8BF13)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -410,110 +521,96 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
         fournisseur['telephone']?.toString();
     final buyerName =
         '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim();
-    final orderId =
-        delivery['orderId']?.toString() ?? delivery['_id']?.toString() ?? '—';
+    final orderNumber = _extractOrderNumberFromDelivery();
     final pieces = delivery['pieces'] as List? ?? [];
-    final paymentLabel =
-        delivery['totalCommande'] != null ? 'Déjà payé en ligne' : '—';
     final exigences = delivery['noteAcheteur']?.toString() ?? 'Porte à porte';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.red[50],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Avant la prise en charge',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.red[700],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    delivery['distanceKm'] != null
+        _cardSection(
+          icon: Icons.local_shipping,
+          title: 'Résumé',
+          tint: Colors.red,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInfoRow(
+                    icon: Icons.route,
+                    title: 'Distance',
+                    value: delivery['distanceKm'] != null
                         ? '${(delivery['distanceKm'] as num).toStringAsFixed(1)} km'
                         : '—',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${delivery['fraisLivraison'] ?? 0} FCFA',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildInfoRow(
+                    icon: Icons.payments_outlined,
+                    title: 'Frais livraison',
+                    value: '${delivery['fraisLivraison'] ?? 0} FCFA',
                   ),
-                  Text(
-                    '${pieces.length} colis',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+            _buildInfoRow(
+              icon: Icons.inventory_2_outlined,
+              title: 'Colis',
+              value: '${pieces.length} colis',
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'À récupérer chez :',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildInfoRow(
+
+        _cardSection(
           icon: Icons.store,
           title: 'Fournisseur',
-          value: supplierName,
-          showCallButton: true,
-          onCall: () => _callPhone(supplierPhone),
+          tint: Colors.blue,
+          children: [
+            _buildInfoRow(
+              icon: Icons.store,
+              title: 'Nom',
+              value: supplierName,
+              showCallButton: true,
+              onCall: () => _callPhone(supplierPhone),
+            ),
+            _buildInfoRow(
+              icon: Icons.location_on,
+              title: 'Adresse',
+              value: supplierAddr,
+            ),
+            if (supplierPhone != null)
+              _buildInfoRow(
+                icon: Icons.phone,
+                title: 'Téléphone',
+                value: supplierPhone,
+              ),
+          ],
         ),
-        _buildInfoRow(
-            icon: Icons.location_on, title: 'Adresse', value: supplierAddr),
-        if (supplierPhone != null)
-          _buildInfoRow(
-              icon: Icons.phone, title: 'Téléphone', value: supplierPhone),
-        const SizedBox(height: 12),
-        const Text(
-          'Commande :',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
+
+        _cardSection(
+          icon: Icons.receipt_long,
+          title: 'Commande',
+          tint: const Color(0xFFF8BF13),
+          children: [
+            _buildInfoRow(
+              icon: Icons.receipt,
+              title: 'N° Commande',
+              value: orderNumber,
+            ),
+            _buildInfoRow(
+              icon: Icons.person,
+              title: 'Acheteur',
+              value: buyerName.isNotEmpty ? buyerName : 'Client',
+            ),
+            _buildInfoRow(
+              icon: Icons.rule,
+              title: 'Exigences',
+              value: exigences,
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        _buildInfoRow(
-            icon: Icons.receipt, title: 'N° Commande', value: orderId),
-        _buildInfoRow(
-            icon: Icons.person,
-            title: 'Acheteur',
-            value: buyerName.isNotEmpty ? buyerName : 'Client'),
-        _buildInfoRow(
-            icon: Icons.payment, title: 'Paiement', value: paymentLabel),
-        _buildInfoRow(
-            icon: Icons.directions_walk, title: 'Exigences', value: exigences),
-        const SizedBox(height: 20),
+
         Row(
           children: [
             Expanded(
@@ -571,86 +668,70 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.orange[50],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'En livraison vers l\'acheteur',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.orange[800],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    delivery['distanceKm'] != null
-                        ? '${(delivery['distanceKm'] as num).toStringAsFixed(1)} km'
-                        : '—',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+        _cardSection(
+          icon: Icons.navigation,
+          title: 'En livraison',
+          tint: Colors.orange,
+          children: [
+            _buildInfoRow(
+              icon: Icons.route,
+              title: 'Distance',
+              value: delivery['distanceKm'] != null
+                  ? '${(delivery['distanceKm'] as num).toStringAsFixed(1)} km'
+                  : '—',
+            ),
+          ],
+        ),
+
+        _cardSection(
+          icon: Icons.person_outline,
+          title: 'À livrer à',
+          tint: Colors.green,
+          children: [
+            _buildInfoRow(
+              icon: Icons.person,
+              title: 'Acheteur',
+              value: name.isNotEmpty ? name : 'Client',
+              showCallButton: true,
+              onCall: () => _callPhone(phone),
+            ),
+            _buildInfoRow(
+              icon: Icons.location_on,
+              title: 'Adresse',
+              value: addr,
+            ),
+            if (phone != null)
+              _buildInfoRow(
+                icon: Icons.phone,
+                title: 'Téléphone',
+                value: phone,
               ),
-            ],
-          ),
+          ],
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'À livrer à :',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
+
+        _cardSection(
+          icon: Icons.inventory_2_outlined,
+          title: 'Colis',
+          tint: const Color(0xFFF8BF13),
+          children: [
+            _buildInfoRow(
+              icon: Icons.inventory,
+              title: 'Colis à livrer',
+              value: '${pieces.length} colis',
+            ),
+            _buildInfoRow(
+              icon: Icons.payment,
+              title: 'Paiement en espèces',
+              value: paymentLabel,
+            ),
+            _buildInfoRow(
+              icon: Icons.rule,
+              title: 'Exigences',
+              value: exigences,
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        _buildInfoRow(
-          icon: Icons.person,
-          title: 'Acheteur',
-          value: name.isNotEmpty ? name : 'Client',
-          showCallButton: true,
-          onCall: () => _callPhone(phone),
-        ),
-        _buildInfoRow(
-            icon: Icons.location_on,
-            title: 'Adresse de livraison',
-            value: addr),
-        if (phone != null)
-          _buildInfoRow(icon: Icons.phone, title: 'Téléphone', value: phone),
-        const SizedBox(height: 12),
-        const Text(
-          'Colis :',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildInfoRow(
-          icon: Icons.inventory,
-          title: 'Colis à livrer',
-          value: '${pieces.length} colis',
-        ),
-        _buildInfoRow(
-            icon: Icons.payment,
-            title: 'Paiement en espèces',
-            value: paymentLabel),
-        _buildInfoRow(
-            icon: Icons.directions_walk, title: 'Exigences', value: exigences),
-        const SizedBox(height: 20),
+
         Row(
           children: [
             Expanded(

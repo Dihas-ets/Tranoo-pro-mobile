@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
 import '../../services/user_service.dart';
 
 // --------- HELPERS SÉCURISÉS ----------
@@ -345,21 +346,6 @@ class VerificationDetailPage extends StatelessWidget {
     return 'Il y a ${diff.inMinutes} minutes';
   }
 
-  // Méthode helper sécurisée pour récupérer les strings
-  static String? _safeGetString(dynamic obj, String key) {
-    try {
-      if (obj is Map && obj.containsKey(key)) {
-        final value = obj[key];
-        if (value is String) return value;
-        if (value != null) return value.toString();
-      }
-      return null;
-    } catch (e) {
-      print('Erreur _safeGetString: $e');
-      return null;
-    }
-  }
-
   // Méthode helper sécurisée pour mapper les images
   static List<Widget> _safeMapImages(List<String> images) {
     try {
@@ -592,6 +578,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           final notif = provider.notifications[index];
           final isVerification =
               _safeGetString(notif, 'type') == 'verification';
+          final isTricycle = _safeGetString(notif, 'type') == 'tricycle';
           final isUnread = !(notif['isRead'] ?? false);
 
           return GestureDetector(
@@ -612,7 +599,27 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               } else {
                 final token = await user?.getIdToken();
                 if (token != null) {
-                  _showNotificationDetail(context, notif, provider, token);
+                  if (isTricycle) {
+                    final notificationId = _safeGetString(notif, '_id');
+                    if (notificationId != null) {
+                      await provider.markNotificationAsRead(notificationId, token);
+                    }
+
+                    final relatedId =
+                        _safeGetString(notif['relatedId'], '_id') ??
+                            _safeGetString(notif, 'relatedId');
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) => ChauffeurTricycleHomePage(
+                          initialContactId: relatedId,
+                        ),
+                      ),
+                    );
+                  } else {
+                    _showNotificationDetail(context, notif, provider, token);
+                  }
                 }
               }
             },

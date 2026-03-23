@@ -53,7 +53,7 @@
 //               ),
 //               SizedBox(height: screenHeight * 0.02),
 //               Text(
-//                 "Bienvenue à Tranoo",
+//                 "Bienvenue sur Tranoo Pro",
 //                 style: TextStyle(
 //                   fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
 //                 ),
@@ -245,13 +245,13 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
 import 'package:tranoo_pro/services/user_service.dart';
-import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
+import 'package:tranoo_pro/widgets/auth_message_popup.dart';
 
 import 'inscription_page.dart';
 
@@ -324,7 +324,7 @@ class _ConnexionPageState extends State<ConnexionPage> {
               ),
               SizedBox(height: screenHeight * 0.02),
               Text(
-                "Bienvenue à Tranoo",
+                "Bienvenue sur Tranoo Pro",
                 style: TextStyle(
                   fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
                 ),
@@ -463,12 +463,10 @@ class _ConnexionPageState extends State<ConnexionPage> {
                             // Vérification des champs obligatoires
                             if (_emailController.text.trim().isEmpty ||
                                 _passwordController.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Veuillez remplir tous les champs.',
-                                  ),
-                                ),
+                              AuthMessagePopup.showWarning(
+                                context,
+                                title: 'Certains champs sont manquants.',
+                                subtitle: 'Veuillez compléter les informations requises.',
                               );
                               return;
                             }
@@ -525,11 +523,10 @@ class _ConnexionPageState extends State<ConnexionPage> {
                               
                               if (needsPhotoUpload) {
                                 // Rediriger vers le profil pour upload photo obligatoire
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Veuillez uploader votre photo de profil pour continuer.'),
-                                    duration: Duration(seconds: 4),
-                                  ),
+                                AuthMessagePopup.showInfo(
+                                  context,
+                                  title: 'Action requise',
+                                  subtitle: 'Veuillez uploader votre photo de profil pour continuer.',
                                 );
                                 if (!mounted) return;
                                 Navigator.pushAndRemoveUntil(
@@ -546,10 +543,9 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                   }
                                 });
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Connexion réussie !'),
-                                  ),
+                                AuthMessagePopup.showSuccess(
+                                  context,
+                                  title: 'Connexion réussie. Bienvenue !',
                                 );
                                 if (!mounted) return;
                                 Navigator.pushAndRemoveUntil(
@@ -564,24 +560,46 @@ class _ConnexionPageState extends State<ConnexionPage> {
                               _logger.warning(
                                 'Erreur lors de la connexion Firebase: ${e.toString()}',
                               );
-                              String errorMsg = 'Erreur : ${e.toString()}';
+                              String title =
+                                  'Impossible de se connecter avec ces informations.';
+                              String? subtitle;
                               if (e.toString().contains('user-not-found')) {
-                                errorMsg =
-                                    'Aucun utilisateur trouvé avec cet email.';
+                                title = "Aucun compte n'est associé à cet email.";
+                                subtitle = 'Créez un compte pour continuer.';
                               } else if (e.toString().contains(
                                 'wrong-password',
                               )) {
-                                errorMsg = 'Mot de passe incorrect.';
+                                title = 'Mot de passe incorrect.';
+                                subtitle = 'Vérifiez vos informations et réessayez.';
                               } else if (e.toString().contains(
                                 'invalid-credential',
                               )) {
-                                errorMsg =
-                                    "Identifiants invalides ou expirés. Vérifiez l'email et le mot de passe, ou réinitialisez le mot de passe si besoin.";
+                                title = 'Email ou mot de passe incorrect.';
+                                subtitle = 'Vérifiez vos informations et réessayez.';
+                              } else if (e.toString().contains('user-disabled')) {
+                                title = 'Votre compte est temporairement bloqué.';
+                                subtitle = 'Contactez l’assistance.';
+                              } else if (e.toString().contains('too-many-requests')) {
+                                title = 'Trop de tentatives de connexion.';
+                                subtitle = 'Réessayez dans quelques minutes.';
+                              } else if (e.toString().contains('network') ||
+                                  e.toString().contains('SocketException') ||
+                                  e.toString().contains('Failed host lookup')) {
+                                title = 'Impossible de se connecter au serveur.';
+                                subtitle = 'Vérifiez votre connexion internet.';
+                              } else if (e.toString().contains('server') ||
+                                  e.toString().contains('500') ||
+                                  e.toString().contains('503')) {
+                                title = 'Notre service rencontre un problème temporaire.';
+                                subtitle = 'Veuillez réessayer plus tard.';
                               }
                               if (!mounted) return;
-                              ScaffoldMessenger.of(
+                              AuthMessagePopup.showError(
                                 context,
-                              ).showSnackBar(SnackBar(content: Text(errorMsg)));
+                                title: title,
+                                subtitle: subtitle,
+                                buttonText: 'Réessayer',
+                              );
                             } finally {
                               setState(() {
                                 _isLoading = false;
@@ -652,20 +670,5 @@ class _ConnexionPageState extends State<ConnexionPage> {
     );
   }
 
-  UserRole _getUserRoleFromString(String? role) {
-    switch (role) {
-      case 'vendeur':
-        return UserRole.vendeur;
-      case 'transitaire':
-        return UserRole.transitaire;
-      case 'chauffeur':
-        return UserRole.chauffeur;
-      case 'agentCommercial':
-        return UserRole.agentCommercial;
-      case 'livreur':
-        return UserRole.livreur;
-      default:
-        return UserRole.vendeur; // Par défaut vendeur pour l'app Pro
-    }
-  }
+  // (supprimé) _getUserRoleFromString : non utilisé
 }

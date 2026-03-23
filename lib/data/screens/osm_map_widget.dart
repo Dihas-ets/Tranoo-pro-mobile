@@ -30,17 +30,28 @@ class OsmMapWidget extends StatelessWidget {
       {bool useWaze = false}) async {
     final lat = destination.latitude;
     final lng = destination.longitude;
-    Uri uri;
     if (useWaze) {
-      uri = Uri.parse('https://waze.com/ul?ll=$lat,$lng&navigate=yes');
-    } else {
-      uri = Uri.parse(
-        'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving',
-      );
+      final waze = Uri.parse('https://waze.com/ul?ll=$lat,$lng&navigate=yes');
+      try {
+        await launchUrl(waze, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+      return;
     }
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+
+    // Essayer d'abord le schéma "navigation" (ouvre directement Google Maps en mode guidage sur Android),
+    // puis fallback web si indisponible.
+    final googleNav = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
+    try {
+      final ok = await launchUrl(googleNav, mode: LaunchMode.externalApplication);
+      if (ok) return;
+    } catch (_) {}
+
+    final web = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving',
+    );
+    try {
+      await launchUrl(web, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   @override
@@ -66,8 +77,9 @@ class OsmMapWidget extends StatelessWidget {
                 polylines: [
                   Polyline(
                     points: polylinePoints!,
-                    color: Colors.blue,
-                    strokeWidth: 4,
+                    // Cohérent avec la légende "Itinéraire" (jaune)
+                    color: const Color(0xFFF8BF13),
+                    strokeWidth: 4.5,
                   ),
                 ],
               ),
@@ -78,10 +90,14 @@ class OsmMapWidget extends StatelessWidget {
                       point: m.point,
                       width: 40,
                       height: 40,
-                      child: Icon(
-                        m.iconData ?? Icons.place,
-                        color: m.color ?? Colors.blue,
-                        size: 40,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: m.onTap,
+                        child: Icon(
+                          m.iconData ?? Icons.place,
+                          color: m.color ?? Colors.blue,
+                          size: 40,
+                        ),
                       ),
                     ),
                   )
@@ -137,8 +153,9 @@ class OsmMarkerData {
   final LatLng point;
   final IconData? iconData;
   final Color? color;
+  final VoidCallback? onTap;
 
-  OsmMarkerData({required this.point, this.iconData, this.color});
+  OsmMarkerData({required this.point, this.iconData, this.color, this.onTap});
 }
 
 /// Convertit les coordonnées [Position] (geolocator) en [LatLng] (latlong2).
@@ -147,8 +164,12 @@ LatLng positionToLatLng(Position p) => LatLng(p.latitude, p.longitude);
 /// Crée un [LatLng] depuis un map (ex: lieuDepart / lieuDestination).
 LatLng? latLngFromMap(Map<String, dynamic>? place) {
   if (place == null) return null;
-  final lat = place['latitude'] as num?;
-  final lng = place['longitude'] as num?;
+  final rawLat = place['latitude'] ?? place['lat'];
+  final rawLng = place['longitude'] ?? place['lng'] ?? place['lon'];
+  if (rawLat == null || rawLng == null) return null;
+
+  final lat = (rawLat is num) ? rawLat.toDouble() : double.tryParse(rawLat.toString());
+  final lng = (rawLng is num) ? rawLng.toDouble() : double.tryParse(rawLng.toString());
   if (lat == null || lng == null) return null;
-  return LatLng(lat.toDouble(), lng.toDouble());
+  return LatLng(lat, lng);
 }

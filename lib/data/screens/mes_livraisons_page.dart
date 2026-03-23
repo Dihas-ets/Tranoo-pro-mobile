@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
+import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
 
 class MesLivraisonsPage extends StatefulWidget {
   const MesLivraisonsPage({super.key});
@@ -256,22 +257,22 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
         statusText = statut;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final card = Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Header avec statut
           Container(
             padding: const EdgeInsets.all(16),
@@ -431,6 +432,23 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
         ],
       ),
     );
+
+    if (type == 'active') {
+      return InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DeliveryMapScreen(delivery: delivery),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: card,
+      );
+    }
+
+    return card;
   }
 
   Widget _buildLocationRow(

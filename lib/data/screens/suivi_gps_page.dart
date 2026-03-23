@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:latlong2/latlong.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/osm_map_widget.dart';
+// url_launcher n'est pas nécessaire ici : la navigation est gérée par `OsmMapWidget.openNavigation`.
 
 class SuiviGpsPage extends StatefulWidget {
   const SuiviGpsPage({super.key});
@@ -24,6 +25,18 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
   List<OsmMarkerData> _osmMarkers = [];
   List<LatLng>? _polylinePoints;
   bool _loading = true;
+  Map<String, dynamic>? _selectedDelivery;
+  LatLng? _selectedPickup;
+  LatLng? _selectedDropoff;
+
+  LatLng? get _myLatLng =>
+      _currentPosition != null ? positionToLatLng(_currentPosition!) : null;
+
+  Map<String, dynamic> _asMap(dynamic v) {
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return Map<String, dynamic>.from(v);
+    return <String, dynamic>{};
+  }
 
   @override
   void initState() {
@@ -80,48 +93,53 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
 
   void _setupMap() {
     final list = <OsmMarkerData>[];
-    List<LatLng>? poly;
 
     if (_currentPosition != null) {
       list.add(OsmMarkerData(
         point: positionToLatLng(_currentPosition!),
         iconData: Icons.my_location,
-        color: Colors.blue,
+        color: Colors.blue, // légende: ma position
       ));
     }
 
-    for (var delivery in _activeDeliveries) {
-      final lieuDepart = delivery['lieuDepart'] as Map<String, dynamic>?;
-      final lieuDestination =
-          delivery['lieuDestination'] as Map<String, dynamic>?;
-      final locationHistory = delivery['locationHistory'] as List? ?? [];
+    final focus = _selectedDelivery;
+    if (focus != null) {
+      final lieuDepart = _asMap(focus['lieuDepart']);
+      final lieuDestination = _asMap(focus['lieuDestination']);
 
       final p1 = latLngFromMap(lieuDepart);
       final p2 = latLngFromMap(lieuDestination);
+
+      _selectedPickup = p1;
+      _selectedDropoff = p2;
+
       if (p1 != null) {
-        list.add(OsmMarkerData(
-            point: p1, iconData: Icons.store, color: Colors.green));
+        list.add(
+          OsmMarkerData(
+            point: p1,
+            iconData: Icons.store,
+            color: Colors.green, // légende: départ
+            onTap: () => OsmMapWidget.openNavigation(p1),
+          ),
+        );
       }
       if (p2 != null) {
-        list.add(OsmMarkerData(
-            point: p2, iconData: Icons.person_pin, color: Colors.red));
+        list.add(
+          OsmMarkerData(
+            point: p2,
+            iconData: Icons.person_pin,
+            color: Colors.red, // légende: destination
+            onTap: () => OsmMapWidget.openNavigation(p2),
+          ),
+        );
       }
-      if (poly == null && p1 != null && p2 != null) {
-        poly = [p1, p2];
-      }
-      if (poly == null && locationHistory.isNotEmpty) {
-        final pts = <LatLng>[];
-        for (var loc in locationHistory) {
-          final ll = latLngFromMap(loc as Map<String, dynamic>?);
-          if (ll != null) pts.add(ll);
-        }
-        if (pts.length > 1) poly = pts;
-      }
+    } else {
+      _selectedPickup = null;
+      _selectedDropoff = null;
     }
 
     setState(() {
       _osmMarkers = list;
-      _polylinePoints = poly;
     });
   }
 
@@ -132,6 +150,76 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
   Future<void> _centerOnCurrentLocation() async {
     await _getCurrentLocation();
     _setupMap();
+  }
+
+  Future<void> _focusOnDelivery(Map<String, dynamic> delivery) async {
+    setState(() {
+      _selectedDelivery = delivery;
+    });
+    _setupMap();
+
+    final from = _myLatLng;
+    final pickup = _selectedPickup;
+    final drop = _selectedDropoff;
+
+    final colisRecupere = delivery['colisRecupere'] == true;
+    final nextTarget = colisRecupere ? drop : pickup;
+
+    if (from == null || nextTarget == null) {
+      setState(() => _polylinePoints = null);
+      return;
+    }
+
+    // Dessiner une vraie route (OSRM) pour la prochaine étape.
+    final pts = await _fetchOsrmRoute(from, nextTarget);
+    if (!mounted) return;
+    setState(() {
+      _polylinePoints = (pts != null && pts.length >= 2) ? pts : [from, nextTarget];
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            colisRecupere
+                ? 'Itinéraire prêt. Appuyez sur le marqueur rouge pour ouvrir Google Maps.'
+                : 'Itinéraire prêt. Appuyez sur le marqueur vert pour ouvrir Google Maps.',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<List<LatLng>?> _fetchOsrmRoute(LatLng from, LatLng to) async {
+    try {
+      final url =
+          'https://router.project-osrm.org/route/v1/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}';
+      final res = await http.get(
+        Uri.parse('$url?overview=full&geometries=geojson&alternatives=false&steps=true'),
+      );
+      if (res.statusCode != 200) return null;
+      final data = jsonDecode(res.body);
+      if (data is! Map) return null;
+      final routes = data['routes'];
+      if (routes is! List || routes.isEmpty) return null;
+      final geometry = routes.first['geometry'];
+      if (geometry is! Map) return null;
+      final coords = geometry['coordinates'];
+      if (coords is! List) return null;
+      final pts = <LatLng>[];
+      for (final c in coords) {
+        if (c is List && c.length >= 2) {
+          final lon = (c[0] as num).toDouble();
+          final lat = (c[1] as num).toDouble();
+          pts.add(LatLng(lat, lon));
+        }
+      }
+      return pts;
+    } catch (e) {
+      debugPrint('OSRM route error: $e');
+      return null;
+    }
   }
 
   @override
@@ -197,23 +285,27 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildLegendItem(
-                    Colors.blue,
-                    'Ma position',
+                    icon: Icons.my_location,
+                    color: Colors.blue,
+                    label: 'Ma position',
                   ),
                   const SizedBox(height: 8),
                   _buildLegendItem(
-                    Colors.green,
-                    'Départ',
+                    icon: Icons.store,
+                    color: Colors.green,
+                    label: 'Départ',
                   ),
                   const SizedBox(height: 8),
                   _buildLegendItem(
-                    Colors.red,
-                    'Destination',
+                    icon: Icons.person_pin,
+                    color: Colors.red,
+                    label: 'Destination',
                   ),
                   const SizedBox(height: 8),
                   _buildLegendItem(
-                    const Color(0xFFF8BF13),
-                    'Itinéraire',
+                    icon: Icons.alt_route,
+                    color: const Color(0xFFF8BF13),
+                    label: 'Itinéraire',
                     isLine: true,
                   ),
                 ],
@@ -287,10 +379,17 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
     );
   }
 
-  Widget _buildLegendItem(Color color, String label, {bool isLine = false}) {
+  Widget _buildLegendItem({
+    required IconData icon,
+    required Color color,
+    required String label,
+    bool isLine = false,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
         if (isLine)
           Container(
             width: 20,
@@ -322,57 +421,61 @@ class _SuiviGpsPageState extends State<SuiviGpsPage> {
     final lieuDestination = delivery['lieuDestination'] ?? {};
     final distanceKm = delivery['distanceKm'] ?? 0;
 
-    return Container(
-      width: 200,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Livraison #${delivery['_id']?.toString().substring(0, 8) ?? 'N/A'}',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+    return InkWell(
+      onTap: () => _focusOnDelivery(delivery),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 200,
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Livraison #${delivery['_id']?.toString().substring(0, 8) ?? 'N/A'}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-              Expanded(
-                child: Text(
-                  lieuDestination['adresse'] ?? 'Destination',
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                Expanded(
+                  child: Text(
+                    lieuDestination['adresse'] ?? 'Destination',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.straighten, size: 16, color: Colors.grey[600]),
+                Text(
+                  '${distanceKm.toStringAsFixed(1)} km',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[700],
+                    fontWeight: FontWeight.w600,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.straighten, size: 16, color: Colors.grey[600]),
-              Text(
-                '${distanceKm.toStringAsFixed(1)} km',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

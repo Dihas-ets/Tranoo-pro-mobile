@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tranoo_pro/services/user_service.dart';
-import 'package:logging/logging.dart';
+import 'package:tranoo_pro/widgets/auth_message_popup.dart';
 
 import 'connexion_page.dart'; // Assurez-vous que ce fichier existe
 
@@ -22,9 +22,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   final TextEditingController _maisonController = TextEditingController();
-  final TextEditingController _registreCommerceController =
-      TextEditingController();
-  final TextEditingController _numeroIFUController = TextEditingController();
   final TextEditingController _entrepriseProvenanceController =
       TextEditingController();
   final TextEditingController _referralController = TextEditingController();
@@ -36,12 +33,12 @@ class _InscriptionPageState extends State<InscriptionPage> {
   final TextEditingController _vehiculeAnneeController = TextEditingController();
   final TextEditingController _vehiculeCouleurController = TextEditingController();
   final UserService _userService = UserService();
-  final _logger = Logger('InscriptionPage');
 
   String? selectedCountry;
   String? selectedCountryCode;
   int selectedDigits = 8;
   String? selectedRole;
+  int _currentStep = 0; // 0: infos, 1: rôle, 2: sécurité
   final List<Map<String, dynamic>> countries = [
     {'name': 'Bénin', 'code': '+229', 'flag': '🇧🇯', 'digits': 8},
     {'name': 'Côte d\'Ivoire', 'code': '+225', 'flag': '🇨🇮', 'digits': 10},
@@ -154,6 +151,139 @@ class _InscriptionPageState extends State<InscriptionPage> {
     selectedCountry = countries[0]['name'] as String?;
     selectedCountryCode = countries[0]['code'] as String?;
     selectedDigits = countries[0]['digits'] as int;
+    selectedRole = roles.isNotEmpty ? roles.first : null;
+  }
+
+  Widget _buildStepBar() {
+    const active = Color(0xFFF8BF13);
+    final inactive = Colors.grey.shade300;
+    return Column(
+      children: [
+        Row(
+          children: List.generate(3, (i) {
+            final isActive = i <= _currentStep;
+            return Expanded(
+              child: Container(
+                height: 6,
+                margin: EdgeInsets.only(right: i == 2 ? 0 : 8),
+                decoration: BoxDecoration(
+                  color: isActive ? active : inactive,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _currentStep == 0
+              ? 'Informations'
+              : _currentStep == 1
+                  ? 'Rôle'
+                  : 'Sécurité',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openCountryPicker() async {
+    final controller = TextEditingController();
+    List<Map<String, dynamic>> filtered = List.from(countries);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.72,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        controller: controller,
+                        decoration: InputDecoration(
+                          hintText: 'Rechercher un indicatif (pays ou +code)',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (v) {
+                          final q = v.trim().toLowerCase();
+                          setModal(() {
+                            filtered = countries.where((c) {
+                              final name =
+                                  (c['name'] ?? '').toString().toLowerCase();
+                              final code =
+                                  (c['code'] ?? '').toString().toLowerCase();
+                              return name.contains(q) || code.contains(q);
+                            }).toList();
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, index) {
+                          final c = filtered[index];
+                          return ListTile(
+                            leading: Text(
+                              c['flag'] as String? ?? '',
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                            title: Text(c['name'] as String? ?? ''),
+                            trailing: Text(
+                              c['code'] as String? ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            onTap: () {
+                              setState(() {
+                                selectedCountry = c['name'] as String?;
+                                selectedCountryCode = c['code'] as String?;
+                                selectedDigits = c['digits'] as int? ?? 8;
+                                _telephoneController.clear();
+                              });
+                              Navigator.pop(ctx);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -165,7 +295,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
     final isPortrait = mediaQuery.orientation == Orientation.portrait;
 
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xFFF9FAFB), elevation: 0),
       backgroundColor: const Color(0xFFF9FAFB),
       body: SingleChildScrollView(
         child: Padding(
@@ -185,51 +314,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                   fit: BoxFit.contain,
                 ),
               ),
-              // Dans votre méthode build(), remplacez le bouton d'inscription par ceci :
-              SizedBox(
-                width: double.infinity,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom +
-                        20, // Marge de sécurité
-                  ),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ConnexionPage(),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF8BF13),
-                      foregroundColor: Colors.black,
-                      padding: EdgeInsets.symmetric(
-                        vertical: screenHeight * 0.02,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      minimumSize: Size(
-                        0,
-                        screenHeight * 0.06,
-                      ), // Hauteur minimale adaptable
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        "S'inscrire",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: screenWidth *
-                              0.04, // Taille de police fixe relative
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              _buildStepBar(),
               SizedBox(height: screenHeight * 0.02),
               Text(
                 "Trouvez votre voiture de rêve!",
@@ -239,410 +324,132 @@ class _InscriptionPageState extends State<InscriptionPage> {
               ),
               SizedBox(height: screenHeight * (isPortrait ? 0.05 : 0.1)),
 
-              // Champs du formulaire avec les contrôleurs
-              buildTextFieldWithController(
-                controller: _nomController,
-                label: "Nom",
-                icon: Icons.person,
-                placeholder: "Jean",
-                screenWidth: screenWidth,
-                screenHeight: screenHeight,
-                isPortrait: isPortrait,
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              buildTextFieldWithController(
-                controller: _prenomController,
-                label: "Prénom(s)",
-                icon: Icons.person_outline,
-                placeholder: "Dupont",
-                screenWidth: screenWidth,
-                screenHeight: screenHeight,
-                isPortrait: isPortrait,
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              buildTextFieldWithController(
-                controller: _emailController,
-                label: "Adresse email",
-                icon: Icons.email,
-                placeholder: "jean.dupont@email.com",
-                screenWidth: screenWidth,
-                screenHeight: screenHeight,
-                isPortrait: isPortrait,
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Champ optionnel: Code de parrainage (statique)
-              buildTextFieldWithController(
-                controller: _referralController,
-                label: "Code de parrainage (optionnel)",
-                icon: Icons.card_giftcard,
-                placeholder: "Ex: TRN-ABCD1234",
-                screenWidth: screenWidth,
-                screenHeight: screenHeight,
-                isPortrait: isPortrait,
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Champ téléphone avec sélecteur de pays
-              Row(
-                children: [
-                  // Sélecteur de pays compact
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedCountry,
-                        isDense: true,
-                        items: countries.map((country) {
-                          return DropdownMenuItem<String>(
-                            value: country['name'] as String,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  country['flag'] as String,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  country['code'] as String,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          final country = countries.firstWhere(
-                            (c) => c['name'] == value,
-                          );
-                          setState(() {
-                            selectedCountry = value;
-                            selectedCountryCode = country['code'] as String?;
-                            selectedDigits = country['digits'] as int;
-                            _telephoneController.clear(); // Vider le champ
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _telephoneController,
-                      keyboardType: TextInputType.number,
-                      maxLength: selectedDigits,
-                      decoration: InputDecoration(
-                        labelText: 'Téléphone ($selectedDigits chiffres)',
-                        counterText: '',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3CD), // jaune pâle d’alerte
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFFC107)),
+              if (_currentStep == 0) ...[
+                // Step 1: nom, prénoms, mail, code parrainage, téléphone + warning WhatsApp
+                buildTextFieldWithController(
+                  controller: _nomController,
+                  label: "Nom",
+                  icon: Icons.person,
+                  placeholder: "Jean",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Icon(Icons.warning_amber_rounded, color: Color(0xFF8A6D3B)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Utilisez un numéro joignable sur WhatsApp : il servira aux OTP et aux échanges entre notre équipe et les utilistaeurs.',
-                        style: TextStyle(
-                          color: Color(0xFF8A6D3B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                SizedBox(height: screenHeight * 0.02),
+                buildTextFieldWithController(
+                  controller: _prenomController,
+                  label: "Prénom(s)",
+                  icon: Icons.person_outline,
+                  placeholder: "Dupont",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
                 ),
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              // Mot de passe avec icône oeil et jauge
-              Focus(
-                onFocusChange: (hasFocus) {
-                  setState(() {});
-                },
-                child: TextField(
-                  controller: _passwordController,
-                  onChanged: _updatePasswordStrength,
-                  obscureText: _obscurePasswordReg,
-                  decoration: InputDecoration(
-                    labelText: 'Mot de passe',
-                    hintText: 'Min. 6 caractères (8+ recommandé)',
-                    labelStyle: TextStyle(
-                      color: Colors.grey,
-                      fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.lock,
-                      color: Colors.grey,
-                      size: screenWidth * (isPortrait ? 0.06 : 0.04),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePasswordReg
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePasswordReg = !_obscurePasswordReg;
-                        });
-                      },
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFF8BF13)),
-                    ),
-                  ),
+                SizedBox(height: screenHeight * 0.02),
+                buildTextFieldWithController(
+                  controller: _emailController,
+                  label: "Adresse email",
+                  icon: Icons.email,
+                  placeholder: "jean.dupont@email.com",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
                 ),
-              ),
-              SizedBox(height: 8),
-              if (_passwordStrengthLabel.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                SizedBox(height: screenHeight * 0.02),
+                buildTextFieldWithController(
+                  controller: _referralController,
+                  label: "Code de parrainage (optionnel)",
+                  icon: Icons.card_giftcard,
+                  placeholder: "Ex: TRN-ABCD1234",
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  isPortrait: isPortrait,
+                ),
+                SizedBox(height: screenHeight * 0.02),
+                Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: _passwordStrength,
-                        minHeight: 6,
-                        backgroundColor: Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _passwordStrengthColor,
+                    InkWell(
+                      onTap: _openCountryPicker,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              countries
+                                      .firstWhere(
+                                        (c) => c['name'] == selectedCountry,
+                                        orElse: () => countries[0],
+                                      )['flag']
+                                      ?.toString() ??
+                                  '',
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              selectedCountryCode ?? '+229',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.keyboard_arrow_down, size: 18),
+                          ],
                         ),
                       ),
                     ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Force du mot de passe: ' + _passwordStrengthLabel,
-                      style: TextStyle(
-                        color: _passwordStrengthColor,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _telephoneController,
+                        keyboardType: TextInputType.number,
+                        maxLength: selectedDigits,
+                        decoration: InputDecoration(
+                          labelText: 'Téléphone ($selectedDigits chiffres)',
+                          counterText: '',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              SizedBox(height: screenHeight * 0.02),
-              // Confirmation avec icône oeil
-              Focus(
-                onFocusChange: (hasFocus) {
-                  setState(() {});
-                },
-                child: TextField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirmReg,
-                  decoration: InputDecoration(
-                    labelText: 'Confirmer le mot de passe',
-                    hintText: 'Retapez le mot de passe',
-                    labelStyle: TextStyle(
-                      color: Colors.grey,
-                      fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.lock,
-                      color: Colors.grey,
-                      size: screenWidth * (isPortrait ? 0.06 : 0.04),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmReg
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureConfirmReg = !_obscureConfirmReg;
-                        });
-                      },
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFF8BF13)),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: screenHeight * 0.02),
-
-              // Nouveau champ de sélection du rôle
-              Focus(
-                onFocusChange: (hasFocus) {
-                  setState(() {});
-                },
-                child: Builder(
-                  builder: (context) {
-                    final focusNode = Focus.of(context);
-                    final bool isFocused = focusNode.hasFocus;
-
-                    return DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Rôle',
-                        labelStyle: TextStyle(
-                          color: Colors.grey,
-                          fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
-                        ),
-                        prefixIcon: Icon(
-                          Icons.person_outline,
-                          color:
-                              isFocused ? const Color(0xFFF8BF13) : Colors.grey,
-                          size: screenWidth * (isPortrait ? 0.06 : 0.04),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: screenHeight * 0.02,
-                          horizontal: screenWidth * 0.04,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: isFocused
-                                ? const Color(0xFFF8BF13)
-                                : Colors.grey,
-                            width: 2,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.grey),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFF8BF13),
-                          ),
-                        ),
-                      ),
-                      value: selectedRole,
-                      items: roles.map((role) {
-                        return DropdownMenuItem(
-                          value: role,
-                          child: Text(
-                            role,
-                            style: TextStyle(
-                              fontSize:
-                                  screenWidth * (isPortrait ? 0.04 : 0.03),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedRole = value;
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-              if (selectedRole == 'Transitaire') ...[
-                SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _entrepriseController,
-                  label: "Entreprise",
-                  icon: Icons.business,
-                  placeholder: "Nom de l'entreprise",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
-              ],
-              if (selectedRole == 'Vendeur') ...[
-                SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _registreCommerceController,
-                  label: "Numéro du registre de commerce",
-                  icon: Icons.business_center,
-                  placeholder: "RC-123456789",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
-                SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _numeroIFUController,
-                  label: "Numéro IFU",
-                  icon: Icons.receipt_long,
-                  placeholder: "IFU123456789",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
-                SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _entrepriseProvenanceController,
-                  label: "Entreprise de provenance",
-                  icon: Icons.factory,
-                  placeholder: "Nom de l'entreprise",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
-              ],
-              // Champs spécifiques Livreur/Chauffeur - Informations véhicule
-              if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
-                SizedBox(height: screenHeight * 0.02),
+                const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE3F2FD), // Bleu clair
+                    color: const Color(0xFFFFF3CD),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2196F3)),
+                    border: Border.all(color: const Color(0xFFFFC107)),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
-                      Icon(Icons.info_outline, color: Color(0xFF1976D2)),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFF8A6D3B),
+                      ),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Informations de votre véhicule (obligatoire pour la sécurité)',
+                          'Utilisez un numéro joignable sur WhatsApp : il servira aux OTP et aux échanges entre notre équipe et les utilisateurs.',
                           style: TextStyle(
-                            color: Color(0xFF1976D2),
+                            color: Color(0xFF8A6D3B),
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
                           ),
                         ),
                       ),
@@ -650,41 +457,246 @@ class _InscriptionPageState extends State<InscriptionPage> {
                   ),
                 ),
                 SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _immatriculationController,
-                  label: "Numéro d'immatriculation",
-                  icon: Icons.confirmation_number,
-                  placeholder: "Ex: 1234-AB-01",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (_nomController.text.trim().isEmpty ||
+                          _prenomController.text.trim().isEmpty ||
+                          _emailController.text.trim().isEmpty ||
+                          _telephoneController.text.trim().isEmpty) {
+                        AuthMessagePopup.showWarning(
+                          context,
+                          title: 'Certains champs sont manquants.',
+                          subtitle: 'Veuillez compléter les informations requises.',
+                        );
+                        return;
+                      }
+                      setState(() => _currentStep = 1);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF8BF13),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Suivant',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
+              ],
+
+              if (_currentStep == 1) ...[
+                // Step 2: rôles + champs liés
+                Focus(
+                  onFocusChange: (hasFocus) {
+                    setState(() {});
+                  },
+                  child: Builder(
+                    builder: (context) {
+                      final focusNode = Focus.of(context);
+                      final bool isFocused = focusNode.hasFocus;
+
+                      return DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Rôle',
+                          labelStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.person_outline,
+                            color: isFocused
+                                ? const Color(0xFFF8BF13)
+                                : Colors.grey,
+                            size: screenWidth * (isPortrait ? 0.06 : 0.04),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: screenHeight * 0.02,
+                            horizontal: screenWidth * 0.04,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isFocused
+                                  ? const Color(0xFFF8BF13)
+                                  : Colors.grey,
+                              width: 2,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.grey),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFF8BF13),
+                            ),
+                          ),
+                        ),
+                        value: selectedRole,
+                        items: roles.map((role) {
+                          return DropdownMenuItem(
+                            value: role,
+                            child: Text(
+                              role,
+                              style: TextStyle(
+                                fontSize: screenWidth *
+                                    (isPortrait ? 0.04 : 0.03),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedRole = value;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                if (selectedRole == 'Transitaire') ...[
+                  SizedBox(height: screenHeight * 0.02),
+                  buildTextFieldWithController(
+                    controller: _entrepriseController,
+                    label: "Entreprise",
+                    icon: Icons.business,
+                    placeholder: "Nom de l'entreprise",
+                    screenWidth: screenWidth,
+                    screenHeight: screenHeight,
+                    isPortrait: isPortrait,
+                  ),
+                ],
+                if (selectedRole == 'Vendeur') ...[
+                  SizedBox(height: screenHeight * 0.02),
+                  buildTextFieldWithController(
+                    controller: _entrepriseProvenanceController,
+                    label: "Entreprise de provenance",
+                    icon: Icons.factory,
+                    placeholder: "Nom de l'entreprise",
+                    screenWidth: screenWidth,
+                    screenHeight: screenHeight,
+                    isPortrait: isPortrait,
+                  ),
+                ],
+                if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
+                  SizedBox(height: screenHeight * 0.02),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3F2FD),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF2196F3)),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.info_outline, color: Color(0xFF1976D2)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Informations de votre véhicule (obligatoire pour la sécurité)',
+                            style: TextStyle(
+                              color: Color(0xFF1976D2),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                  buildTextFieldWithController(
+                    controller: _immatriculationController,
+                    label: "Numéro d'immatriculation",
+                    icon: Icons.confirmation_number,
+                    placeholder: "Ex: 1234-AB-01",
+                    screenWidth: screenWidth,
+                    screenHeight: screenHeight,
+                    isPortrait: isPortrait,
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                  buildTextFieldWithController(
+                    controller: _vehiculeTypeController,
+                    label: "Type de véhicule",
+                    icon: Icons.directions_car,
+                    placeholder: "Ex: Moto, Voiture, Camion",
+                    screenWidth: screenWidth,
+                    screenHeight: screenHeight,
+                    isPortrait: isPortrait,
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: buildTextFieldWithController(
+                          controller: _vehiculeMarqueController,
+                          label: "Marque",
+                          icon: Icons.branding_watermark,
+                          placeholder: "Ex: Toyota",
+                          screenWidth: screenWidth,
+                          screenHeight: screenHeight,
+                          isPortrait: isPortrait,
+                        ),
+                      ),
+                      SizedBox(width: screenWidth * 0.02),
+                      Expanded(
+                        child: buildTextFieldWithController(
+                          controller: _vehiculeModeleController,
+                          label: "Modèle",
+                          icon: Icons.description,
+                          placeholder: "Ex: Corolla",
+                          screenWidth: screenWidth,
+                          screenHeight: screenHeight,
+                          isPortrait: isPortrait,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: buildTextFieldWithController(
+                          controller: _vehiculeAnneeController,
+                          label: "Année",
+                          icon: Icons.calendar_today,
+                          placeholder: "Ex: 2020",
+                          screenWidth: screenWidth,
+                          screenHeight: screenHeight,
+                          isPortrait: isPortrait,
+                        ),
+                      ),
+                      SizedBox(width: screenWidth * 0.02),
+                      Expanded(
+                        child: buildTextFieldWithController(
+                          controller: _vehiculeCouleurController,
+                          label: "Couleur",
+                          icon: Icons.color_lens,
+                          placeholder: "Ex: Rouge",
+                          screenWidth: screenWidth,
+                          screenHeight: screenHeight,
+                          isPortrait: isPortrait,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 SizedBox(height: screenHeight * 0.02),
                 buildTextFieldWithController(
-                  controller: _vehiculeTypeController,
-                  label: "Type de véhicule",
-                  icon: Icons.directions_car,
-                  placeholder: "Ex: Moto, Voiture, Camion",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
-                SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _vehiculeMarqueController,
-                  label: "Marque du véhicule",
-                  icon: Icons.branding_watermark,
-                  placeholder: "Ex: Yamaha, Toyota, Peugeot",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
-                SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _vehiculeModeleController,
-                  label: "Modèle du véhicule",
-                  icon: Icons.description,
-                  placeholder: "Ex: YBR 125, Corolla, 206",
+                  controller: _maisonController,
+                  label: "Maison",
+                  icon: Icons.home,
+                  placeholder: "Rue 123, Cotonou",
                   screenWidth: screenWidth,
                   screenHeight: screenHeight,
                   isPortrait: isPortrait,
@@ -693,316 +705,518 @@ class _InscriptionPageState extends State<InscriptionPage> {
                 Row(
                   children: [
                     Expanded(
-                      child: buildTextFieldWithController(
-                        controller: _vehiculeAnneeController,
-                        label: "Année",
-                        icon: Icons.calendar_today,
-                        placeholder: "Ex: 2020",
-                        screenWidth: screenWidth,
-                        screenHeight: screenHeight,
-                        isPortrait: isPortrait,
+                      child: OutlinedButton(
+                        onPressed: () => setState(() => _currentStep = 0),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Color(0xFFF8BF13)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Retour'),
                       ),
                     ),
-                    SizedBox(width: screenWidth * 0.02),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: buildTextFieldWithController(
-                        controller: _vehiculeCouleurController,
-                        label: "Couleur",
-                        icon: Icons.color_lens,
-                        placeholder: "Ex: Rouge, Bleu",
-                        screenWidth: screenWidth,
-                        screenHeight: screenHeight,
-                        isPortrait: isPortrait,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (selectedRole == null ||
+                              _maisonController.text.trim().isEmpty) {
+                            AuthMessagePopup.showWarning(
+                              context,
+                              title: 'Certains champs sont manquants.',
+                              subtitle:
+                                  'Veuillez compléter les informations requises.',
+                            );
+                            return;
+                          }
+                          if (selectedRole == 'Transitaire' &&
+                              _entrepriseController.text.trim().isEmpty) {
+                            AuthMessagePopup.showWarning(
+                              context,
+                              title: 'Ce champ est obligatoire.',
+                              subtitle: 'Veuillez renseigner votre entreprise.',
+                            );
+                            return;
+                          }
+                          if ((selectedRole == 'Livreur' ||
+                                  selectedRole == 'Chauffeur') &&
+                              (_immatriculationController.text.trim().isEmpty ||
+                                  _vehiculeTypeController.text.trim().isEmpty ||
+                                  _vehiculeMarqueController.text
+                                      .trim()
+                                      .isEmpty ||
+                                  _vehiculeModeleController.text
+                                      .trim()
+                                      .isEmpty)) {
+                            AuthMessagePopup.showWarning(
+                              context,
+                              title: 'Informations véhicule manquantes.',
+                              subtitle:
+                                  'Immatriculation, type, marque et modèle sont requis.',
+                            );
+                            return;
+                          }
+                          setState(() => _currentStep = 2);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF8BF13),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Suivant',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ],
-              SizedBox(height: screenHeight * 0.02),
-              buildTextFieldWithController(
-                controller: _maisonController,
-                label: "Maison",
-                icon: Icons.home,
-                placeholder: "Rue 123, Cotonou",
-                screenWidth: screenWidth,
-                screenHeight: screenHeight,
-                isPortrait: isPortrait,
-              ),
-              SizedBox(height: screenHeight * (isPortrait ? 0.05 : 0.1)),
 
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () async {
-                          // Vérification des champs obligatoires
-                          if (_nomController.text.trim().isEmpty ||
-                              _prenomController.text.trim().isEmpty ||
-                              _emailController.text.trim().isEmpty ||
-                              _telephoneController.text.trim().isEmpty ||
-                              _passwordController.text.trim().isEmpty ||
-                              _confirmPasswordController.text.trim().isEmpty ||
-                              selectedRole == null ||
-                              selectedCountry == null ||
-                              _maisonController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Veuillez remplir tous les champs.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-
-                          // Vérification des champs spécifiques aux transitaires
-                          if (selectedRole == 'Transitaire' &&
-                              _entrepriseController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Veuillez remplir le champ Entreprise.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-
-                          // Vérification des champs spécifiques aux vendeurs
-                          if (selectedRole == 'Vendeur') {
-                            if (_registreCommerceController.text
-                                    .trim()
-                                    .isEmpty ||
-                                _numeroIFUController.text.trim().isEmpty ||
-                                _entrepriseProvenanceController.text
-                                    .trim()
-                                    .isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Veuillez remplir tous les champs vendeur (Registre de commerce, IFU, Entreprise de provenance).',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                          }
-
-                          // Vérification des champs spécifiques aux livreurs/chauffeurs
-                          if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') {
-                            if (_immatriculationController.text.trim().isEmpty ||
-                                _vehiculeTypeController.text.trim().isEmpty ||
-                                _vehiculeMarqueController.text.trim().isEmpty ||
-                                _vehiculeModeleController.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Veuillez remplir les informations obligatoires de votre véhicule (Immatriculation, Type, Marque, Modèle).',
-                                  ),
-                                  backgroundColor: Colors.orange,
-                                ),
-                              );
-                              return;
-                            }
-                          }
-                          // Vérification email
-                          final email = _emailController.text.trim();
-                          final emailRegex = RegExp(
-                            r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                          );
-                          if (!emailRegex.hasMatch(email)) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Adresse email invalide.'),
-                              ),
-                            );
-                            return;
-                          }
-                          // Vérification mot de passe
-                          if (_passwordController.text.length < 6) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Le mot de passe doit contenir au moins 6 caractères.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          if (_passwordController.text !=
-                              _confirmPasswordController.text) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Les mots de passe ne correspondent pas.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          // Validation du numéro de téléphone (nombre de chiffres dynamique)
-                          final phone = _telephoneController.text.trim();
-                          final phoneRegex = RegExp(
-                            '^\\d{$selectedDigits}\$',
-                          );
-                          if (!phoneRegex.hasMatch(phone)) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Numéro de téléphone invalide. Entrez $selectedDigits chiffres.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
+              if (_currentStep == 2) ...[
+                // Step 3: mot de passe
+                Focus(
+                  onFocusChange: (hasFocus) {
+                    setState(() {});
+                  },
+                  child: TextField(
+                    controller: _passwordController,
+                    onChanged: _updatePasswordStrength,
+                    obscureText: _obscurePasswordReg,
+                    decoration: InputDecoration(
+                      labelText: 'Mot de passe',
+                      hintText: 'Min. 8 caractères',
+                      labelStyle: TextStyle(
+                        color: Colors.grey,
+                        fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.lock,
+                        color: Colors.grey,
+                        size: screenWidth * (isPortrait ? 0.06 : 0.04),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePasswordReg
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () {
                           setState(() {
-                            _isLoading = true;
+                            _obscurePasswordReg = !_obscurePasswordReg;
                           });
-                          try {
-                            final fullPhone =
-                                (selectedCountryCode ?? '+229') + phone;
-                            // Récupérer le code de parrainage en attente
-                            final prefs = await SharedPreferences.getInstance();
-                            final pendingReferral =
-                                _referralController.text.trim().isNotEmpty
-                                    ? _referralController.text.trim()
-                                    : prefs.getString('pending_referral');
-
-                            final response = await _userService.registerUser(
-                              email: email,
-                              password: _passwordController.text.trim(),
-                              nom: _nomController.text.trim(),
-                              prenoms: _prenomController.text.trim(),
-                              telephone: fullPhone,
-                              role: selectedRole!.toLowerCase(),
-                              entreprise: selectedRole == 'Transitaire'
-                                  ? _entrepriseController.text.trim()
-                                  : null,
-                              registreCommerce: selectedRole == 'Vendeur'
-                                  ? _registreCommerceController.text.trim()
-                                  : null,
-                              numeroIFU: selectedRole == 'Vendeur'
-                                  ? _numeroIFUController.text.trim()
-                                  : null,
-                              entrepriseProvenance: selectedRole == 'Vendeur'
-                                  ? _entrepriseProvenanceController.text.trim()
-                                  : null,
-                              referralCode: pendingReferral,
-                              // Données véhicule (livreur/chauffeur)
-                              vehiculeImmatriculation: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
-                                  ? _immatriculationController.text.trim()
-                                  : null,
-                              vehiculeType: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
-                                  ? _vehiculeTypeController.text.trim()
-                                  : null,
-                              vehiculeMarque: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
-                                  ? _vehiculeMarqueController.text.trim()
-                                  : null,
-                              vehiculeModele: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
-                                  ? _vehiculeModeleController.text.trim()
-                                  : null,
-                              vehiculeAnnee: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
-                                  ? _vehiculeAnneeController.text.trim()
-                                  : null,
-                              vehiculeCouleur: (selectedRole == 'Livreur' || selectedRole == 'Chauffeur')
-                                  ? _vehiculeCouleurController.text.trim()
-                                  : null,
-                              // fcmToken: ... (à ajouter si dispo)
-                            );
-
-                            if (response.data is Map) {
-                              final data = response.data as Map;
-                              final referralError =
-                                  data['referralError']?.toString();
-                              final referralInfo = data['referral'];
-
-                              if (referralError != null &&
-                                  referralError.isNotEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(referralError)),
-                                );
-                              } else if (referralInfo is Map &&
-                                  referralInfo['status'] != null) {
-                                final status =
-                                    referralInfo['status']?.toString();
-                                final amount =
-                                    referralInfo['rewardAmount']?.toString();
-                                final isAgent = referralInfo['isAgent'] == true;
-                                String message =
-                                    'Code de parrainage enregistré (statut: $status)';
-                                if (isAgent && amount != null) {
-                                  message =
-                                      ' Compte crée avec succès, Parrainage agent validé ';
-                                }
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(message)),
-                                );
-                              }
-                            }
-
-                            // Supprimer le code de parrainage après utilisation
-                            if (pendingReferral != null &&
-                                _referralController.text.trim().isEmpty) {
-                              await prefs.remove('pending_referral');
-                            }
-                            _logger.info('Réponse inscription: $response');
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Inscription réussie ! Connectez-vous.',
-                                ),
-                              ),
-                            );
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ConnexionPage(),
-                              ),
-                            );
-                          } catch (e) {
-                            String errorMsg = 'Erreur : ${e.toString()}';
-                            if (e.toString().contains(
-                                  'email-already-in-use',
-                                )) {
-                              errorMsg = 'Cet email est déjà utilisé.';
-                            } else if (e.toString().contains(
-                                  'weak-password',
-                                )) {
-                              errorMsg = 'Mot de passe trop faible.';
-                            }
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(errorMsg)));
-                          } finally {
-                            setState(() {
-                              _isLoading = false;
-                            });
-                          }
                         },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF8BF13),
-                    foregroundColor: Colors.black,
-                    padding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.02,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFF8BF13)),
+                      ),
                     ),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.black)
-                      : Text(
-                          "S'inscrire",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize:
-                                screenWidth * (isPortrait ? 0.045 : 0.035),
+                ),
+                const SizedBox(height: 8),
+                if (_passwordStrengthLabel.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: _passwordStrength,
+                          minHeight: 6,
+                          backgroundColor: Colors.grey.shade300,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _passwordStrengthColor,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Force du mot de passe: $_passwordStrengthLabel',
+                        style: TextStyle(
+                          color: _passwordStrengthColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                SizedBox(height: screenHeight * 0.02),
+                Focus(
+                  onFocusChange: (hasFocus) {
+                    setState(() {});
+                  },
+                  child: TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmReg,
+                    decoration: InputDecoration(
+                      labelText: 'Confirmer le mot de passe',
+                      hintText: 'Retapez le mot de passe',
+                      labelStyle: TextStyle(
+                        color: Colors.grey,
+                        fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.lock,
+                        color: Colors.grey,
+                        size: screenWidth * (isPortrait ? 0.06 : 0.04),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmReg
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureConfirmReg = !_obscureConfirmReg;
+                          });
+                        },
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFF8BF13)),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                SizedBox(height: screenHeight * 0.02),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => setState(() => _currentStep = 1),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Color(0xFFF8BF13)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Retour'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () async {
+                                if (_nomController.text.trim().isEmpty ||
+                                    _prenomController.text.trim().isEmpty ||
+                                    _emailController.text.trim().isEmpty ||
+                                    _telephoneController.text.trim().isEmpty ||
+                                    _passwordController.text.trim().isEmpty ||
+                                    _confirmPasswordController.text.trim().isEmpty ||
+                                    selectedRole == null ||
+                                    selectedCountry == null ||
+                                    _maisonController.text.trim().isEmpty) {
+                                  AuthMessagePopup.showWarning(
+                                    context,
+                                    title: 'Certains champs sont manquants.',
+                                    subtitle:
+                                        'Veuillez compléter les informations requises.',
+                                  );
+                                  return;
+                                }
+
+                                if (selectedRole == 'Transitaire' &&
+                                    _entrepriseController.text.trim().isEmpty) {
+                                  AuthMessagePopup.showWarning(
+                                    context,
+                                    title: 'Ce champ est obligatoire.',
+                                    subtitle:
+                                        'Veuillez renseigner votre entreprise.',
+                                  );
+                                  return;
+                                }
+
+                                if (selectedRole == 'Vendeur' &&
+                                    _entrepriseProvenanceController.text
+                                        .trim()
+                                        .isEmpty) {
+                                  AuthMessagePopup.showWarning(
+                                    context,
+                                    title: 'Ce champ est obligatoire.',
+                                    subtitle:
+                                        'Veuillez renseigner l’entreprise de provenance.',
+                                  );
+                                  return;
+                                }
+
+                                if ((selectedRole == 'Livreur' ||
+                                        selectedRole == 'Chauffeur') &&
+                                    (_immatriculationController.text
+                                            .trim()
+                                            .isEmpty ||
+                                        _vehiculeTypeController.text
+                                            .trim()
+                                            .isEmpty ||
+                                        _vehiculeMarqueController.text
+                                            .trim()
+                                            .isEmpty ||
+                                        _vehiculeModeleController.text
+                                            .trim()
+                                            .isEmpty)) {
+                                  AuthMessagePopup.showWarning(
+                                    context,
+                                    title: 'Informations véhicule manquantes.',
+                                    subtitle:
+                                        'Immatriculation, type, marque et modèle sont requis.',
+                                  );
+                                  return;
+                                }
+
+                                final email = _emailController.text.trim();
+                                final emailRegex =
+                                    RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                                if (!emailRegex.hasMatch(email)) {
+                                  AuthMessagePopup.showError(
+                                    context,
+                                    title: 'Veuillez entrer une adresse email valide.',
+                                  );
+                                  return;
+                                }
+
+                                if (_passwordController.text.length < 8) {
+                                  AuthMessagePopup.showError(
+                                    context,
+                                    title:
+                                        'Le mot de passe doit contenir au moins 8 caractères.',
+                                  );
+                                  return;
+                                }
+
+                                if (_passwordController.text !=
+                                    _confirmPasswordController.text) {
+                                  AuthMessagePopup.showError(
+                                    context,
+                                    title: 'Les mots de passe ne correspondent pas.',
+                                  );
+                                  return;
+                                }
+
+                                final phone = _telephoneController.text.trim();
+                                final phoneRegex =
+                                    RegExp('^\\d{$selectedDigits}\$');
+                                if (!phoneRegex.hasMatch(phone)) {
+                                  AuthMessagePopup.showError(
+                                    context,
+                                    title: 'Numéro invalide',
+                                    subtitle: 'Entrez $selectedDigits chiffres.',
+                                  );
+                                  return;
+                                }
+
+                                setState(() => _isLoading = true);
+                                try {
+                                  final fullPhone =
+                                      (selectedCountryCode ?? '+229') + phone;
+
+                                  final prefs =
+                                      await SharedPreferences.getInstance();
+                                  final pendingReferral = _referralController
+                                          .text
+                                          .trim()
+                                          .isNotEmpty
+                                      ? _referralController.text.trim()
+                                      : prefs.getString('pending_referral');
+
+                                  final response = await _userService.registerUser(
+                                    email: email,
+                                    password: _passwordController.text.trim(),
+                                    nom: _nomController.text.trim(),
+                                    prenoms: _prenomController.text.trim(),
+                                    telephone: fullPhone,
+                                    role: selectedRole!.toLowerCase(),
+                                    entreprise: selectedRole == 'Transitaire'
+                                        ? _entrepriseController.text.trim()
+                                        : null,
+                                    // Vendeur: on retire RC + IFU à l'inscription
+                                    registreCommerce: null,
+                                    numeroIFU: null,
+                                    entrepriseProvenance: selectedRole == 'Vendeur'
+                                        ? _entrepriseProvenanceController.text
+                                            .trim()
+                                        : null,
+                                    referralCode: pendingReferral,
+                                    vehiculeImmatriculation:
+                                        (selectedRole == 'Livreur' ||
+                                                selectedRole == 'Chauffeur')
+                                            ? _immatriculationController.text
+                                                .trim()
+                                            : null,
+                                    vehiculeType: (selectedRole == 'Livreur' ||
+                                            selectedRole == 'Chauffeur')
+                                        ? _vehiculeTypeController.text.trim()
+                                        : null,
+                                    vehiculeMarque: (selectedRole == 'Livreur' ||
+                                            selectedRole == 'Chauffeur')
+                                        ? _vehiculeMarqueController.text.trim()
+                                        : null,
+                                    vehiculeModele: (selectedRole == 'Livreur' ||
+                                            selectedRole == 'Chauffeur')
+                                        ? _vehiculeModeleController.text.trim()
+                                        : null,
+                                    vehiculeAnnee: (selectedRole == 'Livreur' ||
+                                            selectedRole == 'Chauffeur')
+                                        ? _vehiculeAnneeController.text.trim()
+                                        : null,
+                                    vehiculeCouleur: (selectedRole == 'Livreur' ||
+                                            selectedRole == 'Chauffeur')
+                                        ? _vehiculeCouleurController.text.trim()
+                                        : null,
+                                  );
+
+                                  if (response.data is Map) {
+                                    final data = response.data as Map;
+                                    final referralError =
+                                        data['referralError']?.toString();
+                                    final referralInfo = data['referral'];
+
+                                    if (referralError != null &&
+                                        referralError.isNotEmpty) {
+                                      AuthMessagePopup.showWarning(
+                                        context,
+                                        title: referralError,
+                                      );
+                                    } else if (referralInfo is Map &&
+                                        referralInfo['status'] != null) {
+                                      final status =
+                                          referralInfo['status']?.toString();
+                                      final amount = referralInfo['rewardAmount']
+                                          ?.toString();
+                                      final isAgent =
+                                          referralInfo['isAgent'] == true;
+                                      var message =
+                                          'Code de parrainage enregistré (statut: $status)';
+                                      if (isAgent && amount != null) {
+                                        message =
+                                            'Compte créé avec succès, parrainage agent validé.';
+                                      }
+                                      AuthMessagePopup.showSuccess(
+                                        context,
+                                        title: message,
+                                      );
+                                    }
+                                  }
+
+                                  if (pendingReferral != null &&
+                                      _referralController.text.trim().isEmpty) {
+                                    await prefs.remove('pending_referral');
+                                  }
+
+                                  if (!mounted) return;
+                                  await AuthMessagePopup.showSuccess(
+                                    context,
+                                    title: 'Compte créé avec succès.',
+                                    subtitle: 'Connectez-vous pour continuer.',
+                                    buttonText: 'Se connecter',
+                                    onPressed: () {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const ConnexionPage(),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                } catch (e) {
+                                  var title = 'Une erreur est survenue.';
+                                  String? subtitle;
+                                  if (e.toString().contains(
+                                        'email-already-in-use',
+                                      )) {
+                                    title =
+                                        'Un compte existe déjà avec cette adresse email.';
+                                    subtitle = 'Essayez de vous connecter.';
+                                  } else if (e.toString().contains(
+                                        'weak-password',
+                                      )) {
+                                    title =
+                                        'Le mot de passe doit contenir au moins 8 caractères.';
+                                  } else if (e.toString().contains('network') ||
+                                      e.toString().contains('SocketException') ||
+                                      e.toString().contains('Failed host lookup')) {
+                                    title = 'Impossible de se connecter au serveur.';
+                                    subtitle = 'Vérifiez votre connexion internet.';
+                                  } else if (e.toString().contains('server') ||
+                                      e.toString().contains('500') ||
+                                      e.toString().contains('503')) {
+                                    title =
+                                        'Notre service rencontre un problème temporaire.';
+                                    subtitle = 'Veuillez réessayer plus tard.';
+                                  }
+                                  if (!mounted) return;
+                                  AuthMessagePopup.showError(
+                                    context,
+                                    title: title,
+                                    subtitle: subtitle,
+                                    buttonText: 'Réessayer',
+                                  );
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _isLoading = false);
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF8BF13),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : const Text(
+                                "S'inscrire",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
 
               SizedBox(height: screenHeight * 0.03),
               Row(

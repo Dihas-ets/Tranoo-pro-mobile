@@ -35,7 +35,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   bool _isOnline = false;
   Position? _currentPosition;
   bool _loading = true;
-  int _unreadNotifications = 0;
   Map<String, dynamic>? _userData;
   Map<String, dynamic>? _currentDeliveryNotification;
   Timer? _notificationPollTimer;
@@ -43,6 +42,8 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   DateTime? _lastDeliveryLocationSentAt;
   // État pour le glissement du bouton "Compléter" par livraison
   Map<String, double> _swipeCompleteValues = {};
+  // État pour le glissement du bouton "Accepter" par livraison en attente
+  Map<String, double> _swipeAcceptValues = {};
   final Set<String> _openingDeliveryFlowIds = <String>{};
 
   Future<Map<String, dynamic>?> _fetchDeliveryDetails(String deliveryId) async {
@@ -327,8 +328,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         setState(() {
           _notifications =
               List<Map<String, dynamic>>.from(data['notifications'] ?? []);
-          _unreadNotifications =
-              _notifications.where((n) => n['read'] == false).length;
         });
       }
     } catch (e) {
@@ -388,7 +387,10 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     }
   }
 
-  Future<void> _acceptDelivery(String deliveryId) async {
+  Future<void> _acceptDelivery(
+    String deliveryId, {
+    bool openMapAfter = false,
+  }) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
@@ -402,9 +404,14 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
       if (res.statusCode == 200) {
         await _loadData();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Livraison acceptée avec succès')),
         );
+
+        if (openMapAfter) {
+          await _openDeliveryMap(deliveryId);
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -478,7 +485,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                             _buildQuickActions(size, isPortrait),
                             _buildStatsCards(size, isPortrait),
                             _buildServicesGrid(size, isPortrait),
-                            _buildActiveDeliveries(size, isPortrait),
                             _buildPendingDeliveries(size, isPortrait),
                             const SizedBox(height: 20),
                           ],
@@ -731,8 +737,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
       ),
     );
   }
-
-  bool _isBalanceHidden = false;
 
   Widget _buildBalanceVisibilityCard() {
     return Container(
@@ -1017,40 +1021,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     );
   }
 
-  Widget _buildActiveDeliveries(Size size, bool isPortrait) {
-    if (_activeDeliveries.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Livraisons actives',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ..._activeDeliveries
-              .map((delivery) => _buildDeliveryCard(delivery, true)),
-        ],
-      ),
-    );
-  }
+  // Liste des livraisons actives retirée de la home (section visuelle supprimée).
 
   Widget _buildPendingDeliveries(Size size, bool isPortrait) {
     if (_pendingDeliveries.isEmpty) return const SizedBox.shrink();
@@ -1141,14 +1112,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
           Text('Frais livraison: $fraisLivraison $_currency'),
           const SizedBox(height: 8),
           if (!isActive)
-            ElevatedButton(
-              onPressed: () => _acceptDelivery(delivery['id'] ?? ''),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF8BF13),
-                foregroundColor: Colors.black,
-              ),
-              child: const Text('Accepter'),
-            )
+            _buildSwipeAcceptButton(delivery)
           else
             _buildSwipeCompleteButton(delivery),
         ],
@@ -1231,6 +1195,90 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                         'Glisser pour compléter',
                         style: TextStyle(
                           color: swipeValue > 0 ? Colors.white70 : Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwipeAcceptButton(Map<String, dynamic> delivery) {
+    final deliveryId =
+        delivery['_id']?.toString() ?? delivery['id']?.toString() ?? '';
+    final swipeValue = _swipeAcceptValues[deliveryId] ?? 0.0;
+    final screenW = MediaQuery.of(context).size.width - 32;
+    final threshold = screenW * 0.85;
+    final reached = swipeValue >= threshold;
+
+    return GestureDetector(
+      onHorizontalDragUpdate: (d) {
+        final newVal = (swipeValue + d.delta.dx).clamp(0.0, screenW);
+        setState(() {
+          _swipeAcceptValues[deliveryId] = newVal;
+        });
+        if (newVal >= threshold) {
+          _acceptDelivery(deliveryId, openMapAfter: true);
+        }
+      },
+      onHorizontalDragEnd: (_) {
+        if (swipeValue < threshold * 0.5) {
+          setState(() {
+            _swipeAcceptValues[deliveryId] = 0.0;
+          });
+        } else if (swipeValue >= threshold * 0.5 && swipeValue < threshold) {
+          _acceptDelivery(deliveryId, openMapAfter: true);
+        }
+      },
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          color: Colors.grey[800],
+        ),
+        child: Stack(
+          children: [
+            if (swipeValue > 0 || reached)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: reached ? screenW : swipeValue.clamp(0.0, screenW),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: reached
+                        ? Colors.green
+                        : const Color(0xFFF8BF13),
+                    borderRadius: BorderRadius.circular(32),
+                  ),
+                ),
+              ),
+            Positioned.fill(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      reached ? 'ACCEPTÉE' : 'Accepter',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                      ),
+                    ),
+                    if (!reached) const SizedBox(height: 2),
+                    if (!reached)
+                      Text(
+                        'Glisser pour accepter',
+                        style: TextStyle(
+                          color: swipeValue > 0
+                              ? Colors.white70
+                              : Colors.grey[400],
                           fontSize: 12,
                         ),
                       ),

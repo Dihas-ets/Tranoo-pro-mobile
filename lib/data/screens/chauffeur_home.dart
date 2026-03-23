@@ -299,6 +299,54 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
     }
   }
 
+  /// Synchronise le statut + la position avec le service Tricycle
+  Future<void> _updateTricycleStatusAndLocation(bool isOnline) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      if (idToken == null) return;
+
+      final baseUrl = getBackendBaseUrl();
+
+      // 1) Mettre à jour la localisation pour le service Tricycle
+      Position? pos = _currentPosition;
+      if (pos == null) {
+        try {
+          pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+        } catch (_) {}
+      }
+
+      if (pos != null) {
+        await http.post(
+          Uri.parse('$baseUrl/api/tricycles/location'),
+          headers: {
+            'Authorization': 'Bearer $idToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+          }),
+        );
+      }
+
+      // 2) Mettre à jour le statut de disponibilité Tricycle
+      final tricycleStatus = isOnline ? 'available' : 'offline';
+      await http.post(
+        Uri.parse('$baseUrl/api/tricycles/chauffeur/status'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'status': tricycleStatus}),
+      );
+    } catch (e) {
+      print('Erreur sync statut/location Tricycle: $e');
+    }
+  }
+
   Future<void> _toggleOnlineStatus() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -313,32 +361,24 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
       final baseUrl = getBackendBaseUrl();
       final newStatus = !_isOnline;
 
-      final res = await http.post(
-        Uri.parse('$baseUrl/api/chauffeurs/toggle-status'),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'isOnline': newStatus}),
+      // Pour l'instant, le statut en ligne des chauffeurs est directement
+      // géré via le service Tricycle (pas de route /api/chauffeurs/toggle-status).
+      // On met donc à jour l'état local + le backend Tricycle uniquement.
+      await _updateTricycleStatusAndLocation(newStatus);
+      setState(() {
+        _isOnline = newStatus;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isOnline
+              ? 'Vous êtes maintenant disponible'
+              : 'Vous êtes maintenant indisponible'),
+          backgroundColor: _isOnline ? Colors.green : Colors.grey,
+          duration: const Duration(seconds: 2),
+        ),
       );
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() {
-          _isOnline = data['isOnline'] ?? newStatus;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isOnline
-                ? 'Vous êtes maintenant disponible'
-                : 'Vous êtes maintenant indisponible'),
-            backgroundColor: _isOnline ? Colors.green : Colors.grey,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        if (_isOnline) {
-          _checkForNewRides();
-        }
+      if (_isOnline) {
+        _checkForNewRides();
       }
     } catch (e) {
       print('Erreur changement statut: $e');

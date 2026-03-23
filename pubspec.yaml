@@ -4,8 +4,9 @@ description: "Tranoo_pro - Application de gestion de vente automobie"
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-
-version: 1.0.2+3
+version: 1.0.0+3
+#test fermé
+#version: 1.0.2+3
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
