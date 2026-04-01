@@ -28,6 +28,11 @@ class WalletScreenState extends State<WalletScreen> {
   String _userName = '';
   String _userRole = '';
   String _userVehicle = '';
+  double _num(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0;
+    return 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +77,8 @@ class WalletScreenState extends State<WalletScreen> {
                         children: [
                           Text(
                             fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -81,6 +88,8 @@ class WalletScreenState extends State<WalletScreen> {
                           const SizedBox(height: 4),
                           Text(
                             role,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[700],
@@ -89,6 +98,8 @@ class WalletScreenState extends State<WalletScreen> {
                           const SizedBox(height: 2),
                           Text(
                             vehicleLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey[600],
@@ -167,28 +178,31 @@ class WalletScreenState extends State<WalletScreen> {
                                     ),
                                   ),
                           ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        const RetraitScreen()),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CAF50),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RetraitScreen()),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4CAF50),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 12),
-                            ),
-                            child: const Text(
-                              'Retirer',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                              child: const Text(
+                                'Retirer',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -294,7 +308,7 @@ class WalletScreenState extends State<WalletScreen> {
                                   const Color(0xFF2196F3)),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 12),
 
                           // Graphique
                           Expanded(
@@ -389,68 +403,67 @@ class WalletScreenState extends State<WalletScreen> {
     final safeMax = maxValue > 0 ? maxValue : 1;
     final days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(days.length, (index) {
-        final value = _weeklyData[index];
-        final height = (value / safeMax) * 80;
-        final previousHeight =
-            index > 0 ? (_weeklyData[index - 1] / safeMax) * 80 : 0.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableH = constraints.maxHeight;
+        final barsZoneH = (availableH - 26).clamp(40.0, 90.0);
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(days.length, (index) {
+            final value = _weeklyData[index];
+            final height = (value / safeMax) * barsZoneH;
+            final previousHeight =
+                index > 0 ? (_weeklyData[index - 1] / safeMax) * barsZoneH : 0.0;
 
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  '${value.toInt()}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  height: 100,
-                  child: Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      // Barre de la semaine précédente (bleue)
-                      Container(
-                        width: 8,
-                        height: previousHeight,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2196F3),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: barsZoneH,
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: previousHeight,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2196F3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          Container(
+                            width: 12,
+                            height: height,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4CAF50),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ],
                       ),
-                      // Barre de cette semaine (verte)
-                      Container(
-                        width: 16,
-                        height: height,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      days[index],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  days[index],
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 
@@ -480,19 +493,25 @@ class WalletScreenState extends State<WalletScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
               Text(
                 unit,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 12,
                   color: color,
                   fontWeight: FontWeight.w500,
                 ),
@@ -632,13 +651,16 @@ class WalletScreenState extends State<WalletScreen> {
 
       if (walletRes.statusCode == 200) {
         final data = jsonDecode(walletRes.body);
-        _balance = (data['balance'] ?? 0).toDouble();
+        _balance = _num(data['balance']);
         _currency = data['currency'] ?? 'XOF';
       }
       if (txRes.statusCode == 200) {
         final data = jsonDecode(txRes.body);
         final List list = data['transactions'] ?? [];
-        _transactions = list.cast<Map<String, dynamic>>();
+        _transactions = list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
       }
       if (profileRes.statusCode == 200) {
         final data = jsonDecode(profileRes.body);
@@ -661,8 +683,8 @@ class WalletScreenState extends State<WalletScreen> {
       }
       if (statsRes.statusCode == 200) {
         final data = jsonDecode(statsRes.body);
-        _totalOrders = (data['totalOrders'] ?? 0).toDouble();
-        _totalKm = (data['totalKm'] ?? 0).toDouble();
+        _totalOrders = _num(data['totalOrders']);
+        _totalKm = _num(data['totalKm']);
         final list = data['weeklyData'];
         if (list is List && list.length >= 7) {
           _weeklyData =

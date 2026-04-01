@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:intl/intl.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,12 +10,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/data/screens/wallet_screen.dart';
-import 'package:tranoo_pro/data/screens/settings_page.dart';
-import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/mes_livraisons_page.dart';
 import 'package:tranoo_pro/data/screens/suivi_gps_page.dart';
-import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
 import 'package:tranoo_pro/data/screens/delivery_notification_banner.dart';
 import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
 import 'dart:async';
@@ -31,7 +29,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   String _currency = 'XOF';
   List<Map<String, dynamic>> _pendingDeliveries = [];
   List<Map<String, dynamic>> _activeDeliveries = [];
-  List<Map<String, dynamic>> _notifications = [];
   bool _isOnline = false;
   Position? _currentPosition;
   bool _loading = true;
@@ -45,6 +42,51 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   // État pour le glissement du bouton "Accepter" par livraison en attente
   Map<String, double> _swipeAcceptValues = {};
   final Set<String> _openingDeliveryFlowIds = <String>{};
+  final Set<String> _acceptingDeliveryIds = <String>{};
+  bool _showBalance = false;
+
+  List<Map<String, dynamic>> _safeMapList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Map<String, dynamic> _asMap(dynamic v) {
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return Map<String, dynamic>.from(v);
+    return <String, dynamic>{};
+  }
+
+  double? _toDouble(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  double _deliveryDistanceKm(Map<String, dynamic> delivery) {
+    final apiDistance = _toDouble(delivery['distanceKm']);
+    if (apiDistance != null && apiDistance > 0) return apiDistance;
+    final depart = _asMap(delivery['lieuDepart']);
+    final dest = _asMap(delivery['lieuDestination']);
+    final lat1 = _toDouble(depart['latitude']);
+    final lon1 = _toDouble(depart['longitude']);
+    final lat2 = _toDouble(dest['latitude']);
+    final lon2 = _toDouble(dest['longitude']);
+    if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
+      const r = 6371.0;
+      final dLat = (lat2 - lat1) * (pi / 180);
+      final dLon = (lon2 - lon1) * (pi / 180);
+      final a = (sin(dLat / 2) * sin(dLat / 2)) +
+          cos(lat1 * (pi / 180)) *
+              cos(lat2 * (pi / 180)) *
+              (sin(dLon / 2) * sin(dLon / 2));
+      final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+      return r * c;
+    }
+    return 0;
+  }
 
   Future<Map<String, dynamic>?> _fetchDeliveryDetails(String deliveryId) async {
     try {
@@ -113,16 +155,37 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   Future<void> _initializePage() async {
     await _loadUserData();
     await _requestLocationPermission();
+    await _syncOnlineStatus();
     await _loadData();
     _startLocationTracking();
     _startNotificationsListener();
+  }
+
+  Future<void> _syncOnlineStatus() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      if (idToken == null) return;
+      final baseUrl = getBackendBaseUrl();
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/livreurs/status'),
+        headers: {'Authorization': 'Bearer $idToken'},
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final v = data['isOnline'];
+        final parsed = v is bool ? v : (v?.toString().toLowerCase() == 'true');
+        if (mounted) setState(() => _isOnline = parsed);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUserData() async {
     final authProvider =
         Provider.of<myauth.AuthProvider>(context, listen: false);
     setState(() {
-      _userData = authProvider.user;
+      final u = authProvider.user;
+      _userData = (u is Map<String, dynamic>) ? u : null;
     });
   }
 
@@ -251,6 +314,8 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
       final baseUrl = getBackendBaseUrl();
 
+      await _syncOnlineStatus();
+
       // Charger le solde
       final walletRes = await http.get(
         Uri.parse('$baseUrl/api/wallet/me'),
@@ -275,15 +340,14 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
       if (walletRes.statusCode == 200) {
         final data = jsonDecode(walletRes.body);
         setState(() {
-          _balance = (data['balance'] ?? 0).toDouble();
+          _balance = _toDouble(data['balance']) ?? 0;
           _currency = data['currency'] ?? 'XOF';
         });
       }
 
       if (pendingRes.statusCode == 200) {
         final data = jsonDecode(pendingRes.body);
-        final pending =
-            List<Map<String, dynamic>>.from(data['deliveries'] ?? []);
+        final pending = _safeMapList(data['deliveries']);
         setState(() {
           _pendingDeliveries = pending;
           // Afficher le cadran de notification avec la première livraison en attente (par le bas)
@@ -298,8 +362,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
       if (activeRes.statusCode == 200) {
         final data = jsonDecode(activeRes.body);
         setState(() {
-          _activeDeliveries =
-              List<Map<String, dynamic>>.from(data['deliveries'] ?? []);
+          _activeDeliveries = _safeMapList(data['deliveries']);
         });
       }
     } catch (e) {
@@ -325,10 +388,8 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        setState(() {
-          _notifications =
-              List<Map<String, dynamic>>.from(data['notifications'] ?? []);
-        });
+        // Chargement conservé pour badge/banner potentiels futurs.
+        _safeMapList(data['notifications']);
       }
     } catch (e) {
       print('Erreur chargement notifications: $e');
@@ -360,8 +421,10 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
+        final v = data['isOnline'];
+        final parsed = v is bool ? v : (v?.toString().toLowerCase() == 'true');
         setState(() {
-          _isOnline = data['isOnline'] ?? newStatus;
+          _isOnline = parsed;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -391,6 +454,8 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     String deliveryId, {
     bool openMapAfter = false,
   }) async {
+    if (_acceptingDeliveryIds.contains(deliveryId)) return;
+    _acceptingDeliveryIds.add(deliveryId);
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
@@ -405,9 +470,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
       if (res.statusCode == 200) {
         await _loadData();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Livraison acceptée avec succès')),
-        );
 
         if (openMapAfter) {
           await _openDeliveryMap(deliveryId);
@@ -417,6 +479,8 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: ${e.toString()}')),
       );
+    } finally {
+      _acceptingDeliveryIds.remove(deliveryId);
     }
   }
 
@@ -464,7 +528,8 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         if (auth.user != null && _userData == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             setState(() {
-              _userData = auth.user;
+              final u = auth.user;
+              _userData = (u is Map<String, dynamic>) ? u : null;
             });
           });
         }
@@ -484,7 +549,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                             _buildHeader(size, isPortrait),
                             _buildQuickActions(size, isPortrait),
                             _buildStatsCards(size, isPortrait),
-                            _buildServicesGrid(size, isPortrait),
                             _buildPendingDeliveries(size, isPortrait),
                             const SizedBox(height: 20),
                           ],
@@ -532,11 +596,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
       padding: EdgeInsets.fromLTRB(
           16, MediaQuery.of(context).padding.top + 10, 16, 20),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0A1F44), Color(0xFF1a3a6a)],
-        ),
+        color: Color(0xFFFFF7D6),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -548,7 +608,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                 child: Text(
                   _userData?['nom'] ?? 'Livreur',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black87,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
@@ -620,23 +680,41 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                       const Text(
                         'Portefeuille',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: Colors.black54,
                           fontSize: 14,
                         ),
                       ),
                       const SizedBox(height: 5),
-                      Text(
-                        _balance != null
-                            ? NumberFormat.currency(
-                                locale: 'fr_FR',
-                                symbol: '$_currency ',
-                              ).format(_balance)
-                            : '--',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            _showBalance
+                                ? (_balance != null
+                                    ? NumberFormat.currency(
+                                        locale: 'fr_FR',
+                                        symbol: '$_currency ',
+                                      ).format(_balance)
+                                    : '--')
+                                : '••••••',
+                            style: const TextStyle(
+                              color: Color(0xFFB8860B),
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () =>
+                                setState(() => _showBalance = !_showBalance),
+                            child: Icon(
+                              _showBalance
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              size: 18,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -692,100 +770,58 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const WalletScreen(),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cardWidth = (constraints.maxWidth - 16) / 3;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildQuickActionIcon(
+                      Icons.account_balance_wallet_outlined,
+                      'Portefeuille',
+                      const Color(0xFFF8BF13),
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const WalletScreen(),
+                        ),
                       ),
-                    );
-                  },
-                  child: _buildBalanceVisibilityCard(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _buildQuickActionIcon(
-                Icons.local_shipping,
-                'Mes Livraisons',
-                Colors.blue,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const MesLivraisonsPage(),
+                    ),
                   ),
-                ),
-              ),
-              _buildQuickActionIcon(
-                Icons.map,
-                'Suivi GPS',
-                Colors.green,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SuiviGpsPage(),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildQuickActionIcon(
+                      Icons.local_shipping,
+                      'Mes Livraisons',
+                      const Color(0xFFF8BF13),
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MesLivraisonsPage(),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBalanceVisibilityCard() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.purple.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.purple.withOpacity(0.4),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.purple.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.account_balance_wallet_outlined,
-            color: Colors.purple,
-            size: 24,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Portefeuille',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _balance != null
-                ? NumberFormat.currency(
-                    locale: 'fr_FR',
-                    symbol: '$_currency ',
-                  ).format(_balance)
-                : '--',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.purple,
-            ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildQuickActionIcon(
+                      Icons.map,
+                      'Suivi GPS',
+                      const Color(0xFFF8BF13),
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SuiviGpsPage(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -794,17 +830,17 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
   Widget _buildQuickActionIcon(
       IconData icon, String label, Color color, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        height: 106,
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: const Color(0xFFFFF7D6),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: color.withOpacity(0.3),
+              color: const Color(0xFFF3E7A1),
               width: 1.5,
             ),
           ),
@@ -812,25 +848,18 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  color: const Color(0xFFF8BF13),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: Colors.white, size: 28),
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
+                style: const TextStyle(
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
                 ),
@@ -913,114 +942,6 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     );
   }
 
-  Widget _buildServicesGrid(Size size, bool isPortrait) {
-    final services = [
-      {
-        'icon': Icons.notifications_active,
-        'label': 'Notifications',
-        'color': Colors.red
-      },
-      {
-        'icon': Icons.local_shipping,
-        'label': 'Livraisons',
-        'color': Colors.orange
-      },
-      {'icon': Icons.history, 'label': 'Historique', 'color': Colors.purple},
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Mes Services',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.1,
-            ),
-            itemCount: services.length,
-            itemBuilder: (context, index) {
-              final service = services[index];
-              return _buildServiceIcon(
-                service['icon'] as IconData,
-                service['label'] as String,
-                service['color'] as Color,
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServiceIcon(IconData icon, String label, Color color) {
-    return GestureDetector(
-      onTap: () {
-        // Navigation selon le service
-        if (label == 'Portefeuille') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const WalletScreen()),
-          );
-        } else if (label == 'Paramètres') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()),
-          );
-        } else if (label == 'Notifications') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const Notifications()),
-          );
-        } else if (label == 'Tricycle') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ChauffeurTricycleHomePage(),
-            ),
-          );
-        }
-        // Ajouter d'autres navigations selon les besoins
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.black87,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // Liste des livraisons actives retirée de la home (section visuelle supprimée).
 
   Widget _buildPendingDeliveries(Size size, bool isPortrait) {
@@ -1059,19 +980,19 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   }
 
   Widget _buildDeliveryCard(Map<String, dynamic> delivery, bool isActive) {
-    final lieuDestination = delivery['lieuDestination'] ?? {};
-    final distanceKm = delivery['distanceKm'] ?? 0;
-    final fraisLivraison = delivery['fraisLivraison'] ?? 0;
+    final lieuDestination = _asMap(delivery['lieuDestination']);
+    final distanceKm = _deliveryDistanceKm(delivery);
+    final fraisLivraison = _toDouble(delivery['fraisLivraison']) ?? 0;
+    final id = (delivery['_id'] ?? delivery['id'] ?? '').toString();
+    final shortId = id.isNotEmpty ? id.substring(0, id.length > 8 ? 8 : id.length) : 'N/A';
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isActive
-            ? const Color(0xFFF8BF13).withOpacity(0.1)
-            : Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFFFFDF4),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? const Color(0xFFF8BF13) : Colors.grey,
+          color: const Color(0xFFF3E7A1),
           width: 1,
         ),
       ),
@@ -1082,34 +1003,34 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Livraison #${delivery['_id']?.toString().substring(0, 8) ?? 'N/A'}',
+                'Livraison #$shortId',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 15,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isActive ? Colors.green : Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
+              Text(
+                '${fraisLivraison.toStringAsFixed(0)} $_currency',
+                style: const TextStyle(
+                  color: Color(0xFFB8860B),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
-                child: Text(
-                  isActive ? 'Active' : 'En attente',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              )
             ],
           ),
           const SizedBox(height: 8),
           Text(
-              'Destination: ${lieuDestination['adresse'] ?? 'Non renseignée'}'),
-          Text('Distance: ${distanceKm.toStringAsFixed(1)} km'),
-          Text('Frais livraison: $fraisLivraison $_currency'),
+            (lieuDestination['adresse'] ?? 'Destination non renseignée').toString(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, color: Colors.black54),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${distanceKm.toStringAsFixed(1)} km',
+            style: const TextStyle(fontSize: 12, color: Colors.black45),
+          ),
           const SizedBox(height: 8),
           if (!isActive)
             _buildSwipeAcceptButton(delivery)
@@ -1215,9 +1136,10 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     final screenW = MediaQuery.of(context).size.width - 32;
     final threshold = screenW * 0.85;
     final reached = swipeValue >= threshold;
+    final isAccepting = _acceptingDeliveryIds.contains(deliveryId);
 
     return GestureDetector(
-      onHorizontalDragUpdate: (d) {
+      onHorizontalDragUpdate: isAccepting ? null : (d) {
         final newVal = (swipeValue + d.delta.dx).clamp(0.0, screenW);
         setState(() {
           _swipeAcceptValues[deliveryId] = newVal;
@@ -1226,7 +1148,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
           _acceptDelivery(deliveryId, openMapAfter: true);
         }
       },
-      onHorizontalDragEnd: (_) {
+      onHorizontalDragEnd: isAccepting ? null : (_) {
         if (swipeValue < threshold * 0.5) {
           setState(() {
             _swipeAcceptValues[deliveryId] = 0.0;
@@ -1264,7 +1186,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      reached ? 'ACCEPTÉE' : 'Accepter',
+                      isAccepting ? 'TRAITEMENT...' : (reached ? 'ACCEPTÉE' : 'Accepter'),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

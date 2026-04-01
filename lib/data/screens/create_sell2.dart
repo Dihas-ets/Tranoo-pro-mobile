@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
+import 'package:dio/dio.dart';
 
 import 'mastervacpage.dart'; // Importez la page MastervacPage
 import '../../utils/cloudinary_upload.dart';
@@ -28,23 +28,17 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _companyController = TextEditingController();
   // Infos fournisseur
-  final TextEditingController _fournisseurNomController =
-      TextEditingController();
-  final TextEditingController _fournisseurPrenomController =
-      TextEditingController();
   final TextEditingController _fournisseurTelController =
       TextEditingController();
-  final TextEditingController _fournisseurAdresseController =
-      TextEditingController();
-  String? _selectedDepartement;
-  String? _selectedCommune;
-  String? _selectedVille;
-  String? _selectedQuartier;
+  final TextEditingController _modelController = TextEditingController();
   double? _fournisseurLatitude;
   double? _fournisseurLongitude;
+  String _fournisseurAddress = '';
+  String _fournisseurCity = '';
+  bool _useSupplierCurrentLocation = false;
+  bool _loadingSupplierAddress = false;
   String? _selectedPieceType; // Nouveau/Occasion
   String? _selectedFuelType; // Essence/Gazoil/Diezel/Electrique/Hybride
-  String? _selectedModel; // Modèle (String, pas int)
   // Variables pour l'upload d'images - Liste dynamique
   List<File?> _uploadedImages = [];
   List<String?> _cloudinaryUrls = [];
@@ -67,15 +61,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     'Hybride',
     'Aucun',
   ];
-  final List<String> _models = ['Modèle1', 'Modèle2', 'Autre'];
   String? _customFuelType;
-  String? _customModel;
-
-  // Hiérarchie Benin – chargée via backend /api/geo/benin
-  final List<String> _departementsBenin = [];
-  final Map<String, List<String>> _communesParDepartement = {};
-  final Map<String, List<String>> _villesParCommune = {};
-  final Map<String, List<String>> _quartiersParVille = {};
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
@@ -96,125 +82,85 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   @override
   void initState() {
     super.initState();
-    _loadDepartements();
   }
 
-  Future<void> _loadDepartements() async {
+  Future<String> _getAddressFromCoordinates(double lat, double lng) async {
     try {
-      final baseUrl = getBaseUrl().replaceAll('/api', '');
-      final res =
-          await http.get(Uri.parse('$baseUrl/api/geo/benin/departements'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final List list = data['departements'] ?? [];
+      final response = await Dio().get(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'format': 'json',
+          'lat': lat,
+          'lon': lng,
+          'zoom': 18,
+          'addressdetails': 1,
+        },
+        options: Options(
+          headers: {
+            'User-Agent': 'TranooPro/1.0',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        final address = data['display_name'] as String? ?? '';
+        final city = data['address']?['city'] ??
+            data['address']?['town'] ??
+            data['address']?['village'] ??
+            '';
+        if (!mounted) return address;
         setState(() {
-          _departementsBenin
-            ..clear()
-            ..addAll(list.cast<String>());
+          _fournisseurCity = city?.toString() ?? '';
         });
+        return address;
       }
     } catch (e) {
-      log('[GEO] Erreur chargement départements: $e');
+      log('[GEO] Reverse geocoding error: $e');
     }
+    return '';
   }
 
-  Future<void> _loadCommunes(String departement) async {
-    try {
-      final baseUrl = getBaseUrl().replaceAll('/api', '');
-      final res = await http.get(Uri.parse(
-          '$baseUrl/api/geo/benin/communes?departement=${Uri.encodeQueryComponent(departement)}'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final List list = data['communes'] ?? [];
-        setState(() {
-          _communesParDepartement[departement] = list.cast<String>();
-        });
-      }
-    } catch (e) {
-      log('[GEO] Erreur chargement communes: $e');
-    }
-  }
-
-  Future<void> _loadVilles(String commune) async {
-    try {
-      final baseUrl = getBaseUrl().replaceAll('/api', '');
-      final res = await http.get(Uri.parse(
-          '$baseUrl/api/geo/benin/villes?commune=${Uri.encodeQueryComponent(commune)}'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final List list = data['villes'] ?? [];
-        setState(() {
-          _villesParCommune[commune] = list.cast<String>();
-        });
-      }
-    } catch (e) {
-      log('[GEO] Erreur chargement villes: $e');
-    }
-  }
-
-  Future<void> _loadQuartiers(String ville) async {
-    try {
-      final baseUrl = getBaseUrl().replaceAll('/api', '');
-      final res = await http.get(Uri.parse(
-          '$baseUrl/api/geo/benin/quartiers?ville=${Uri.encodeQueryComponent(ville)}'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final List list = data['quartiers'] ?? [];
-        setState(() {
-          _quartiersParVille[ville] = list.cast<String>();
-        });
-      }
-    } catch (e) {
-      log('[GEO] Erreur chargement quartiers: $e');
-    }
-  }
-
-  Future<void> _pickImage(int index) async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-    if (image == null) return;
-
-    final file = File(image.path);
+  Future<void> _setSupplierLocation({
+    required double lat,
+    required double lng,
+    required bool fromCurrent,
+  }) async {
+    if (!mounted) return;
     setState(() {
-      _uploadedImages[index] = file;
-      _isUploadingImage[index] = true;
+      _fournisseurLatitude = lat;
+      _fournisseurLongitude = lng;
+      _useSupplierCurrentLocation = fromCurrent;
+      _loadingSupplierAddress = true;
     });
+    final address = await _getAddressFromCoordinates(lat, lng);
+    if (!mounted) return;
+    setState(() {
+      _fournisseurAddress = address;
+      _loadingSupplierAddress = false;
+    });
+  }
 
+  Future<void> _useCurrentSupplierLocation() async {
     try {
-      final url = await uploadImageToCloudinary(
-        file,
-        folder: CloudinaryFolders.pieceImages,
-      );
-      if (!mounted) return;
-      if (url != null) {
-        setState(() {
-          _cloudinaryUrls[index] = url;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Erreur lors de l\'upload de l\'image. Veuillez réessayer.'),
-          ),
-        );
-        setState(() {
-          _uploadedImages[index] = null;
-        });
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload échoué: $e')),
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
       );
-      setState(() {
-        _uploadedImages[index] = null;
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isUploadingImage[index] = false;
-      });
+      await _setSupplierLocation(
+        lat: pos.latitude,
+        lng: pos.longitude,
+        fromCurrent: true,
+      );
+    } catch (e) {
+      log('[GEO] Erreur position actuelle fournisseur: $e');
     }
   }
 
@@ -398,30 +344,6 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     ),
                     const SizedBox(height: 12),
                     _buildLabel(
-                      'Nom',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _fournisseurNomController,
-                      decoration: _inputDecoration('Nom du fournisseur'),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel(
-                      'Prénom',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _fournisseurPrenomController,
-                      decoration: _inputDecoration('Prénom du fournisseur'),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel(
                       'Téléphone',
                       isSmallScreen,
                       isMediumScreen,
@@ -435,182 +357,129 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     ),
                     const SizedBox(height: 16),
                     _buildLabel(
-                      'Département',
+                      'Localisation fournisseur',
                       isSmallScreen,
                       isMediumScreen,
                       isLargeScreen,
                     ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedDepartement,
-                      decoration:
-                          _inputDecoration('Sélectionner le département'),
-                      items: _departementsBenin
-                          .map<DropdownMenuItem<String>>(
-                            (d) => DropdownMenuItem<String>(
-                              value: d,
-                              child: Text(d),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) async {
-                        setState(() {
-                          _selectedDepartement = value;
-                          _selectedCommune = null;
-                          _selectedVille = null;
-                          _selectedQuartier = null;
-                        });
-                        if (value != null) {
-                          await _loadCommunes(value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel(
-                      'Commune',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _useCurrentSupplierLocation,
+                        icon: const Icon(Icons.my_location),
+                        label: const Text('Utiliser ma position actuelle'),
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCommune,
-                      decoration: _inputDecoration('Sélectionner la commune'),
-                      items: (_selectedDepartement != null
-                              ? _communesParDepartement[
-                                      _selectedDepartement!] ??
-                                  []
-                              : [])
-                          .map<DropdownMenuItem<String>>(
-                            (c) => DropdownMenuItem<String>(
-                              value: c,
-                              child: Text(c),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push<Map<String, double>>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MapPickerScreen(
+                                initialLatitude: _fournisseurLatitude,
+                                initialLongitude: _fournisseurLongitude,
+                              ),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) async {
-                        setState(() {
-                          _selectedCommune = value;
-                          _selectedVille = null;
-                          _selectedQuartier = null;
-                        });
-                        if (value != null) {
-                          await _loadVilles(value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel(
-                      'Ville / Village',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
+                          );
+                          if (result != null) {
+                            final lat = result['latitude'];
+                            final lng = result['longitude'];
+                            if (lat != null && lng != null) {
+                              await _setSupplierLocation(
+                                lat: lat,
+                                lng: lng,
+                                fromCurrent: false,
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Choisir sur la carte'),
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedVille,
-                      decoration: _inputDecoration('Sélectionner la ville'),
-                      items: (_selectedCommune != null
-                              ? _villesParCommune[_selectedCommune!] ?? []
-                              : [])
-                          .map<DropdownMenuItem<String>>(
-                            (v) => DropdownMenuItem<String>(
-                              value: v,
-                              child: Text(v),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) async {
-                        setState(() {
-                          _selectedVille = value;
-                          _selectedQuartier = null;
-                        });
-                        if (value != null) {
-                          await _loadQuartiers(value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel(
-                      'Quartier',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedQuartier,
-                      decoration: _inputDecoration('Sélectionner le quartier'),
-                      items: (_selectedVille != null
-                              ? _quartiersParVille[_selectedVille!] ?? []
-                              : [])
-                          .map<DropdownMenuItem<String>>(
-                            (q) => DropdownMenuItem<String>(
-                              value: q,
-                              child: Text(q),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedQuartier = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel(
-                      'Adresse détaillée (texte)',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _fournisseurAdresseController,
-                      maxLines: 2,
-                      decoration:
-                          _inputDecoration('Ex: Maison verte, près de ...'),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _fournisseurLatitude != null &&
-                                    _fournisseurLongitude != null
-                                ? 'Point GPS sélectionné (${_fournisseurLatitude!.toStringAsFixed(4)}, ${_fournisseurLongitude!.toStringAsFixed(4)})'
-                                : 'Point GPS non défini',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _fournisseurLatitude != null
-                                  ? Colors.green
-                                  : Colors.grey,
-                            ),
+                    if (_fournisseurLatitude != null &&
+                        _fournisseurLongitude != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFCC00).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFFFCC00).withOpacity(0.65),
                           ),
                         ),
-                        TextButton.icon(
-                          onPressed: () async {
-                            final result = await Navigator.push<Map<String, double>>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MapPickerScreen(
-                                  initialLatitude: _fournisseurLatitude,
-                                  initialLongitude: _fournisseurLongitude,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  _useSupplierCurrentLocation
+                                      ? Icons.my_location
+                                      : Icons.map,
+                                  size: 16,
+                                  color: const Color(0xFFB45309),
                                 ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _useSupplierCurrentLocation
+                                      ? 'Position actuelle'
+                                      : 'Position sélectionnée',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                                if (_fournisseurCity.isNotEmpty) ...[
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFCC00),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      _fournisseurCity,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_loadingSupplierAddress)
+                              const Text(
+                                'Récupération de l’adresse...',
+                                style: TextStyle(color: Colors.black54),
+                              )
+                            else
+                              Text(
+                                _fournisseurAddress.isNotEmpty
+                                    ? _fournisseurAddress
+                                    : 'Adresse non disponible',
+                                style: const TextStyle(color: Colors.black87),
                               ),
-                            );
-                            if (result != null) {
-                              setState(() {
-                                _fournisseurLatitude = result['latitude'];
-                                _fournisseurLongitude = result['longitude'];
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.map_outlined),
-                          label: const Text('Choisir sur la carte'),
+                          ],
                         ),
-                      ],
-                    ),
+                      )
+                    else
+                      const Text(
+                        'Localisation fournisseur non définie',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
                     const SizedBox(height: 24),
 
                     // Type et Année
@@ -812,64 +681,10 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                                 isLargeScreen,
                               ),
                               const SizedBox(height: 8),
-                              _buildDropdown(
-                                value: _selectedModel,
-                                hint: 'Modèle',
-                                items: _models,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedModel = value;
-                                    _customModel = value == 'Autre' ? '' : null;
-                                  });
-                                },
+                              TextField(
+                                controller: _modelController,
+                                decoration: _inputDecoration('Ex: Corolla, Hilux...'),
                               ),
-                              if (_selectedModel == 'Autre')
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: TextField(
-                                    decoration: const InputDecoration(
-                                      hintText: 'Entrez le modèle',
-                                      filled: true,
-                                      fillColor: Color(0xFFF2F2F2),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                          Radius.circular(8),
-                                        ),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    onChanged: (val) {
-                                      setState(() {
-                                        _customModel = val;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              if (_selectedModel != null &&
-                                  _selectedModel != 'Autre')
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    'Modèle sélectionné : $_selectedModel',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                              if (_selectedModel == 'Autre' &&
-                                  _customModel != null &&
-                                  _customModel!.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    'Modèle personnalisé : $_customModel',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ),
                             ],
                           ),
                         ),
@@ -1155,6 +970,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                 ),
               ),
             ),
+            const SizedBox(height: 20),
             _buildVerificationButton(context),
           ],
         ),
@@ -1435,16 +1251,14 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     final pieceType = _selectedPieceType;
     final fuelType =
         _selectedFuelType == 'Aucun' ? _customFuelType : _selectedFuelType;
-    final model = (_selectedModel == 'Autre') ? _customModel : _selectedModel;
+    final model = _modelController.text.trim();
     log('[DEBUG] title: "$title" (empty: ${title.isEmpty})');
     log('[DEBUG] pieceType: "$pieceType" (null: ${pieceType == null})');
     log('[DEBUG] annee: "$annee" (empty: ${annee.isEmpty})');
     log(
       '[DEBUG] fuelType: "$fuelType" (null/empty:  ${fuelType == null || fuelType.isEmpty})',
     );
-    log(
-      '[DEBUG] model: "$model" (null/empty: ${model == null || model.isEmpty})',
-    );
+    log('[DEBUG] model: "$model" (empty: ${model.isEmpty})');
     log(
       '[DEBUG] localisation: "$localisation" (empty: ${localisation.isEmpty})',
     );
@@ -1456,7 +1270,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         pieceType == null ||
         annee.isEmpty ||
         (fuelType == null || fuelType.isEmpty) ||
-        (model == null || model.isEmpty) ||
+        model.isEmpty ||
         localisation.isEmpty ||
         prix.isEmpty ||
         description.isEmpty ||
@@ -1499,14 +1313,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         .toList();
 
     final fournisseur = {
-      'nom': _fournisseurNomController.text.trim(),
-      'prenom': _fournisseurPrenomController.text.trim(),
       'telephone': _fournisseurTelController.text.trim(),
-      'adresseTexte': _fournisseurAdresseController.text.trim(),
-      'departement': _selectedDepartement,
-      'commune': _selectedCommune,
-      'ville': _selectedVille,
-      'quartier': _selectedQuartier,
       'latitude': _fournisseurLatitude,
       'longitude': _fournisseurLongitude,
     };

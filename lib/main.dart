@@ -171,10 +171,17 @@ class NotificationService {
         }
       }
     } else {
-      LocalNotificationService.showNotification(
-        message.notification?.title ?? 'Tranoo',
-        message.notification?.body ?? '',
-      );
+      if (message.data['type'] == 'tricycle') {
+        LocalNotificationService.showTricycleNotification(
+          message.notification?.title ?? 'Tranoo',
+          message.notification?.body ?? '',
+        );
+      } else {
+        LocalNotificationService.showNotification(
+          message.notification?.title ?? 'Tranoo',
+          message.notification?.body ?? '',
+        );
+      }
     }
   }
 

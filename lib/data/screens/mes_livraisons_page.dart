@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:intl/intl.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
@@ -20,6 +21,53 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
   List<Map<String, dynamic>> _activeDeliveries = [];
   List<Map<String, dynamic>> _completedDeliveries = [];
   bool _loading = true;
+
+  List<Map<String, dynamic>> _safeMapList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Map<String, dynamic> _asMap(dynamic v) {
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return Map<String, dynamic>.from(v);
+    return <String, dynamic>{};
+  }
+
+  double? _toDouble(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371.0;
+    final dLat = (lat2 - lat1) * (3.141592653589793 / 180);
+    final dLon = (lon2 - lon1) * (3.141592653589793 / 180);
+    final a = (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(lat1 * (3.141592653589793 / 180)) *
+            cos(lat2 * (3.141592653589793 / 180)) *
+            (sin(dLon / 2) * sin(dLon / 2));
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return r * c;
+  }
+
+  double _deliveryDistanceKm(Map<String, dynamic> delivery) {
+    final apiDistance = _toDouble(delivery['distanceKm']);
+    if (apiDistance != null && apiDistance > 0) return apiDistance;
+    final depart = _asMap(delivery['lieuDepart']);
+    final dest = _asMap(delivery['lieuDestination']);
+    final lat1 = _toDouble(depart['latitude']);
+    final lon1 = _toDouble(depart['longitude']);
+    final lat2 = _toDouble(dest['latitude']);
+    final lon2 = _toDouble(dest['longitude']);
+    if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
+      return _haversineKm(lat1, lon1, lat2, lon2);
+    }
+    return 0;
+  }
 
   @override
   void initState() {
@@ -64,24 +112,21 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
       if (pendingRes.statusCode == 200) {
         final data = jsonDecode(pendingRes.body);
         setState(() {
-          _pendingDeliveries =
-              List<Map<String, dynamic>>.from(data['deliveries'] ?? []);
+          _pendingDeliveries = _safeMapList(data['deliveries']);
         });
       }
 
       if (activeRes.statusCode == 200) {
         final data = jsonDecode(activeRes.body);
         setState(() {
-          _activeDeliveries =
-              List<Map<String, dynamic>>.from(data['deliveries'] ?? []);
+          _activeDeliveries = _safeMapList(data['deliveries']);
         });
       }
 
       if (completedRes.statusCode == 200) {
         final data = jsonDecode(completedRes.body);
         setState(() {
-          _completedDeliveries =
-              List<Map<String, dynamic>>.from(data['deliveries'] ?? []);
+          _completedDeliveries = _safeMapList(data['deliveries']);
         });
       }
     } catch (e) {
@@ -217,13 +262,13 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
 
   Widget _buildDeliveryCard(Map<String, dynamic> delivery, String type) {
     final statut = delivery['statut'] ?? '';
-    final lieuDepart = delivery['lieuDepart'] ?? {};
-    final lieuDestination = delivery['lieuDestination'] ?? {};
-    final distanceKm = delivery['distanceKm'] ?? 0;
-    final fraisLivraison = delivery['fraisLivraison'] ?? 0;
-    final dateCommande = delivery['dateCommande'] != null
-        ? DateTime.parse(delivery['dateCommande'])
-        : null;
+    final lieuDepart = _asMap(delivery['lieuDepart']);
+    final lieuDestination = _asMap(delivery['lieuDestination']);
+    final distanceKm = _deliveryDistanceKm(delivery);
+    final fraisLivraison = _toDouble(delivery['fraisLivraison']) ?? 0;
+    final dateCommandeRaw = delivery['dateCommande']?.toString();
+    final dateCommande =
+        dateCommandeRaw != null ? DateTime.tryParse(dateCommandeRaw) : null;
 
     Color statusColor;
     IconData statusIcon;
@@ -299,7 +344,7 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Livraison #${delivery['_id']?.toString().substring(0, 8) ?? 'N/A'}',
+                        'Livraison #${((delivery['_id'] ?? 'N/A').toString().length > 8 ? (delivery['_id'] ?? 'N/A').toString().substring(0, 8) : (delivery['_id'] ?? 'N/A').toString())}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -367,7 +412,7 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
                   ],
                 ),
                 // Pièces concernées
-                if (delivery['pieces'] != null &&
+                if (delivery['pieces'] is List &&
                     (delivery['pieces'] as List).isNotEmpty) ...[
                   const SizedBox(height: 12),
                   const Text(
@@ -384,7 +429,7 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
                     children: (delivery['pieces'] as List)
                         .map<Widget>((piece) => Chip(
                               label: Text(
-                                '${piece['titre'] ?? 'Pièce'} x${piece['quantite'] ?? 1}',
+                                '${(piece is Map ? piece['titre'] : null) ?? 'Pièce'} x${(piece is Map ? piece['quantite'] : null) ?? 1}',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               backgroundColor: Colors.grey[100],
@@ -410,7 +455,12 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => _acceptDelivery(delivery['_id'] ?? ''),
+                  onPressed: () {
+                    final id = delivery['_id']?.toString();
+                    if (id != null && id.isNotEmpty) {
+                      _acceptDelivery(id);
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF8BF13),
                     foregroundColor: Colors.black,
@@ -480,6 +530,8 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
               const SizedBox(height: 4),
               Text(
                 address,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,

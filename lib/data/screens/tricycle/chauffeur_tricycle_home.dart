@@ -29,12 +29,26 @@ class _ChauffeurTricycleHomePageState
   List<Map<String, dynamic>> _incomingContacts = [];
   Timer? _pollTimer;
   final Set<String> _seenContactIds = {};
-  bool _initialPopupShown = false;
+  String _selectedFilter = 'all';
 
   List<Map<String, dynamic>> get _unreadIncomingContacts =>
       _incomingContacts
           .where((c) => c['readByChauffeurAt'] == null)
           .toList();
+
+  List<Map<String, dynamic>> get _filteredIncomingContacts {
+    final list = _incomingContacts;
+    switch (_selectedFilter) {
+      case 'new':
+        return list.where((c) => (c['status'] ?? '').toString() != 'accepted').toList();
+      case 'accepted':
+        return list.where((c) => (c['status'] ?? '').toString() == 'accepted').toList();
+      case 'unread':
+        return list.where((c) => c['readByChauffeurAt'] == null).toList();
+      default:
+        return list;
+    }
+  }
 
   @override
   void initState() {
@@ -146,154 +160,17 @@ class _ChauffeurTricycleHomePageState
           });
         }
 
-        // Détecter une demande ciblée via initialContactId (tap notif)
-        if (!_initialPopupShown &&
-            widget.initialContactId != null &&
-            contacts.isNotEmpty) {
-          final targeted = contacts.firstWhere(
-            (c) => c['_id']?.toString() == widget.initialContactId,
-            orElse: () => {},
-          );
-          if (targeted.isNotEmpty) {
-            _initialPopupShown = true;
-            final id = targeted['_id']?.toString();
-            if (id != null) _seenContactIds.add(id);
-            _showIncomingContactDialog(targeted);
-          }
-        } else {
-          // Sinon: popup auto sur nouvelle demande (polling)
-          final newOnes = <Map<String, dynamic>>[];
-          for (final c in contacts) {
-            final id = c['_id']?.toString();
-            if (id != null && !_seenContactIds.contains(id)) {
-              _seenContactIds.add(id);
-              newOnes.add(c);
-            }
-          }
-
-          if (mounted && newOnes.isNotEmpty) {
-            _showIncomingContactDialog(newOnes.last);
+        // Marquer les demandes déjà vues pour éviter les re-traitements.
+        for (final c in contacts) {
+          final id = c['_id']?.toString();
+          if (id != null) {
+            _seenContactIds.add(id);
           }
         }
       }
     } catch (e) {
       debugPrint('Erreur chargement contacts tricycle: $e');
     }
-  }
-
-  Future<void> _showIncomingContactDialog(
-    Map<String, dynamic> contact,
-  ) async {
-    if (!mounted) return;
-    final user = contact['user'] as Map<String, dynamic>?;
-    final name =
-        '${user?['prenoms'] ?? ''} ${user?['nom'] ?? ''}'.trim().isEmpty
-            ? 'Client'
-            : '${user?['prenoms'] ?? ''} ${user?['nom'] ?? ''}'.trim();
-    final phone = user?['telephone'] as String? ?? 'Téléphone non renseigné';
-    final distanceKm = _distanceKmToBuyer(contact);
-
-    final contactId = contact['_id']?.toString();
-    if (contactId != null) _seenContactIds.add(contactId);
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Nouvelle demande Tricycle',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Fermer',
-                onPressed: () => Navigator.of(ctx).pop(),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                phone,
-                style: const TextStyle(fontSize: 14, color: Colors.black54),
-              ),
-              if (distanceKm != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Distance estimée: ${distanceKm.toStringAsFixed(2)} km',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              const Text(
-                'Vous pouvez appeler le client ou accepter la demande pour voir la localisation exacte.',
-                style: TextStyle(fontSize: 13, color: Colors.black87),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _callUser(contact);
-              },
-              icon: const Icon(Icons.call, color: Colors.green),
-              label: const Text(
-                'Appeler',
-                style: TextStyle(color: Colors.green),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () async {
-                Navigator.of(ctx).pop();
-                await _closeContact(contact);
-              },
-              icon: const Icon(Icons.close, color: Colors.red),
-              label: const Text(
-                'Rejeter',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.of(ctx).pop();
-                await _acceptContact(contact);
-              },
-              icon: const Icon(Icons.check_circle, color: Colors.white),
-              label: const Text('Accepter'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   // _toggleAvailability supprimé: statut géré ailleurs (pas de bouton ici)
@@ -485,11 +362,9 @@ class _ChauffeurTricycleHomePageState
   Widget build(BuildContext context) {
     return Consumer<myauth.AuthProvider>(
       builder: (context, auth, _) {
-        final user = auth.user;
-
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Tricycle - Chauffeur'),
+            title: const Text('Historiques'),
             backgroundColor: const Color(0xFFF8BF13),
             foregroundColor: Colors.black,
             actions: [
@@ -508,10 +383,7 @@ class _ChauffeurTricycleHomePageState
                       child: ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
-                          _buildHeader(user),
-                          const SizedBox(height: 16),
-                          _buildLocationInfo(),
-                          const SizedBox(height: 16),
+                          _buildFilters(),
                           _buildIncomingContactsSection(),
                         ],
                       ),
@@ -718,116 +590,9 @@ class _ChauffeurTricycleHomePageState
     );
   }
 
-  Widget _buildHeader(Map<String, dynamic>? user) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: Colors.grey[300],
-            backgroundImage: user != null &&
-                    user['photo'] != null &&
-                    (user['photo'] as String).isNotEmpty
-                ? NetworkImage(user['photo'] as String)
-                : null,
-            child: user == null ||
-                    user['photo'] == null ||
-                    (user['photo'] as String).isEmpty
-                ? const Icon(Icons.person, color: Colors.white)
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user != null
-                      ? '${user['prenoms'] ?? ''} ${user['nom'] ?? ''}'.trim()
-                      : 'Chauffeur',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                const SizedBox.shrink(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLocationInfo() {
-    final hasLocation = _currentPosition != null;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(
-            hasLocation ? Icons.location_on : Icons.location_off,
-            color: hasLocation ? Colors.green : Colors.red,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hasLocation
-                      ? 'Position active'
-                      : 'Localisation inactive',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hasLocation
-                      ? 'Votre position est partagée pour recevoir des demandes proches.'
-                      : 'Activez la localisation pour apparaître chez les utilisateurs.',
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _updateCurrentLocation,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildIncomingContactsSection() {
-    if (_incomingContacts.isEmpty) {
+    final contacts = _filteredIncomingContacts;
+    if (contacts.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -863,17 +628,48 @@ class _ChauffeurTricycleHomePageState
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Demandes Tricycle',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+      children: contacts.map(_buildContactCard).toList(),
+    );
+  }
+
+  Widget _buildFilters() {
+    Widget chip(String label, String value) {
+      final selected = _selectedFilter == value;
+      return GestureDetector(
+        onTap: () => setState(() => _selectedFilter = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFF8BF13) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? const Color(0xFFF8BF13) : Colors.grey.shade300,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.black : Colors.black54,
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        ..._incomingContacts.map(_buildContactCard),
-      ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          chip('Tous', 'all'),
+          chip('Nouvelles', 'new'),
+          chip('Acceptées', 'accepted'),
+          chip('Non lues', 'unread'),
+        ],
+      ),
     );
   }
 

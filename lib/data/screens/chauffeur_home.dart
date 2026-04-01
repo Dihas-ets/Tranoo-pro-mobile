@@ -10,10 +10,9 @@ import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/data/screens/wallet_screen.dart';
 import 'package:tranoo_pro/data/screens/settings_page.dart';
-import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_ride_notification.dart';
-import 'package:tranoo_pro/data/screens/chauffeur_rides_history.dart';
+import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
 import 'dart:async';
 
 class ChauffeurHomePage extends StatefulWidget {
@@ -23,9 +22,7 @@ class ChauffeurHomePage extends StatefulWidget {
   State<ChauffeurHomePage> createState() => _ChauffeurHomePageState();
 }
 
-class _ChauffeurHomePageState extends State<ChauffeurHomePage>
-    with SingleTickerProviderStateMixin {
-  double? _balance;
+class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
   String _currency = 'XOF';
   // ignore: unused_field - utilisé pour le polling des nouvelles courses
   List<Map<String, dynamic>> _pendingRides = [];
@@ -40,37 +37,25 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
   Map<String, dynamic>? _currentRideNotification;
   Timer? _notificationPollTimer;
   StreamSubscription<Position>? _locationSubscription;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
 
   // Statistiques pour l'affichage
   int _todayRides = 0;
   int _weekRides = 0;
-  double _todayEarnings = 0;
-  double _weekEarnings = 0;
-  double _rating = 4.8;
+  int _acceptedRidesTotal = 0;
+  double _loanPaid = 0;
+  double _loanRemaining = 0;
+  DateTime? _loanDueDate;
 
   @override
   void initState() {
     super.initState();
-    _initializeAnimations();
     _initializePage();
-  }
-
-  void _initializeAnimations() {
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat(reverse: true);
-    _pulseAnimation =
-        Tween<double>(begin: 1.0, end: 1.2).animate(_pulseController);
   }
 
   @override
   void dispose() {
     _notificationPollTimer?.cancel();
     _locationSubscription?.cancel();
-    _pulseController.dispose();
     super.dispose();
   }
 
@@ -215,9 +200,9 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
         headers: {'Authorization': 'Bearer $idToken'},
       );
 
-      // Charger les statistiques
-      final statsRes = await http.get(
-        Uri.parse('$baseUrl/api/chauffeurs/stats'),
+      // Charger les contacts tricycle pour stats dynamiques "courses acceptées"
+      final incomingContactsRes = await http.get(
+        Uri.parse('$baseUrl/api/tricycles/contacts/incoming'),
         headers: {'Authorization': 'Bearer $idToken'},
       );
 
@@ -226,9 +211,25 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
 
       if (walletRes.statusCode == 200) {
         final data = jsonDecode(walletRes.body);
+        final loan = (data['loan'] is Map<String, dynamic>)
+            ? data['loan'] as Map<String, dynamic>
+            : <String, dynamic>{};
+        final paid = (loan['paidAmount'] as num?)?.toDouble() ??
+            (data['loanPaidAmount'] as num?)?.toDouble() ??
+            0;
+        final total = (loan['totalAmount'] as num?)?.toDouble() ??
+            (data['loanTotalAmount'] as num?)?.toDouble() ??
+            0;
+        final remaining = (loan['remainingAmount'] as num?)?.toDouble() ??
+            (total - paid).clamp(0, double.infinity);
+        final dueDateRaw = loan['dueDate'] ?? data['loanDueDate'];
         setState(() {
-          _balance = (data['balance'] ?? 0).toDouble();
           _currency = data['currency'] ?? 'XOF';
+          _loanPaid = paid;
+          _loanRemaining = remaining;
+          _loanDueDate = dueDateRaw != null
+              ? DateTime.tryParse(dueDateRaw.toString())
+              : _loanDueDate;
         });
       }
 
@@ -254,14 +255,32 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
         });
       }
 
-      if (statsRes.statusCode == 200) {
-        final data = jsonDecode(statsRes.body);
+      if (incomingContactsRes.statusCode == 200) {
+        final data = jsonDecode(incomingContactsRes.body);
+        final contacts =
+            List<Map<String, dynamic>>.from(data['contacts'] ?? []);
+        final accepted = contacts.where((c) {
+          final status = (c['status'] ?? '').toString().toLowerCase();
+          return status == 'accepted' || c['acceptedAt'] != null;
+        }).toList();
+        final now = DateTime.now();
+        final startToday = DateTime(now.year, now.month, now.day);
+        final startWeek = startToday.subtract(Duration(days: now.weekday - 1));
+        int today = 0;
+        int week = 0;
+        for (final c in accepted) {
+          final acceptedAtRaw = c['acceptedAt'];
+          final acceptedAt = acceptedAtRaw != null
+              ? DateTime.tryParse(acceptedAtRaw.toString())
+              : null;
+          if (acceptedAt == null) continue;
+          if (!acceptedAt.isBefore(startToday)) today += 1;
+          if (!acceptedAt.isBefore(startWeek)) week += 1;
+        }
         setState(() {
-          _todayRides = data['todayRides'] ?? 0;
-          _weekRides = data['weekRides'] ?? 0;
-          _todayEarnings = (data['todayEarnings'] ?? 0).toDouble();
-          _weekEarnings = (data['weekEarnings'] ?? 0).toDouble();
-          _rating = (data['rating'] ?? 4.8).toDouble();
+          _todayRides = today;
+          _weekRides = week;
+          _acceptedRidesTotal = accepted.length;
         });
       }
     } catch (e) {
@@ -358,7 +377,6 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
         return;
       }
 
-      final baseUrl = getBackendBaseUrl();
       final newStatus = !_isOnline;
 
       // Pour l'instant, le statut en ligne des chauffeurs est directement
@@ -413,7 +431,6 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
                         child: Column(
                           children: [
                             _buildHeader(),
-                            _buildOnlineToggleCard(),
                             _buildStatsCards(),
                             _buildQuickActions(),
                             _buildActiveRides(),
@@ -441,6 +458,15 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
                 ),
             ],
           ),
+          floatingActionButton: FloatingActionButton.small(
+            onPressed: _toggleOnlineStatus,
+            backgroundColor: _isOnline ? Colors.green : Colors.grey,
+            tooltip: _isOnline ? 'Passer hors ligne' : 'Passer en ligne',
+            child: Icon(
+              _isOnline ? Icons.toggle_on : Icons.toggle_off,
+              color: Colors.white,
+            ),
+          ),
         );
       },
     );
@@ -450,23 +476,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
     return Container(
       padding: EdgeInsets.fromLTRB(
           20, MediaQuery.of(context).padding.top + 16, 20, 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFF8BF13),
-            Colors.orange.shade700,
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
+      decoration: const BoxDecoration(color: Color(0xFFFFF7D6)),
       child: Column(
         children: [
           Row(
@@ -479,7 +489,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
                     Text(
                       'Bonjour ${_userData?['prenoms'] ?? 'Chauffeur'} 👋',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Colors.black87,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                       ),
@@ -488,280 +498,71 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
                     Text(
                       _isOnline ? 'Vous êtes en ligne' : 'Vous êtes hors ligne',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.black54,
                         fontSize: 14,
                       ),
                     ),
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  Stack(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.notifications_outlined,
-                            color: Colors.white, size: 28),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const Notifications()),
-                          );
-                        },
-                      ),
-                      if (_unreadNotifications > 0)
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              '$_unreadNotifications',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const Profile()),
-                      );
-                    },
-                    child: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.white,
-                      backgroundImage: _userData?['photo'] != null &&
-                              (_userData!['photo'] as String).isNotEmpty
-                          ? NetworkImage(_userData!['photo'] as String)
-                          : null,
-                      child: _userData?['photo'] == null ||
-                              (_userData!['photo'] as String).isEmpty
-                          ? const Icon(
-                              Icons.person,
-                              color: Color(0xFFF8BF13),
-                              size: 28,
-                            )
-                          : null,
-                    ),
-                  ),
-                ],
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const Profile()),
+                  );
+                },
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.white,
+                  backgroundImage: _userData?['photo'] != null &&
+                          (_userData!['photo'] as String).isNotEmpty
+                      ? NetworkImage(_userData!['photo'] as String)
+                      : null,
+                  child: _userData?['photo'] == null ||
+                          (_userData!['photo'] as String).isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          color: Color(0xFFF8BF13),
+                          size: 28,
+                        )
+                      : null,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          // Solde et note
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.account_balance_wallet,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Portefeuille',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _balance != null
-                            ? NumberFormat.currency(
-                                locale: 'fr_FR',
-                                symbol: '$_currency ',
-                                decimalDigits: 0,
-                              ).format(_balance)
-                            : '--',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Note',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOnlineToggleCard() {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: _isOnline
-              ? [Colors.green.shade400, Colors.green.shade600]
-              : [Colors.grey.shade300, Colors.grey.shade400],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: (_isOnline ? Colors.green : Colors.grey).withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _isOnline ? 'Vous êtes en ligne' : 'Vous êtes hors ligne',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isOnline
-                        ? 'Prêt à accepter des courses'
-                        : 'Activez pour recevoir des courses',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-              if (_isOnline)
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.wifi_tethering,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
+          // Portefeuille masqué (sans icône oeil)
+          Container(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _toggleOnlineStatus,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: _isOnline ? Colors.green : Colors.grey,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFF3E7A1)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Color(0xFFB8860B),
+                  size: 20,
                 ),
-                elevation: 0,
-              ),
-              child: Text(
-                _isOnline ? 'Passer hors ligne' : 'Passer en ligne',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(width: 8),
+                const Text(
+                  'Portefeuille',
+                  style: TextStyle(fontSize: 13, color: Colors.black54),
                 ),
-              ),
+                const Spacer(),
+                const Text(
+                  '••••••',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFB8860B),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -812,28 +613,20 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
             children: [
               Expanded(
                 child: _buildStatCard(
-                  'Gagné aujourd\'hui',
-                  NumberFormat.currency(
-                    locale: 'fr_FR',
-                    symbol: '',
-                    decimalDigits: 0,
-                  ).format(_todayEarnings),
-                  'FCFA',
-                  Icons.monetization_on,
+                  'Acceptées total',
+                  '$_acceptedRidesTotal',
+                  'Courses',
+                  Icons.verified,
                   Colors.green,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildStatCard(
-                  'Gagné cette semaine',
-                  NumberFormat.currency(
-                    locale: 'fr_FR',
-                    symbol: '',
-                    decimalDigits: 0,
-                  ).format(_weekEarnings),
-                  'FCFA',
-                  Icons.trending_up,
+                  'Non lues',
+                  '$_unreadNotifications',
+                  'Alertes',
+                  Icons.notifications_active,
                   Colors.orange,
                 ),
               ),
@@ -946,7 +739,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ChauffeurRidesHistoryPage(),
+                        builder: (context) => const ChauffeurTricycleHomePage(),
                       ),
                     );
                   },
@@ -1164,6 +957,13 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
   }
 
   Widget _buildEarningsChart() {
+    final paid = _loanPaid;
+    final remaining = _loanRemaining;
+    final total = (paid + remaining) <= 0 ? 1 : (paid + remaining);
+    final progress = (paid / total).clamp(0.0, 1.0);
+    final due = _loanDueDate;
+    final dueLabel = due != null ? DateFormat('dd/MM/yyyy').format(due) : 'Choisir';
+
     return Container(
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(20),
@@ -1172,14 +972,14 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.blue.shade50,
-            Colors.blue.shade100,
+            const Color(0xFFFFF9E8),
+            const Color(0xFFFFF3CB),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.1),
+            color: const Color(0xFFF8BF13).withOpacity(0.15),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1189,61 +989,164 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Vos gains',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+              const Expanded(
+                child: Text(
+                  'Remboursement prêt',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Cette semaine',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue.shade700,
-                    fontWeight: FontWeight.w600,
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: _pickLoanDueDate,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.calendar_month,
+                        size: 14,
+                        color: Color(0xFFB8860B),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        dueLabel,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFB8860B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          Center(
-            child: Text(
-              NumberFormat.currency(
-                locale: 'fr_FR',
-                symbol: '$_currency ',
-                decimalDigits: 0,
-              ).format(_weekEarnings),
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue.shade700,
+          Row(
+            children: [
+              Expanded(
+                child: _buildLoanInfoBox(
+                  'Déjà payé',
+                  NumberFormat.currency(
+                    locale: 'fr_FR',
+                    symbol: '$_currency ',
+                    decimalDigits: 0,
+                  ).format(paid),
+                  Colors.green,
+                ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildLoanInfoBox(
+                  'Reste à payer',
+                  NumberFormat.currency(
+                    locale: 'fr_FR',
+                    symbol: '$_currency ',
+                    decimalDigits: 0,
+                  ).format(remaining),
+                  Colors.redAccent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              minHeight: 10,
+              value: progress,
+              backgroundColor: Colors.white,
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF8BF13)),
             ),
           ),
-          const SizedBox(height: 8),
-          Center(
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(6, (i) {
+              final step = (i + 1) / 6;
+              final done = progress >= step;
+              final isDue = i == 5;
+              return Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: isDue
+                      ? const Color(0xFFD32F2F)
+                      : (done ? const Color(0xFFF8BF13) : Colors.white),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDue
+                        ? const Color(0xFFD32F2F)
+                        : const Color(0xFFF8BF13),
+                    width: 1.5,
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Calendrier de remboursement (point rouge = date limite)',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoanInfoBox(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Text(
-              'Gain total de la semaine',
+              value,
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: color,
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _pickLoanDueDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _loanDueDate ?? now,
+      firstDate: now.subtract(const Duration(days: 3650)),
+      lastDate: now.add(const Duration(days: 3650)),
+      helpText: 'Choisir la date d\'échéance',
+    );
+    if (selected != null && mounted) {
+      setState(() => _loanDueDate = selected);
+    }
   }
 }

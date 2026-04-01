@@ -1,9 +1,11 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 class LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static const String tricycleChannelId = 'tricycle_channel';
+  static const String tricycleSoundAndroid = 'driver_request_sound'; // res/raw/driver_request_sound.*
+  static const String tricycleSoundIOS = 'driver_request_sound.wav';
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -27,6 +29,23 @@ class LocalNotificationService {
         print('Notification tapée: ${details.payload}');
       },
     );
+
+    // Créer le channel Tricycle avec son custom (Android 8+)
+    final androidPlugin =
+        _notifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          tricycleChannelId,
+          'Tricycle',
+          description: 'Notifications Tricycle (demandes, annulations, rejets)',
+          importance: Importance.high,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound(tricycleSoundAndroid),
+        ),
+      );
+    }
 
     _initialized = true;
   }
@@ -77,6 +96,40 @@ class LocalNotificationService {
     );
 
     const iosDetails = DarwinNotificationDetails();
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _notifications.show(
+      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title,
+      body,
+      details,
+    );
+  }
+
+  static Future<void> showTricycleNotification(String title, String body) async {
+    await initialize();
+
+    const androidDetails = AndroidNotificationDetails(
+      tricycleChannelId,
+      'Tricycle',
+      channelDescription: 'Notifications Tricycle (demandes, annulations, rejets)',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound(tricycleSoundAndroid),
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound: tricycleSoundIOS,
+    );
 
     const details = NotificationDetails(
       android: androidDetails,

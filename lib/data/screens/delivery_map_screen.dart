@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
+import 'dart:convert';
 // ——— Google Maps (grisé — réactiver si clé API) ———
 // import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -28,16 +30,56 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   // GoogleMapController? _mapController;
   Position? _currentPosition;
   bool _isCollapsed = false;
-  int _selectedTab = 0; // 0 = fournisseur/colis, 1 = acheteur
+  int _selectedTab = 0; // 0..(pickups-1) = fournisseurs, last = acheteur
   double _swipePickup = 0;
+  double _swipeBuyerArrival = 0;
   double _swipeDeliver = 0;
   bool _pickupDone = false;
   bool _deliverDone = false;
   bool _buyerArrived = false;
+  bool _isOpeningPickupFlow = false;
+  bool _isCompletingSwipe = false;
   List<OsmMarkerData> _osmMarkers = [];
 
   Map<String, dynamic> get delivery => widget.delivery;
   bool get colisRecupere => delivery['colisRecupere'] == true;
+
+  List<Map<String, dynamic>> get _pickups {
+    final raw = delivery['pickups'];
+    if (raw is List) {
+      return raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+    return const [];
+  }
+
+  bool get _hasMultiPickups => _pickups.isNotEmpty;
+
+  int get _buyerTabIndex => _hasMultiPickups ? _pickups.length : 1;
+
+  bool get _isBuyerTab => _selectedTab == _buyerTabIndex;
+
+  int? get _currentPickupIndex {
+    if (!_hasMultiPickups) return 0;
+    if (_isBuyerTab) return null;
+    return _selectedTab.clamp(0, _pickups.length - 1);
+  }
+
+  bool get _currentPickupDone {
+    if (_isBuyerTab) return false;
+    if (!_hasMultiPickups) return _pickupDone;
+    final idx = _currentPickupIndex;
+    if (idx == null) return false;
+    final p = _pickups[idx];
+    return p['statut'] == 'picked_up';
+  }
+
+  int get _pickedCount {
+    if (!_hasMultiPickups) return _pickupDone ? 1 : 0;
+    return _pickups.where((p) => p['statut'] == 'picked_up').length;
+  }
 
   /// Normalise une valeur dynamique en `Map<String, dynamic>`.
   /// Certains anciens enregistrements/retours API peuvent renvoyer `[]` au lieu de `{}`.
@@ -64,6 +106,24 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
       return 'CMD #${clean.substring(0, 8).toUpperCase()}';
     }
     return clean;
+  }
+
+  double? _haversineKm(LatLng? a, LatLng? b) {
+    if (a == null || b == null) return null;
+    const r = 6371.0;
+    final dLat = (b.latitude - a.latitude) * (3.141592653589793 / 180.0);
+    final dLon = (b.longitude - a.longitude) * (3.141592653589793 / 180.0);
+    final lat1 = a.latitude * (3.141592653589793 / 180.0);
+    final lat2 = b.latitude * (3.141592653589793 / 180.0);
+    final h = (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(lat1) * cos(lat2) * (sin(dLon / 2) * sin(dLon / 2));
+    final c = 2 * atan2(sqrt(h), sqrt(1 - h));
+    return r * c;
+  }
+
+  String _kmLabel(double? km) {
+    if (km == null) return '—';
+    return '${km.toStringAsFixed(1)} km';
   }
 
   /// Récupère le "numéro de commande" de façon robuste.
@@ -162,7 +222,7 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   void initState() {
     super.initState();
     _pickupDone = colisRecupere;
-    if (colisRecupere) _selectedTab = 1;
+    if (colisRecupere) _selectedTab = _buyerTabIndex;
     _buyerArrived = delivery['dateArrivee'] != null;
     _getCurrentLocation();
     _buildMarkers();
@@ -188,10 +248,22 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     final lieuDestination = _asMap(delivery['lieuDestination']);
     final list = <OsmMarkerData>[];
 
-    final pickup = latLngFromMap(lieuDepart);
-    if (pickup != null) {
-      list.add(OsmMarkerData(
-          point: pickup, iconData: Icons.store, color: Colors.blue));
+    if (_hasMultiPickups) {
+      for (int i = 0; i < _pickups.length; i++) {
+        final p = _pickups[i];
+        final dep = _asMap(p['lieuDepart']);
+        final ll = latLngFromMap(dep);
+        if (ll != null) {
+          list.add(OsmMarkerData(
+              point: ll, iconData: Icons.store, color: Colors.blue));
+        }
+      }
+    } else {
+      final pickup = latLngFromMap(lieuDepart);
+      if (pickup != null) {
+        list.add(OsmMarkerData(
+            point: pickup, iconData: Icons.store, color: Colors.blue));
+      }
     }
     final dest = latLngFromMap(lieuDestination);
     if (dest != null) {
@@ -212,6 +284,12 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   // void _fitBounds() { ... }
 
   LatLng _initialTarget() {
+    if (_hasMultiPickups) {
+      final idx = _currentPickupIndex ?? 0;
+      final dep = _asMap(_pickups[idx]['lieuDepart']);
+      final p = latLngFromMap(dep);
+      return p ?? const LatLng(14.716677, -17.467686);
+    }
     final p = latLngFromMap(_asMap(delivery['lieuDepart']));
     return p ?? const LatLng(14.716677, -17.467686);
   }
@@ -225,11 +303,51 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     }
   }
 
+  Future<void> _openOptimizedRouteTo({
+    required LatLng? destination,
+    LatLng? waypoint,
+  }) async {
+    if (destination == null) return;
+    final origin = _currentPosition != null
+        ? positionToLatLng(_currentPosition!)
+        : null;
+
+    final query = <String, String>{
+      'api': '1',
+      'destination': '${destination.latitude},${destination.longitude}',
+      'travelmode': 'driving',
+    };
+    if (origin != null) {
+      query['origin'] = '${origin.latitude},${origin.longitude}';
+    }
+    if (waypoint != null) {
+      query['waypoints'] = '${waypoint.latitude},${waypoint.longitude}';
+    }
+
+    final uri = Uri.https('www.google.com', '/maps/dir/', query);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
   Future<void> _notifyDeliver() async {
     if (_deliverDone) return;
     final id = delivery['_id']?.toString();
     if (id == null) return;
     try {
+      // QR obligatoire avant livraison (fin)
+      final expectedOrderId = _extractOrderId();
+      final ok = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DeliveryQrScannerScreen(
+            expectedOrderId: expectedOrderId,
+            expectedDeliveryId: id,
+          ),
+        ),
+      );
+      if (ok != true) return;
+
       final user = FirebaseAuth.instance.currentUser;
       final token = await user?.getIdToken();
       if (token == null) return;
@@ -251,6 +369,71 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
         );
       }
     }
+  }
+
+  String _extractOrderId() {
+    final order = delivery['orderId'];
+    if (order is Map) {
+      return (order['_id'] ?? order['id'] ?? '').toString();
+    }
+    return (order ?? '').toString();
+  }
+
+  Future<void> _notifyPickup() async {
+    if (_isBuyerTab) return;
+    if (_currentPickupDone || _isOpeningPickupFlow) return;
+    setState(() {
+      _isOpeningPickupFlow = true;
+      _swipePickup = 0;
+    });
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PackageValidationScreen(
+          delivery: delivery,
+          pickupIndex: _currentPickupIndex,
+        ),
+      ),
+    );
+    await _refreshDeliveryState();
+    if (mounted) {
+      setState(() => _isOpeningPickupFlow = false);
+    }
+  }
+
+  Future<void> _refreshDeliveryState() async {
+    final id = delivery['_id']?.toString();
+    if (id == null) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+      if (token == null) return;
+      final res = await http.get(
+        Uri.parse('${getBackendBaseUrl()}/api/deliveries/$id'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (res.statusCode == 200) {
+        final updated = (jsonDecode(res.body) as Map<String, dynamic>)['delivery']
+            as Map<String, dynamic>?;
+        if (updated != null && mounted) {
+          setState(() {
+            delivery
+              ..clear()
+              ..addAll(updated);
+            _pickupDone = delivery['colisRecupere'] == true;
+            _buyerArrived = delivery['dateArrivee'] != null;
+            if (_pickupDone) {
+              _selectedTab = _buyerTabIndex;
+            } else if (_hasMultiPickups) {
+              final next =
+                  _pickups.indexWhere((p) => p['statut'] != 'picked_up');
+              if (next >= 0) _selectedTab = next;
+            }
+          });
+          _buildMarkers();
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _notifyArrival() async {
@@ -285,10 +468,16 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Destination pour le bouton "Naviguer" : fournisseur (onglet 0) ou acheteur (onglet 1)
-    final navDest = _selectedTab == 0
-        ? latLngFromMap(_asMap(delivery['lieuDepart']))
-        : latLngFromMap(_asMap(delivery['lieuDestination']));
+    // Destination "Naviguer" selon l'onglet courant
+    LatLng? navDest;
+    if (_isBuyerTab) {
+      navDest = latLngFromMap(_asMap(delivery['lieuDestination']));
+    } else if (_hasMultiPickups) {
+      final idx = _currentPickupIndex ?? 0;
+      navDest = latLngFromMap(_asMap(_pickups[idx]['lieuDepart']));
+    } else {
+      navDest = latLngFromMap(_asMap(delivery['lieuDepart']));
+    }
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
@@ -377,9 +566,9 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
                     16,
                     MediaQuery.of(context).padding.bottom + 140,
                   ),
-                  child: _selectedTab == 0
-                      ? _buildFournisseurContent()
-                      : _buildAcheteurContent(),
+                  child: _isBuyerTab
+                      ? _buildAcheteurContent()
+                      : _buildFournisseurContent(),
                 ),
               ),
             ] else
@@ -415,9 +604,17 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          _buildTabIcon(0, Icons.inventory_2_outlined, 'Colis & Fournisseur'),
-          const SizedBox(width: 8),
-          _buildTabIcon(1, Icons.person_outline, 'Acheteur'),
+          if (_hasMultiPickups) ...[
+            for (int i = 0; i < _pickups.length; i++) ...[
+              _buildTabIcon(i, Icons.inventory_2_outlined, 'Fournisseur ${i + 1}'),
+              const SizedBox(width: 8),
+            ],
+            _buildTabIcon(_buyerTabIndex, Icons.person_outline, 'Acheteur'),
+          ] else ...[
+            _buildTabIcon(0, Icons.inventory_2_outlined, 'Colis & Fournisseur'),
+            const SizedBox(width: 8),
+            _buildTabIcon(1, Icons.person_outline, 'Acheteur'),
+          ],
         ],
       ),
     );
@@ -426,7 +623,19 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   Widget _buildTabIcon(int index, IconData icon, String tooltip) {
     final selected = _selectedTab == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedTab = index),
+      onTap: () {
+        if (index == _buyerTabIndex && !_pickupDone) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Validez "Sur place" chez le fournisseur avant l\'étape acheteur.',
+              ),
+            ),
+          );
+          return;
+        }
+        setState(() => _selectedTab = index);
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -453,9 +662,16 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   Widget _buildCollapsedContent() {
     final lieuDepart = _asMap(delivery['lieuDepart']);
     final lieuDestination = _asMap(delivery['lieuDestination']);
-    final dest = _selectedTab == 0
-        ? (lieuDepart['adresse'] ?? 'Fournisseur')
-        : (lieuDestination['adresse'] ?? 'Acheteur');
+    String dest;
+    if (_isBuyerTab) {
+      dest = (lieuDestination['adresse'] ?? 'Acheteur').toString();
+    } else if (_hasMultiPickups) {
+      final idx = _currentPickupIndex ?? 0;
+      dest = (_asMap(_pickups[idx]['lieuDepart'])['adresse'] ?? 'Fournisseur')
+          .toString();
+    } else {
+      dest = (lieuDepart['adresse'] ?? 'Fournisseur').toString();
+    }
     final acheteur = _asMap(delivery['acheteur']);
     final name = '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim();
     return Padding(
@@ -469,12 +685,16 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _pickupDone ? 'En livraison' : 'En direction du fournisseur',
+                  _pickupDone
+                      ? 'En livraison'
+                      : (_hasMultiPickups
+                          ? 'Pickups ${_pickedCount}/${_pickups.length}'
+                          : 'En direction du fournisseur'),
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _selectedTab == 0 ? dest : (name.isNotEmpty ? name : dest),
+                  _isBuyerTab ? (name.isNotEmpty ? name : dest) : dest,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -507,8 +727,11 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   }
 
   Widget _buildFournisseurContent() {
-    final lieuDepart = _asMap(delivery['lieuDepart']);
-    final fournisseur = _asMap(delivery['fournisseur']);
+    final pickup = _hasMultiPickups && _currentPickupIndex != null
+        ? _pickups[_currentPickupIndex!]
+        : null;
+    final lieuDepart = pickup != null ? _asMap(pickup['lieuDepart']) : _asMap(delivery['lieuDepart']);
+    final fournisseur = pickup != null ? _asMap(pickup['fournisseur']) : _asMap(delivery['fournisseur']);
     final acheteur = _asMap(delivery['acheteur']);
     final supplierName = fournisseur['nom']?.toString() ??
         fournisseur['entreprise']?.toString() ??
@@ -522,8 +745,14 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     final buyerName =
         '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim();
     final orderNumber = _extractOrderNumberFromDelivery();
-    final pieces = delivery['pieces'] as List? ?? [];
+    final pieces = pickup != null ? (pickup['pieces'] as List? ?? []) : (delivery['pieces'] as List? ?? []);
     final exigences = delivery['noteAcheteur']?.toString() ?? 'Porte à porte';
+    final supplierLatLng = latLngFromMap(lieuDepart);
+    final buyerLatLng = latLngFromMap(_asMap(delivery['lieuDestination']));
+    final currentLatLng =
+        _currentPosition != null ? positionToLatLng(_currentPosition!) : null;
+    final kmToSupplier = _haversineKm(currentLatLng, supplierLatLng);
+    final supplierToBuyerKm = _haversineKm(supplierLatLng, buyerLatLng);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -538,21 +767,24 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
                 Expanded(
                   child: _buildInfoRow(
                     icon: Icons.route,
-                    title: 'Distance',
-                    value: delivery['distanceKm'] != null
-                        ? '${(delivery['distanceKm'] as num).toStringAsFixed(1)} km'
-                        : '—',
+                    title: 'Vers fournisseur',
+                    value: _kmLabel(kmToSupplier),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildInfoRow(
                     icon: Icons.payments_outlined,
-                    title: 'Frais livraison',
+                    title: 'Gain livraison',
                     value: '${delivery['fraisLivraison'] ?? 0} FCFA',
                   ),
                 ),
               ],
+            ),
+            _buildInfoRow(
+              icon: Icons.compare_arrows,
+              title: 'Fournisseur -> Acheteur',
+              value: _kmLabel(supplierToBuyerKm),
             ),
             _buildInfoRow(
               icon: Icons.inventory_2_outlined,
@@ -615,17 +847,17 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _callPhone(supplierPhone),
-                icon: const Icon(Icons.phone, color: Colors.green, size: 20),
-                label: const Text('Appeler fournisseur'),
+                onPressed: () => _openOptimizedRouteTo(destination: supplierLatLng),
+                icon: const Icon(Icons.near_me, color: Colors.green, size: 20),
+                label: const Text('Géolocaliser fournisseur'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.message, color: Colors.blue, size: 20),
-                label: const Text('Assistance'),
+                onPressed: () => _callPhone(supplierPhone),
+                icon: const Icon(Icons.phone, color: Colors.blue, size: 20),
+                label: const Text('Contacter'),
               ),
             ),
           ],
@@ -636,17 +868,8 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
           icon: Icons.location_on,
           value: _swipePickup,
           onDrag: (v) => setState(() => _swipePickup = v),
-          onComplete: () {
-            if (_pickupDone) return;
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    PackageValidationScreen(delivery: delivery),
-              ),
-            );
-          },
-          enabled: !_pickupDone,
+          onComplete: _notifyPickup,
+          enabled: !_pickupDone && !_currentPickupDone,
         ),
       ],
     );
@@ -654,6 +877,7 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
 
   Widget _buildAcheteurContent() {
     final lieuDestination = _asMap(delivery['lieuDestination']);
+    final lieuDepart = _asMap(delivery['lieuDepart']);
     final acheteur = _asMap(delivery['acheteur']);
     final name = '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim();
     final addr = lieuDestination['adresse']?.toString() ?? '—';
@@ -664,6 +888,12 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     final paymentLabel =
         delivery['fraisLivraison'] != null ? 'Espèces à la livraison' : '—';
     final exigences = delivery['noteAcheteur']?.toString() ?? 'Porte à porte';
+    final buyerLatLng = latLngFromMap(lieuDestination);
+    final supplierLatLng = latLngFromMap(lieuDepart);
+    final currentLatLng =
+        _currentPosition != null ? positionToLatLng(_currentPosition!) : null;
+    final kmToBuyer = _haversineKm(currentLatLng, buyerLatLng);
+    final supplierToBuyerKm = _haversineKm(supplierLatLng, buyerLatLng);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -675,10 +905,18 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
           children: [
             _buildInfoRow(
               icon: Icons.route,
-              title: 'Distance',
-              value: delivery['distanceKm'] != null
-                  ? '${(delivery['distanceKm'] as num).toStringAsFixed(1)} km'
-                  : '—',
+              title: 'Vers acheteur',
+              value: _kmLabel(kmToBuyer),
+            ),
+            _buildInfoRow(
+              icon: Icons.compare_arrows,
+              title: 'Fournisseur -> Acheteur',
+              value: _kmLabel(supplierToBuyerKm),
+            ),
+            _buildInfoRow(
+              icon: Icons.payments_outlined,
+              title: 'Gain livraison',
+              value: '${delivery['fraisLivraison'] ?? 0} FCFA',
             ),
           ],
         ),
@@ -736,17 +974,24 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _callPhone(phone),
-                icon: const Icon(Icons.phone, color: Colors.green, size: 20),
-                label: const Text('Appeler l\'acheteur'),
+                onPressed: _pickupDone
+                    ? () => _openOptimizedRouteTo(
+                          destination: buyerLatLng,
+                          waypoint: (!_pickupDone && supplierLatLng != null)
+                              ? supplierLatLng
+                              : null,
+                        )
+                    : null,
+                icon: const Icon(Icons.near_me, color: Colors.green, size: 20),
+                label: const Text('Géolocaliser Acheteur'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.message, color: Colors.blue, size: 20),
-                label: const Text('Message support'),
+                onPressed: () => _callPhone(phone),
+                icon: const Icon(Icons.phone, color: Colors.blue, size: 20),
+                label: const Text('Contacter'),
               ),
             ),
           ],
@@ -757,10 +1002,10 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
           _buildSwipeButton(
             text: 'Sur place',
             icon: Icons.location_on,
-            value: _swipePickup,
-            onDrag: (v) => setState(() => _swipePickup = v),
+            value: _swipeBuyerArrival,
+            onDrag: (v) => setState(() => _swipeBuyerArrival = v),
             onComplete: _notifyArrival,
-            enabled: true,
+            enabled: _pickupDone,
           ),
         ] else ...[
           _buildSwipeButton(
@@ -834,9 +1079,20 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     return GestureDetector(
       onHorizontalDragUpdate: enabled
           ? (d) {
+              if (_isCompletingSwipe) return;
               final newVal = (value + d.delta.dx).clamp(0.0, screenW);
               onDrag(newVal);
-              if (newVal >= threshold) onComplete();
+              if (newVal >= threshold) {
+                _isCompletingSwipe = true;
+                onComplete();
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (mounted) {
+                    setState(() => _isCompletingSwipe = false);
+                  } else {
+                    _isCompletingSwipe = false;
+                  }
+                });
+              }
             }
           : null,
       onHorizontalDragEnd: enabled
@@ -883,12 +1139,12 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(icon, color: Colors.white70, size: 22),
+                      Icon(icon, color: Colors.black54, size: 22),
                       const SizedBox(width: 8),
                       Text(
                         'Glisser pour $text',
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: Colors.black54,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),

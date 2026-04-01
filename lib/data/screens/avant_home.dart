@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tranoo_pro/data/screens/wallet_screen.dart';
+import 'package:tranoo_pro/data/screens/wallet_vendeur_screen.dart';
 import 'package:tranoo_pro/data/screens/marque.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/piece.dart';
-import 'package:tranoo_pro/data/screens/cart_page.dart';
-import 'package:tranoo_pro/services/cart_service.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
@@ -247,59 +246,6 @@ class _AvantHomeState extends State<AvantHome> {
               ),
             ),
             actions: [
-              // Icône de panier (seulement pour les non-vendeurs)
-              if (role != 'vendeur')
-                Consumer<CartService>(
-                  builder: (context, cart, child) {
-                    return IconButton(
-                      icon: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(
-                            Icons.shopping_cart_outlined,
-                            color: Colors.black,
-                            size: iconSize,
-                          ),
-                          if (cart.totalQuantity > 0)
-                            Positioned(
-                              right: 4,
-                              top: 4,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 16,
-                                  minHeight: 16,
-                                ),
-                                child: Text(
-                                  cart.totalQuantity > 99
-                                      ? '99+'
-                                      : cart.totalQuantity.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CartPage(),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
               Consumer<CounterProvider>(
                 builder: (context, counter, child) {
                   return IconButton(
@@ -473,8 +419,9 @@ class _AvantHomeState extends State<AvantHome> {
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) =>
-                                          const WalletScreen(),
+                                      builder: (context) => role == 'vendeur'
+                                          ? const WalletVendeurScreen()
+                                          : const WalletScreen(),
                                     ),
                                   ),
                                   icon: Icon(

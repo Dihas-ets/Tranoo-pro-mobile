@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:dio/dio.dart';
 
 class MapPickerScreen extends StatefulWidget {
   final double? initialLatitude;
@@ -21,6 +22,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   late MapController _mapController;
   LatLng? _selectedPosition;
   bool _isLoading = false;
+  bool _isLoadingAddress = false;
+  String _selectedAddress = '';
 
   @override
   void initState() {
@@ -33,6 +36,46 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     } else {
       // Position par défaut : Cotonou, Bénin
       _selectedPosition = const LatLng(6.3654, 2.4183);
+    }
+  }
+
+  Future<void> _updateSelectedAddress() async {
+    final pos = _selectedPosition;
+    if (pos == null) return;
+    setState(() {
+      _isLoadingAddress = true;
+    });
+    try {
+      final response = await Dio().get(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'format': 'json',
+          'lat': pos.latitude,
+          'lon': pos.longitude,
+          'zoom': 18,
+          'addressdetails': 1,
+        },
+        options: Options(
+          headers: {
+            'User-Agent': 'TranooPro/1.0',
+          },
+        ),
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        final address = data['display_name'] as String? ?? '';
+        setState(() {
+          _selectedAddress = address;
+        });
+      }
+    } catch (_) {
+      // Silence: l'adresse est optionnelle
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingAddress = false;
+      });
     }
   }
 
@@ -88,6 +131,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       });
 
       _mapController.move(_selectedPosition!, 15.0);
+      await _updateSelectedAddress();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -136,6 +180,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 setState(() {
                   _selectedPosition = point;
                 });
+                _updateSelectedAddress();
               },
             ),
             children: [
@@ -210,14 +255,25 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Lat: ${_selectedPosition!.latitude.toStringAsFixed(6)}\nLon: ${_selectedPosition!.longitude.toStringAsFixed(6)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                      if (_isLoadingAddress)
+                        const Text(
+                          'Récupération de l’adresse...',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        )
+                      else
+                        Text(
+                          _selectedAddress.isNotEmpty
+                              ? _selectedAddress
+                              : 'Adresse non disponible',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
                     ],
                   ),
                 ),
