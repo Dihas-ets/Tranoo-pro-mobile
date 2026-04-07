@@ -35,6 +35,14 @@ class _DeliveryNotificationBannerState
   bool _isDismissed = false;
   double? _calculatedDistanceKm;
 
+  Map<String, dynamic> _asMap(dynamic v) {
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return Map<String, dynamic>.from(v);
+    return <String, dynamic>{};
+  }
+
+  List _asList(dynamic v) => v is List ? v : const [];
+
   // Calculer la distance depuis la position actuelle du livreur jusqu'au lieu de départ
   double _calculateDistanceToPickup() {
     if (widget.currentPosition == null) {
@@ -42,7 +50,13 @@ class _DeliveryNotificationBannerState
       return widget.delivery['distanceKm'] ?? 0.0;
     }
 
-    final lieuDepart = widget.delivery['lieuDepart'] ?? {};
+    final lieuDepartRaw = widget.delivery['lieuDepart'];
+    final lieuDepart = _asMap(lieuDepartRaw);
+    if (lieuDepart.isEmpty && lieuDepartRaw != null) {
+      debugPrint(
+        '[DeliveryNotificationBanner] lieuDepart type inattendu: ${lieuDepartRaw.runtimeType} ($lieuDepartRaw)',
+      );
+    }
     final lat = lieuDepart['latitude'];
     final lng = lieuDepart['longitude'];
 
@@ -158,17 +172,13 @@ class _DeliveryNotificationBannerState
   Widget build(BuildContext context) {
     if (_isDismissed) return const SizedBox.shrink();
 
-    final lieuDepart = widget.delivery['lieuDepart'] ?? {};
+    final lieuDepart = _asMap(widget.delivery['lieuDepart']);
     final distanceKm = _calculatedDistanceKm ?? widget.delivery['distanceKm'] ?? 0.0;
     final prixEstime =
         widget.delivery['prixEstime'] ?? widget.delivery['fraisLivraison'] ?? 0;
-    final acheteur = widget.delivery['acheteur'] ?? {};
-    final acheteurNom =
-        '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim().isEmpty
-            ? 'Client'
-            : '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim();
+    // Acheteur (optionnel) - gardé pour extension UI, mais non affiché ici.
 
-    final adresse = lieuDepart['adresse'] ?? '';
+    final adresse = (lieuDepart['adresse'] ?? '').toString();
     final adresseParts = adresse
         .split(',')
         .map((s) => s.trim())
@@ -180,7 +190,7 @@ class _DeliveryNotificationBannerState
       left: 0,
       right: 0,
       child: Container(
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -198,7 +208,7 @@ class _DeliveryNotificationBannerState
           children: [
             // Distance + durée en haut
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: const BoxDecoration(
                 color: Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -208,7 +218,7 @@ class _DeliveryNotificationBannerState
                   Text(
                     '${_formatDistance(distanceKm)} • ${_formatDuration(distanceKm)}',
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                       letterSpacing: -0.5,
@@ -229,12 +239,12 @@ class _DeliveryNotificationBannerState
             // Ligne de séparation fine
             Container(
               height: 1,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 14),
               color: Colors.grey[300],
             ),
             // Détails (activité + prix)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
                   // Section Activité avec cercle vert contenant "A"
@@ -323,7 +333,7 @@ class _DeliveryNotificationBannerState
             if (widget.delivery['noteAcheteur'] != null &&
                 (widget.delivery['noteAcheteur'] as String).isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -357,7 +367,7 @@ class _DeliveryNotificationBannerState
             // Adresse
             if (adresseParts.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: adresseParts.map((part) {
@@ -422,8 +432,8 @@ class _DeliveryNotificationBannerState
         }
       },
       child: Container(
-        height: 64,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        height: 58,
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
           color: widget.isOnline && _slideValue == 0 && !_isAccepted
@@ -463,18 +473,22 @@ class _DeliveryNotificationBannerState
                                 ? Colors.black87
                                 : Colors.grey[400],
                         fontWeight: FontWeight.bold,
-                        fontSize: _isAccepted ? 16 : 17,
+                        fontSize: _isAccepted ? 15 : 16,
                       ),
                     ),
                     if (!_isAccepted) const SizedBox(height: 2),
                     if (!_isAccepted)
                       Text(
-                        'Coursier - ${widget.delivery['pieces']?.length ?? 1} arrêt${(widget.delivery['pieces']?.length ?? 1) > 1 ? 's' : ''}',
+                        () {
+                          final n = _asList(widget.delivery['pieces']).length;
+                          final stops = n == 0 ? 1 : n;
+                          return 'Coursier - $stops arrêt${stops > 1 ? 's' : ''}';
+                        }(),
                         style: TextStyle(
                           color: widget.isOnline
                               ? Colors.black54
                               : Colors.grey[500],
-                          fontSize: 12,
+                          fontSize: 11.5,
                         ),
                       ),
                   ],

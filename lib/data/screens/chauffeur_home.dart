@@ -24,6 +24,8 @@ class ChauffeurHomePage extends StatefulWidget {
 
 class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
   String _currency = 'XOF';
+  double? _balance;
+  bool _showBalance = false;
   // ignore: unused_field - utilisé pour le polling des nouvelles courses
   List<Map<String, dynamic>> _pendingRides = [];
   List<Map<String, dynamic>> _activeRides = [];
@@ -62,9 +64,31 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
   Future<void> _initializePage() async {
     await _loadUserData();
     await _requestLocationPermission();
+    await _syncOnlineStatus();
     await _loadData();
     _startLocationTracking();
     _startNotificationsListener();
+  }
+
+  Future<void> _syncOnlineStatus() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      if (idToken == null) return;
+      final baseUrl = getBackendBaseUrl();
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/tricycles/chauffeur/status'),
+        headers: {'Authorization': 'Bearer $idToken'},
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final s = (data['availabilityStatus'] ?? '').toString().toLowerCase();
+        if (!mounted) return;
+        setState(() {
+          _isOnline = s == 'available';
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUserData() async {
@@ -138,8 +162,9 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
   void _startNotificationsListener() {
     _notificationPollTimer =
         Timer.periodic(const Duration(seconds: 10), (_) async {
-      if (mounted && _isOnline) {
-        await _loadNotifications();
+      if (!mounted) return;
+      await _loadNotifications();
+      if (_isOnline) {
         await _checkForNewRides();
       }
     });
@@ -225,6 +250,12 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
         final dueDateRaw = loan['dueDate'] ?? data['loanDueDate'];
         setState(() {
           _currency = data['currency'] ?? 'XOF';
+          _balance = (data['balance'] as num?)?.toDouble() ??
+              (data['balance'] is String
+                  ? double.tryParse(data['balance'])
+                  : null) ??
+              _balance ??
+              0;
           _loanPaid = paid;
           _loanRemaining = remaining;
           _loanDueDate = dueDateRaw != null
@@ -554,12 +585,29 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
                   style: TextStyle(fontSize: 13, color: Colors.black54),
                 ),
                 const Spacer(),
-                const Text(
-                  '••••••',
-                  style: TextStyle(
+                Text(
+                  _showBalance
+                      ? NumberFormat.currency(
+                          locale: 'fr_FR',
+                          symbol: '$_currency ',
+                          decimalDigits: 0,
+                        ).format(_balance ?? 0)
+                      : '••••••',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFFB8860B),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _showBalance = !_showBalance),
+                  child: Icon(
+                    _showBalance ? Icons.visibility_off : Icons.visibility,
+                    size: 18,
+                    color: Colors.black54,
                   ),
                 ),
               ],

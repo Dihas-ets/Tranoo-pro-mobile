@@ -1366,36 +1366,40 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Recommandé",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF040415),
-                ),
+
+Padding(
+  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        _userService.currentRole == UserRole.vendeur ? "Mes voitures" : "Recommandé",
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF040415),
+        ),
+      ),
+      if (_userService.currentRole != UserRole.vendeur)
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const VoituresPage(),
               ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const VoituresPage(),
-                    ),
-                  );
-                },
-                child: const Text(
-                  "Voir tout",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-              ),
-            ],
+            );
+          },
+          child: const Text(
+            "Voir tout",
+            style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
         ),
+    ],
+  ),
+),
+
+
         if (isLoadingVoitures) const Center(child: CircularProgressIndicator()),
         if (errorVoitures != null) Center(child: Text(errorVoitures!)),
         if (!isLoadingVoitures && errorVoitures == null)
@@ -1724,34 +1728,39 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Pièces détachées",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF040415),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => Piece()),
-                  );
-                },
-                child: const Text(
-                  "Voir plus",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-              ),
-            ],
+
+
+Padding(
+  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        _userService.currentRole == UserRole.vendeur ? "Mes pièces" : "Pièces détachées",
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF040415),
+        ),
+      ),
+      if (_userService.currentRole != UserRole.vendeur)
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => Piece()),
+            );
+          },
+          child: const Text(
+            "Voir plus",
+            style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
         ),
+    ],
+  ),
+),
+
+
         if (isLoadingPieces) const Center(child: CircularProgressIndicator()),
         if (errorPieces != null) Center(child: Text(errorPieces!)),
         if (!isLoadingPieces && errorPieces == null)
@@ -2259,44 +2268,46 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
   }
 
   // SECTION À LA UNE (carrousel)
-  Widget buildPubsALaUneCarousel() {
-    if (isLoadingPubs) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (errorPubs != null) {
-      return Center(child: Text(errorPubs!));
-    }
-    if (pubsALaUne.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    // Affiche le carrousel et l'indicateur uniquement si la liste n'est pas vide
-    return Column(
-      children: [
-        SizedBox(
-          height: 260,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: pubsALaUne.length,
-            itemBuilder: (context, index) {
-              final pub = pubsALaUne[index];
-              final hasLink = (pub.lien ?? '').trim().isNotEmpty;
-              final card = Card(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: pub.media.isNotEmpty
-                          ? Container(
-                              width: double.infinity,
-                              height: 260,
-                              color: Colors.black,
+Widget buildPubsALaUneCarousel() {
+  if (isLoadingPubs) {
+    return const Center(child: CircularProgressIndicator());
+  }
+  if (errorPubs != null) {
+    return Center(child: Text(errorPubs!));
+  }
+  if (pubsALaUne.isEmpty) {
+    return const SizedBox.shrink();
+  }
+  // Affiche le carrousel et l'indicateur uniquement si la liste n'est pas vide
+  return Column(
+    children: [
+      SizedBox(
+        height: 260,
+        child: PageView.builder(
+          controller: _pageController,
+          itemCount: pubsALaUne.length,
+          itemBuilder: (context, index) {
+            final pub = pubsALaUne[index];
+            final hasLink = (pub.lien ?? '').trim().isNotEmpty;
+            final card = Card(
+              margin: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  height: 260,
+                  color: Colors.black,
+                  child: pub.media.isNotEmpty
+                      ? Stack(
+                          children: [
+                            // Image avec ajustement auto
+                            Positioned.fill(
                               child: Image.network(
                                 pub.media[0],
-                                fit: BoxFit.contain,
+                                fit: BoxFit.cover,
                                 alignment: Alignment.center,
                                 filterQuality: FilterQuality.high,
                                 errorBuilder: (context, error, stackTrace) {
@@ -2310,101 +2321,74 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
                                   );
                                 },
                               ),
-                            )
-                          : Container(
-                              height: 260,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.image, size: 120),
                             ),
-                    ),
-                    Positioned(
-                      left: 8,
-                      bottom: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          pub.description,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    if (hasLink)
-                      Positioned(
-                        right: 12,
-                        bottom: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.85),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.link, size: 16, color: Colors.black87),
-                              SizedBox(width: 4),
-                              Text(
-                                'Voir plus',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                            // Overlay pour s'assurer que le contenu reste lisible
+                            if (pub.description.isNotEmpty)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        Colors.black.withOpacity(0.7),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
+                          ],
+                        )
+                      : Container(
+                          height: 260,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.image, size: 120),
                         ),
-                      ),
-                  ],
                 ),
-              );
+              ),
+            );
 
-              if (hasLink) {
-                return InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => _openPubLink(pub.lien!.trim()),
-                  child: card,
-                );
-              }
-              return InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () =>
-                    _openFlyerPreview(pub.media.isNotEmpty ? pub.media[0] : ''),
-                child: card,
-              );
-            },
+            return GestureDetector(
+              onTap: () {
+                if (hasLink) {
+                  _openPubLink(pub.lien!.trim());
+                } else {
+                  _openFlyerPreview(pub.media.isNotEmpty ? pub.media[0] : '');
+                }
+              },
+              onDoubleTap: () {
+                if (hasLink) {
+                  _openFlyerPreview(pub.media.isNotEmpty ? pub.media[0] : '');
+                }
+              },
+              child: card,
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 8),
+      if (pubsALaUne.length > 1)
+        SmoothPageIndicator(
+          controller: _pageController,
+          count: pubsALaUne.length,
+          effect: JumpingDotEffect(
+            activeDotColor: Color(0xFFF8BF13),
+            dotColor: Colors.grey.shade300,
+            dotHeight: 10,
+            dotWidth: 10,
           ),
         ),
-        const SizedBox(height: 8),
-        if (pubsALaUne.length > 1)
-          SmoothPageIndicator(
-            controller: _pageController,
-            count: pubsALaUne.length,
-            effect: JumpingDotEffect(
-              activeDotColor: Color(0xFFF8BF13),
-              dotColor: Colors.grey.shade300,
-              dotHeight: 10,
-              dotWidth: 10,
-            ),
-          ),
-      ],
-    );
-  }
+    ],
+  );
+}
 
   @override
   Widget build(BuildContext context) {

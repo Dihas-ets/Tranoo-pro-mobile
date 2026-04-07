@@ -141,7 +141,7 @@ class _UneState extends State<Une> {
     _loadPrixConfig(); // Charger les prix depuis le backend
     if (widget.isStandalone) {
       _selectedVoiture = 'À la une';
-      _descriptionController.text = 'Publicité À la une (flyer vitrine Tranoo)';
+      _descriptionController.text = 'Description de la publicité ';
     }
     // Si on a un articleId, charger ses infos
     if (widget.articleId != null) {

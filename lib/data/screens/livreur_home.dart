@@ -318,7 +318,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
       // Charger le solde
       final walletRes = await http.get(
-        Uri.parse('$baseUrl/api/wallet/me'),
+        Uri.parse('$baseUrl/api/livreurs/balance/me'),
         headers: {'Authorization': 'Bearer $idToken'},
       );
 
@@ -341,8 +341,21 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         final data = jsonDecode(walletRes.body);
         setState(() {
           _balance = _toDouble(data['balance']) ?? 0;
-          _currency = data['currency'] ?? 'XOF';
+          _currency = (data['currency'] ?? 'XOF').toString();
         });
+      } else {
+        // Fallback compat: ancienne route wallet
+        final fallbackRes = await http.get(
+          Uri.parse('$baseUrl/api/wallet/me'),
+          headers: {'Authorization': 'Bearer $idToken'},
+        );
+        if (fallbackRes.statusCode == 200) {
+          final data = jsonDecode(fallbackRes.body);
+          setState(() {
+            _balance = _toDouble(data['balance']) ?? 0;
+            _currency = (data['currency'] ?? 'XOF').toString();
+          });
+        }
       }
 
       if (pendingRes.statusCode == 200) {
@@ -1054,7 +1067,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         setState(() {
           _swipeCompleteValues[deliveryId] = newVal;
         });
-        if (newVal >= threshold) {
+        if (newVal >= threshold * 0.8) {
           _completeDelivery(deliveryId, delivery, screenW);
         }
       },
@@ -1072,7 +1085,9 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         height: 64,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
-          color: Colors.grey[800], // Fond gris foncé
+          color: _isOnline && swipeValue == 0 && !reached
+              ? const Color(0xFFFFC107)
+              : Colors.grey[800], // Fond gris foncé
         ),
         child: Stack(
           children: [
@@ -1083,7 +1098,8 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                 top: 0,
                 bottom: 0,
                 width: reached ? screenW : swipeValue.clamp(0.0, screenW),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 80),
                   decoration: BoxDecoration(
                     color: reached
                         ? const Color(0xFF2E7D32) // Vert après complétion
@@ -1103,9 +1119,9 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                       style: TextStyle(
                         color: reached
                             ? Colors.white
-                            : swipeValue > 0
-                                ? Colors.white
-                                : Colors.white,
+                            : (_isOnline && swipeValue == 0
+                                ? Colors.black87
+                                : Colors.white),
                         fontWeight: FontWeight.bold,
                         fontSize: reached ? 16 : 17,
                       ),
@@ -1115,7 +1131,9 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                       Text(
                         'Glisser pour compléter',
                         style: TextStyle(
-                          color: swipeValue > 0 ? Colors.white70 : Colors.grey[400],
+                          color: _isOnline
+                              ? Colors.black54
+                              : Colors.grey[400],
                           fontSize: 12,
                         ),
                       ),
@@ -1137,18 +1155,19 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     final threshold = screenW * 0.85;
     final reached = swipeValue >= threshold;
     final isAccepting = _acceptingDeliveryIds.contains(deliveryId);
+    final isDisabled = !_isOnline || isAccepting;
 
     return GestureDetector(
-      onHorizontalDragUpdate: isAccepting ? null : (d) {
+      onHorizontalDragUpdate: isDisabled ? null : (d) {
         final newVal = (swipeValue + d.delta.dx).clamp(0.0, screenW);
         setState(() {
           _swipeAcceptValues[deliveryId] = newVal;
         });
-        if (newVal >= threshold) {
+        if (newVal >= threshold * 0.8) {
           _acceptDelivery(deliveryId, openMapAfter: true);
         }
       },
-      onHorizontalDragEnd: isAccepting ? null : (_) {
+      onHorizontalDragEnd: isDisabled ? null : (_) {
         if (swipeValue < threshold * 0.5) {
           setState(() {
             _swipeAcceptValues[deliveryId] = 0.0;
@@ -1161,7 +1180,9 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
         height: 64,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
-          color: Colors.grey[800],
+          color: _isOnline && swipeValue == 0 && !reached
+              ? const Color(0xFFFFC107)
+              : Colors.grey[800],
         ),
         child: Stack(
           children: [
@@ -1171,11 +1192,12 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                 top: 0,
                 bottom: 0,
                 width: reached ? screenW : swipeValue.clamp(0.0, screenW),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 80),
                   decoration: BoxDecoration(
                     color: reached
-                        ? Colors.green
-                        : const Color(0xFFF8BF13),
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFF2E7D32),
                     borderRadius: BorderRadius.circular(32),
                   ),
                 ),
@@ -1187,8 +1209,12 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                   children: [
                     Text(
                       isAccepting ? 'TRAITEMENT...' : (reached ? 'ACCEPTÉE' : 'Accepter'),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: reached
+                            ? Colors.white
+                            : (_isOnline && swipeValue == 0
+                                ? Colors.black87
+                                : Colors.white),
                         fontWeight: FontWeight.bold,
                         fontSize: 17,
                       ),
@@ -1196,10 +1222,10 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
                     if (!reached) const SizedBox(height: 2),
                     if (!reached)
                       Text(
-                        'Glisser pour accepter',
+                        _isOnline ? 'Glisser pour accepter' : 'Passez en ligne',
                         style: TextStyle(
-                          color: swipeValue > 0
-                              ? Colors.white70
+                          color: _isOnline
+                              ? Colors.black54
                               : Colors.grey[400],
                           fontSize: 12,
                         ),
