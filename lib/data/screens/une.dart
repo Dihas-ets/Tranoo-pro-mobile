@@ -15,6 +15,9 @@ import 'package:http/http.dart' as http;
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'dart:developer';
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:geolocator/geolocator.dart';
+import 'map_picker_screen.dart';
+import '../../widgets/location_permission_dialog.dart';
 
 class Une extends StatefulWidget {
   final String? articleId; // ID de l'article existant (optionnel)
@@ -90,7 +93,7 @@ class _UneState extends State<Une> {
   bool _isUploadingVideo = false;
   double _videoUploadProgress = 0.0; // Progression de l'upload vidéo
 
-  final List<String> voitures = ['Sponsorisée', 'À la une'];
+  final List<String> voitures = ['À la une', 'Sponsorisée'];
   final List<String> moyensPaiement = ['Paiement bancaire', 'Mobile Money'];
   final List<String> durees = [
     '1 semaine',
@@ -115,6 +118,7 @@ class _UneState extends State<Une> {
     'Aucun',
   ];
   final List<String> _carModels = ['Modèle1', 'Modèle2', 'Autre'];
+  String? _customCarModel; // Pour les modèles personnalisés
 
   final ImagePicker picker = ImagePicker();
 
@@ -132,6 +136,14 @@ class _UneState extends State<Une> {
   bool _isLoadingArticle = false;
   String? _createdArticleId; // ID de l'article créé pendant la session
 
+  // Variables pour la localisation
+  double? _userLatitude;
+  double? _userLongitude;
+  String _userAddress = '';
+  String _userCity = '';
+  bool _isUsingCurrentLocation = false;
+  bool _loadingAddress = false;
+
   bool get _isAnyUploading =>
       _isUploadingImage.contains(true) || _isUploadingVideo;
 
@@ -140,8 +152,10 @@ class _UneState extends State<Une> {
     super.initState();
     _loadPrixConfig(); // Charger les prix depuis le backend
     if (widget.isStandalone) {
-      _selectedVoiture = 'À la une';
+      _selectedVoiture = null; // Valeur par défaut pour standalone
       _descriptionController.text = 'Description de la publicité ';
+    } else {
+      _selectedVoiture = 'À la une'; // Par défaut pour les pubs d'articles
     }
     // Si on a un articleId, charger ses infos
     if (widget.articleId != null) {
@@ -158,9 +172,14 @@ class _UneState extends State<Une> {
       _carCompanyController.text =
           widget.articleCompany ?? 'Nom de l\'entreprise';
       _carModelController.text = widget.articleModel ?? 'Marque';
-      _selectedCarModel = _carModels.contains(widget.articleModel)
-          ? widget.articleModel
-          : 'Modèle1';
+      if (_carModels.contains(widget.articleModel)) {
+        _selectedCarModel = widget.articleModel;
+      } else if (widget.articleModel != null) {
+        _selectedCarModel = 'Autre';
+        _customCarModel = widget.articleModel;
+      } else {
+        _selectedCarModel = 'Modèle1';
+      }
       _selectedCarFuelType = _carFuelTypes.contains(widget.articleFuelType)
           ? widget.articleFuelType
           : 'Essence';
@@ -170,7 +189,9 @@ class _UneState extends State<Une> {
 
       // Charger les images si fournies
       if (widget.articleImages != null && widget.articleImages!.isNotEmpty) {
-        _cloudinaryImageUrls = List<String>.from(widget.articleImages!);
+        for (int i = 0; i < widget.articleImages!.length && i < 11; i++) {
+          _cloudinaryImageUrls[i] = widget.articleImages![i];
+        }
       }
     }
   }
@@ -305,9 +326,14 @@ class _UneState extends State<Une> {
           _carDescriptionController.text = articleData['description'] ?? '';
           _carCompanyController.text = articleData['entreprise'] ?? '';
           _carModelController.text = articleData['marque'] ?? '';
-          _selectedCarModel = _carModels.contains(articleData['modele'])
-              ? articleData['modele']
-              : 'Modèle1';
+          if (_carModels.contains(articleData['modele'])) {
+            _selectedCarModel = articleData['modele'];
+          } else if (articleData['modele'] != null) {
+            _selectedCarModel = 'Autre';
+            _customCarModel = articleData['modele'];
+          } else {
+            _selectedCarModel = 'Modèle1';
+          }
           _selectedCarFuelType =
               _carFuelTypes.contains(articleData['carburant'])
                   ? articleData['carburant']
@@ -318,7 +344,9 @@ class _UneState extends State<Une> {
 
           // Charger les images existantes
           if (articleData['photos'] != null) {
-            _cloudinaryImageUrls = List<String>.from(articleData['photos']);
+            for (int i = 0; i < articleData['photos'].length && i < 11; i++) {
+              _cloudinaryImageUrls[i] = articleData['photos'][i];
+            }
           }
         } else if (articleData['type'] == 'piece') {
           _carNameController.text = articleData['titre'] ?? '';
@@ -327,9 +355,14 @@ class _UneState extends State<Une> {
           _carPriceController.text = articleData['prix']?.toString() ?? '';
           _carDescriptionController.text = articleData['description'] ?? '';
           _carCompanyController.text = articleData['entreprise'] ?? '';
-          _selectedCarModel = _carModels.contains(articleData['modele'])
-              ? articleData['modele']
-              : 'Modèle1';
+          if (_carModels.contains(articleData['modele'])) {
+            _selectedCarModel = articleData['modele'];
+          } else if (articleData['modele'] != null) {
+            _selectedCarModel = 'Autre';
+            _customCarModel = articleData['modele'];
+          } else {
+            _selectedCarModel = 'Modèle1';
+          }
           _selectedCarFuelType =
               _carFuelTypes.contains(articleData['typeMoteur'])
                   ? articleData['typeMoteur']
@@ -340,7 +373,9 @@ class _UneState extends State<Une> {
 
           // Charger les images existantes
           if (articleData['photos'] != null) {
-            _cloudinaryImageUrls = List<String>.from(articleData['photos']);
+            for (int i = 0; i < articleData['photos'].length && i < 11; i++) {
+              _cloudinaryImageUrls[i] = articleData['photos'][i];
+            }
           }
         }
 
@@ -417,8 +452,190 @@ class _UneState extends State<Une> {
     setState(() {
       _uploadedImages[index] = null;
       _cloudinaryImageUrls[index] = null;
+      _uploadedImagesWeb[index] = null;
       _isUploadingImage[index] = false;
     });
+  }
+
+  // Fonction pour sélectionner plusieurs images
+  Future<void> _pickMultipleImages() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final List<XFile>? images = await picker.pickMultiImage(
+        imageQuality: 85,
+        maxWidth: 1920.0,
+        maxHeight: 1080.0,
+      );
+      
+      if (images != null) {
+        for (int i = 0; i < images.length && i < 11; i++) {
+          final image = images[i];
+          final emptyIndex = _uploadedImages.indexWhere((img) => img == null);
+          
+          if (emptyIndex != -1 && emptyIndex < 11) {
+            await _processImageUpload(image, emptyIndex);
+          }
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Fonction pour sélectionner une seule image
+  Future<void> _pickSingleImage() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1920.0,
+        maxHeight: 1080.0,
+      );
+      
+      if (image != null) {
+        final emptyIndex = _uploadedImages.indexWhere((img) => img == null);
+        
+        if (emptyIndex != -1 && emptyIndex < 11) {
+          await _processImageUpload(image, emptyIndex);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Maximum d\'images atteint (10 images)'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Fonction pour traiter l'upload d'une image
+  Future<void> _processImageUpload(XFile image, int index) async {
+    // Validation de la taille
+    final fileSize = await image.length();
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    
+    if (fileSize > maxFileSize) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Image trop volumineuse: ${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB (max: 5MB)'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    
+    // Validation du format
+    final fileName = image.path.toLowerCase();
+    final allowedFormats = ['jpg', 'jpeg', 'png', 'webp'];
+    final extension = fileName.split('.').last;
+    
+    if (!allowedFormats.contains(extension)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Format non supporté: $extension. Formats: ${allowedFormats.join(', ')}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _uploadedImagesWeb[index] = bytes;
+        _isUploadingImage[index] = true;
+      });
+      
+      try {
+        final url = await uploadImageToCloudinaryWeb(bytes);
+        if (!mounted) return;
+        
+        setState(() {
+          _cloudinaryImageUrls[index] = url;
+          _uploadedImagesWeb[index] = null;
+          _isUploadingImage[index] = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image ajoutée: ${image.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isUploadingImage[index] = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur upload: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _uploadedImages[index] = File(image.path);
+        _isUploadingImage[index] = true;
+      });
+      
+      try {
+        final currentFile = _uploadedImages[index];
+        final url = currentFile != null
+            ? await uploadImageToCloudinary(
+                currentFile,
+                folder: _imageFolder,
+              )
+            : null;
+            
+        if (!mounted) return;
+        
+        if (url != null) {
+          setState(() {
+            _cloudinaryImageUrls[index] = url;
+            _uploadedImages[index] = null;
+            _isUploadingImage[index] = false;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Image uploadée: ${image.name}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          setState(() => _isUploadingImage[index] = false);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isUploadingImage[index] = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur upload: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _removeVideo() {
@@ -489,7 +706,6 @@ class _UneState extends State<Une> {
     });
 
     try {
-      _cloudinaryImageUrls.clear();
       for (int i = 0; i < _uploadedImages.length; i++) {
         if (_uploadedImages[i] != null) {
           final url = await uploadImageToCloudinary(
@@ -687,6 +903,119 @@ class _UneState extends State<Une> {
     return prix.toString();
   }
 
+  // Fonctions de localisation
+  Future<void> _setUserLocation({
+    required double lat,
+    required double lng,
+    required bool fromCurrent,
+  }) async {
+    if (!mounted) return;
+    setState(() {
+      _userLatitude = lat;
+      _userLongitude = lng;
+      _isUsingCurrentLocation = fromCurrent;
+      _loadingAddress = true;
+    });
+    final address = await _getAddressFromCoordinates(lat, lng);
+    if (!mounted) return;
+    setState(() {
+      _userAddress = address;
+      _loadingAddress = false;
+      _carLocationController.text = address; // Mettre à jour le champ de localisation
+    });
+  }
+
+  Future<void> _getCurrentLocation () async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        // Afficher le dialogue de divulgation avant de demander la permission
+        await showDialog(
+          context: context,
+          builder: (context) => LocationPermissionDialog(
+            userRole: 'vendeur',
+            onPermissionGranted: () async {
+              // La permission sera demandée dans le dialogue
+            },
+            onPermissionDenied: () {
+              // Ne rien faire, l'utilisateur a refusé
+            },
+          ),
+        );
+        
+        // Vérifier à nouveau si la permission a été accordée
+        permission = await Geolocator.checkPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      await _setUserLocation(
+        lat: pos.latitude,
+        lng: pos.longitude,
+        fromCurrent: true,
+      );
+    } catch (e) {
+      log('[GEO] Erreur position actuelle: $e');
+    }
+  }
+
+  Future<String> _getAddressFromCoordinates(double lat, double lng) async {
+    try {
+      // Utiliser une API de géocodification (ici nous simulons)
+      // En production, vous pourriez utiliser l'API Google Maps ou OpenStreetMap Nominatim
+      final response = await http.get(
+        Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&accept-language=fr'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['address'] != null) {
+          final address = data['address'];
+          final road = address['road'] ?? '';
+          final suburb = address['suburb'] ?? '';
+          final city = address['city'] ?? address['town'] ?? '';
+          final postcode = address['postcode'] ?? '';
+          
+          String fullAddress = '';
+          if (road.isNotEmpty) fullAddress += '$road, ';
+          if (suburb.isNotEmpty) fullAddress += '$suburb, ';
+          if (city.isNotEmpty) fullAddress += city;
+          if (postcode.isNotEmpty) fullAddress += ' $postcode';
+          
+          return fullAddress.isNotEmpty ? fullAddress : '$lat, $lng';
+        }
+      }
+    } catch (e) {
+      log('[GEO] Erreur géocodification: $e');
+    }
+    return '$lat, $lng'; // Valeur par défaut si échec
+  }
+
+  Future<void> _openMapPicker() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MapPickerScreen(),
+      ),
+    );
+    
+    if (result != null && result is Map<String, dynamic>) {
+      final lat = result['latitude'];
+      final lng = result['longitude'];
+      if (lat != null && lng != null) {
+        await _setUserLocation(
+          lat: lat,
+          lng: lng,
+          fromCurrent: false,
+        );
+      }
+    }
+  }
+
   Future<void> _onPayer() async {
     debugPrint('🚀 [DEBUG] Début _onPayer - articleId: ${widget.articleId}');
     log('🚀 [DEBUG] Début _onPayer - articleId: ${widget.articleId}');
@@ -722,6 +1051,7 @@ class _UneState extends State<Une> {
     final bool isALaUne = currentType == 'À la une';
 
     if (isSponsorisee) {
+      // Pour les pubs sponsorisées, vérifier tous les champs de voiture
       if (_isAnyUploading) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -883,42 +1213,9 @@ class _UneState extends State<Une> {
           return;
         }
       } else {
-        // Pour les pubs "Sponsorisée", créer automatiquement l'article
-        if (_selectedVoiture == 'Sponsorisée') {
-          log('📝 [DEBUG] Création automatique d\'article pour pub Sponsorisée');
-          articleIdToUse = await _createArticle();
-
-          if (articleIdToUse == null) {
-            log('❌ [DEBUG] Échec de la création de l\'article');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Erreur lors de la création de l\'article. Veuillez réessayer.',
-                ),
-              ),
-            );
-            setState(() {
-              _isLoading = false;
-            });
-            return;
-          }
-
-          log('✅ [DEBUG] Article créé avec succès: $articleIdToUse');
-        } else {
-          // Pour les autres types de pub, nécessiter un article existant
-          log('⚠️ [DEBUG] Aucun articleId fourni et type de pub non-Sponsorisée');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Cet article n\'existe pas. Pour les pubs "À la une", veuillez d\'abord créer l\'article et après validation par l\'admin vous pourrez le mettre en avant.',
-              ),
-            ),
-          );
-          setState(() {
-            _isLoading = false;
-          });
-          return;
-        }
+        // Pour les pubs "À la une", utiliser l'article existant ou en créer un
+        log('📝 [DEBUG] Utilisation de l\'article existant pour pub À la une');
+        articleIdToUse = widget.articleId;
       }
 
       // Préparation des données de publicité
@@ -1016,6 +1313,242 @@ class _UneState extends State<Une> {
     }
   }
 
+  // Widget pour afficher la grille d'images
+  Widget _buildImageGrid() {
+    // S'assurer que les listes ont la bonne taille
+    while (_cloudinaryImageUrls.length < 11) {
+      _cloudinaryImageUrls.add(null);
+    }
+    while (_isUploadingImage.length < 11) {
+      _isUploadingImage.add(false);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Bouton pour upload multiple
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _pickMultipleImages,
+            icon: const Icon(Icons.add_photo_alternate, size: 20),
+            label: const Text('Ajouter plusieurs images'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF8BF13),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Affichage des images uploadées
+        if (_cloudinaryImageUrls.where((url) => url != null && url!.isNotEmpty).isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(11, (index) {
+              final hasImage = _cloudinaryImageUrls[index] != null && _cloudinaryImageUrls[index]!.isNotEmpty;
+              final isUploading = _isUploadingImage[index];
+              
+              if (!hasImage && !isUploading) return const SizedBox.shrink();
+              
+              return Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (hasImage)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          _cloudinaryImageUrls[index]!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
+                    else
+                      const Icon(
+                        Icons.image,
+                        color: Colors.grey,
+                      ),
+                    if (isUploading)
+                      const Positioned.fill(
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    if (hasImage)
+                      Positioned(
+                        right: 2,
+                        top: 2,
+                        child: GestureDetector(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ),
+      ],
+    );
+  }
+
+  // Widget pour l'upload vidéo
+  Widget _buildVideoUpload() {
+    return GestureDetector(
+      onTap: _pickVideo,
+      child: Container(
+        height: 80,
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.hardEdge,
+          children: [
+            if (_uploadedVideo != null)
+              const Icon(
+                Icons.videocam,
+                color: Colors.blue,
+                size: 40,
+              )
+            else
+              const Icon(
+                Icons.add_to_photos,
+                color: Colors.grey,
+              ),
+            if (_isUploadingVideo)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black54,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 35,
+                          height: 35,
+                          child: CircularProgressIndicator(
+                            value: _videoUploadProgress > 0 ? _videoUploadProgress : null,
+                            color: Colors.blue,
+                            backgroundColor: Colors.white24,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _videoUploadProgress < 0.85
+                              ? 'Envoi...'
+                              : 'Traitement...',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${(_videoUploadProgress * 100).toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 9,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        // Barre de progression linéaire
+                        Container(
+                          width: 140,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: _videoUploadProgress,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            if (_cloudinaryVideoUrl != null)
+              Positioned(
+                right: 4,
+                top: 4,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: _removeVideo,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
@@ -1023,13 +1556,12 @@ class _UneState extends State<Une> {
     final screenWidth = mediaQuery.size.width;
 
     // LOGS DEBUG pour les listes d'images
-    log(
-      '[UNE][build] _cloudinaryImageUrls.length = ${_cloudinaryImageUrls.length}',
-    );
+    log('[UNE][build] _cloudinaryImageUrls.length = ${_cloudinaryImageUrls.length}');
     log('[UNE][build] _isUploadingImage.length = ${_isUploadingImage.length}');
+    
     // Correction : toujours 11 éléments dans les listes
     while (_cloudinaryImageUrls.length < 11) {
-      _cloudinaryImageUrls.add('');
+      _cloudinaryImageUrls.add(null);
     }
     while (_isUploadingImage.length < 11) {
       _isUploadingImage.add(false);
@@ -1047,12 +1579,7 @@ class _UneState extends State<Une> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Color.fromRGBO(
-                      Colors.black.r.toInt(),
-                      Colors.black.g.toInt(),
-                      Colors.black.b.toInt(),
-                      0.1,
-                    ),
+                    color: Colors.black.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -1079,13 +1606,13 @@ class _UneState extends State<Une> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: widget.isStandalone
-                            ? Colors.orange.shade50
-                            : Colors.blue.shade50,
+                            ? Colors.orange.withOpacity(0.1)
+                            : Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: widget.isStandalone
-                              ? Colors.orange.shade200
-                              : Colors.blue.shade200,
+                              ? Colors.orange.withOpacity(0.2)
+                              : Colors.blue.withOpacity(0.2),
                         ),
                       ),
                       child: Column(
@@ -1137,7 +1664,7 @@ class _UneState extends State<Une> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Indicateur de chargement de l'article (seulement si pas standalone)
+                    // Indicateur de chargement de l'article
                     if (!widget.isStandalone && _isLoadingArticle) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -1169,7 +1696,7 @@ class _UneState extends State<Une> {
                       const SizedBox(height: 20),
                     ],
 
-                    // Message si article chargé (seulement si pas standalone)
+                    // Message si article chargé
                     if (!widget.isStandalone &&
                         widget.articleId != null &&
                         !_isLoadingArticle) ...[
@@ -1219,129 +1746,35 @@ class _UneState extends State<Une> {
                     ),
                     const SizedBox(height: 20),
 
-                    if (widget.isStandalone ||
-                        (_selectedVoiture == 'À la une')) ...[
-                      TextFormField(
-                        controller: _linkController,
-                        keyboardType: TextInputType.url,
-                        decoration: const InputDecoration(
-                          labelText: 'Lien cliquable (optionnel)',
-                          hintText:
-                              'Ex: https://wa.me/2250700000000 ou https://mon-site.com',
-                          helperText:
-                              'Permettre aux utilisateurs d\'ouvrir votre site, catalogue ou formulaire de paiement.',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ] else
-                      const SizedBox(height: 10),
-
                     // Type de publicité
-                    if (!widget.isStandalone) ...[
-                      DropdownButtonFormField<String>(
-                        value: _selectedVoiture,
-                        items: voitures
-                            .map(
-                              (voiture) => DropdownMenuItem(
-                                value: voiture,
-                                child: Text(voiture),
-                              ),
-                            )
-                            .toList(),
-                        decoration: const InputDecoration(
-                          labelText: 'Type de publicité',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Veuillez sélectionner un type';
-                          }
-                          return null;
-                        },
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedVoiture = value;
-                            _updatePrix(); // Calculer le prix dynamiquement
-                            // Met à jour le prix selon le type de pub
-                            if (value == 'Sponsorisée') {
-                              // Pré-remplir les champs si pas d'article existant
-                              if (widget.articleId == null) {
-                                // Utiliser les paramètres passés ou des valeurs par défaut
-                                _carNameController.text =
-                                    widget.articleTitle ?? 'Nom de la voiture';
-                                _carYearController.text = widget.articleYear ??
-                                    DateTime.now().year.toString();
-                                _carLocationController.text =
-                                    widget.articleLocation ?? 'Localisation';
-                                _carPriceController.text =
-                                    widget.articlePrice ?? 'Prix';
-                                _carDescriptionController.text =
-                                    widget.articleDescription ??
-                                        'Description de la voiture';
-                                _carCompanyController.text =
-                                    widget.articleCompany ??
-                                        'Nom de l\'entreprise';
-                                _carModelController.text =
-                                    widget.articleModel ?? 'Marque';
-                                _selectedCarModel =
-                                    widget.articleModel ?? 'Modèle1';
-                                _selectedCarFuelType =
-                                    widget.articleFuelType ?? 'Essence';
-                                _selectedCarType =
-                                    widget.articlePieceType ?? 'Nouveau';
-
-                                // Charger les images si fournies
-                                if (widget.articleImages != null &&
-                                    widget.articleImages!.isNotEmpty) {
-                                  _cloudinaryImageUrls = List<String>.from(
-                                    widget.articleImages!,
-                                  );
-                                }
-                              }
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 30),
-                    ] else ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.local_fire_department,
-                                color: Colors.orange),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Text(
-                                    'Publicité À la une',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Flyer dédié, pas besoin d\'article existant. Ajoutez simplement votre visuel et (optionnellement) un lien externe.',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ],
-                              ),
+                    DropdownButtonFormField<String>(
+                      value: _selectedVoiture,
+                      items: voitures
+                          .map(
+                            (voiture) => DropdownMenuItem(
+                              value: voiture,
+                              child: Text(voiture),
                             ),
-                          ],
-                        ),
+                          )
+                          .toList(),
+                      decoration: const InputDecoration(
+                        labelText: 'Type de publicité',
+                        border: OutlineInputBorder(),
                       ),
-                      const SizedBox(height: 30),
-                    ],
+                      validator: (value) {
+                        if (value == null) {
+                          return 'Veuillez sélectionner un type';
+                        }
+                        return null;
+                      },
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedVoiture = value;
+                          _updatePrix();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 20),
 
                     // Durée de la pub
                     DropdownButtonFormField<String>(
@@ -1367,13 +1800,13 @@ class _UneState extends State<Une> {
                       onChanged: (value) {
                         setState(() {
                           _selectedDuree = value;
-                          _updatePrix(); // Recalculer le prix
+                          _updatePrix();
                         });
                       },
                     ),
                     const SizedBox(height: 30),
 
-                    // Prix (non éditable)
+                    // Prix
                     TextFormField(
                       controller: _prixController,
                       enabled: false,
@@ -1395,8 +1828,21 @@ class _UneState extends State<Une> {
                       ),
                     const SizedBox(height: 30),
 
-                    // SECTION DYNAMIQUE : Informations concernant la voiture
-                    if (_selectedVoiture == 'Sponsorisée') ...[
+                    // Lien externe (pour publicité standalone)
+                    if (widget.isStandalone) ...[
+                      TextFormField(
+                        controller: _linkController,
+                        decoration: const InputDecoration(
+                          labelText: 'Lien externe (optionnel)',
+                          hintText: 'https://...',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // SECTION DYNAMIQUE : Informations concernant la voiture (toujours affichées pour standalone)
+                    if (widget.isStandalone) ...[
                       const Divider(height: 40, thickness: 2),
                       const Text(
                         'Informations concernant la voiture',
@@ -1439,19 +1885,114 @@ class _UneState extends State<Une> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Localisation
-                      TextFormField(
-                        controller: _carLocationController,
-                        decoration: const InputDecoration(
-                          labelText: 'Localisation',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Veuillez entrer la localisation';
-                          }
-                          return null;
-                        },
+                      // Localisation dynamique
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Localisation',
+                            style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                          ),
+                          const SizedBox(height: 8),
+                          
+                          // Boutons de localisation
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _getCurrentLocation ,
+                                  icon: const Icon(Icons.my_location),
+                                  label: const Text('Utiliser ma position actuelle'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _openMapPicker,
+                                  icon: const Icon(Icons.map),
+                                  label: const Text('Choisir sur la carte'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Affichage de la localisation
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _isUsingCurrentLocation
+                                          ? Icons.my_location
+                                          : Icons.map,
+                                      size: 16,
+                                      color: const Color(0xFFB45309),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _isUsingCurrentLocation
+                                          ? 'Position actuelle'
+                                          : 'Position sélectionnée',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFFB45309),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                if (_loadingAddress)
+                                  const Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('Recherche de l\'adresse...'),
+                                    ],
+                                  )
+                                else if (_userAddress.isNotEmpty)
+                                  Text(
+                                    _userAddress,
+                                    style: const TextStyle(fontSize: 14),
+                                  )
+                                else
+                                  const Text(
+                                    'Localisation non définie',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          
+                          // Champ caché pour la validation
+                          TextFormField(
+                            controller: _carLocationController,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Veuillez définir une localisation';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
 
@@ -1557,9 +2098,31 @@ class _UneState extends State<Une> {
                         onChanged: (value) {
                           setState(() {
                             _selectedCarModel = value;
+                            if (value != 'Autre') {
+                              _customCarModel = null;
+                            }
                           });
                         },
                       ),
+                      if (_selectedCarModel == 'Autre') ...[
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: TextEditingController(text: _customCarModel ?? ''),
+                          decoration: const InputDecoration(
+                            labelText: 'Précisez le modèle',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (value) {
+                            _customCarModel = value.trim().isEmpty ? null : value.trim();
+                          },
+                          validator: (value) {
+                            if (_selectedCarModel == 'Autre' && (value == null || value.trim().isEmpty)) {
+                              return 'Veuillez préciser le modèle';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 20),
 
                       // Type (Nouveau/Occasion)
@@ -1592,7 +2155,7 @@ class _UneState extends State<Une> {
                       const SizedBox(height: 30),
                     ],
 
-                    // Section conditionnelle selon le type de pub
+                    // SECTION IMAGES SELON LE TYPE
                     if (_selectedVoiture == 'À la une') ...[
                       const Text(
                         'Image principale (flyer)',
@@ -1718,224 +2281,22 @@ class _UneState extends State<Une> {
                         ),
                       ),
                     ] else ...[
+                      // Section pour les images multiples
                       const Text(
-                        'Images supplémentaires (optionnel)',
+                        'Images (obligatoire pour cette catégorie)',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 10),
-
-                      // Sélection des images pour "Sponsorisée" (optionnel)
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                          childAspectRatio: 1,
-                        ),
-                        itemCount: 6, // Réduire à 6 images max
-                        itemBuilder: (context, index) => GestureDetector(
-                          onTap: () => _pickImage(index),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.amber),
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                if (_cloudinaryImageUrls[index] != null &&
-                                    _cloudinaryImageUrls[index]!.isNotEmpty)
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      _cloudinaryImageUrls[index]!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  )
-                                else
-                                  const Icon(
-                                    Icons.add_a_photo,
-                                    color: Colors.grey,
-                                  ),
-                                if (_isUploadingImage[index])
-                                  const Positioned.fill(
-                                    child: Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  ),
-                                if (_cloudinaryImageUrls[index] != null &&
-                                    _cloudinaryImageUrls[index]!.isNotEmpty)
-                                  Positioned(
-                                    right: 4,
-                                    top: 4,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.green,
-                                          size: 16,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        GestureDetector(
-                                          onTap: () => _removeImage(index),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(
-                                              2,
-                                            ),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildImageGrid(),
                       const SizedBox(height: 16),
 
                       // Upload vidéo (optionnelle)
-                      GestureDetector(
-                        onTap: _pickVideo,
-                        child: Container(
-                          height: 80,
-                          clipBehavior: Clip.hardEdge,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue),
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            clipBehavior: Clip.hardEdge,
-                            children: [
-                              if (_uploadedVideo != null)
-                                const Icon(
-                                  Icons.videocam,
-                                  color: Colors.blue,
-                                  size: 40,
-                                )
-                              else
-                                const Icon(
-                                  Icons.add_to_photos,
-                                  color: Colors.grey,
-                                ),
-                              if (_isUploadingVideo)
-                                Positioned.fill(
-                                  child: Container(
-                                    color: Colors.black54,
-                                  child: Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          SizedBox(
-                                            width: 35,
-                                            height: 35,
-                                            child: CircularProgressIndicator(
-                                              value: _videoUploadProgress > 0 ? _videoUploadProgress : null,
-                                              color: Colors.blue,
-                                              backgroundColor: Colors.white24,
-                                              strokeWidth: 3,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            _videoUploadProgress < 0.85
-                                                ? 'Envoi...'
-                                                : 'Traitement...',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            '${(_videoUploadProgress * 100).toStringAsFixed(0)}%',
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 9,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 5),
-                                          // Barre de progression linéaire
-                                          Container(
-                                            width: 140,
-                                            height: 3,
-                                            decoration: BoxDecoration(
-                                              color: Colors.white24,
-                                              borderRadius: BorderRadius.circular(2),
-                                            ),
-                                            child: FractionallySizedBox(
-                                              alignment: Alignment.centerLeft,
-                                              widthFactor: _videoUploadProgress,
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color: Colors.blue,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              if (_cloudinaryVideoUrl != null)
-                                Positioned(
-                                  right: 4,
-                                  top: 4,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      GestureDetector(
-                                        onTap: _removeVideo,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(2),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.close,
-                                            color: Colors.white,
-                                            size: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                      const Text(
+                        'Vidéo (optionnelle)',
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
+                      const SizedBox(height: 10),
+                      _buildVideoUpload(),
                     ],
 
                     const SizedBox(height: 40),

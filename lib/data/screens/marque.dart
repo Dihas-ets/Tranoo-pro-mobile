@@ -315,7 +315,10 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
       setState(() {});
     });
 
-    _pageController = PageController(initialPage: 0);
+    _pageController = PageController(
+      initialPage: 0,
+      viewportFraction: 0.85,  // Pour voir les pubs adjacentes
+    );
     _searchGlobalController.addListener(() {
       setState(() {
         _searchGlobalText = _searchGlobalController.text.trim();
@@ -2281,24 +2284,31 @@ Widget buildPubsALaUneCarousel() {
   // Affiche le carrousel et l'indicateur uniquement si la liste n'est pas vide
   return Column(
     children: [
-      SizedBox(
-        height: 260,
+      Container(
+        height: 200, // Un peu plus haut pour mieux voir les adjacentes
+        margin: const EdgeInsets.symmetric(horizontal: 8), // Marge extérieure pour voir les adjacents
         child: PageView.builder(
           controller: _pageController,
+          // Afficher une partie des slides adjacents
+          padEnds: true,
           itemCount: pubsALaUne.length,
           itemBuilder: (context, index) {
             final pub = pubsALaUne[index];
             final hasLink = (pub.lien ?? '').trim().isNotEmpty;
             final card = Card(
               margin: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
+                horizontal: 8, // Marges pour espacer les cards
+                vertical: 8,
+              ),
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   width: double.infinity,
-                  height: 260,
+                  height: 180,
                   color: Colors.black,
                   child: pub.media.isNotEmpty
                       ? Stack(
@@ -2315,7 +2325,7 @@ Widget buildPubsALaUneCarousel() {
                                     color: Colors.grey[300],
                                     child: const Icon(
                                       Icons.image_not_supported,
-                                      size: 80,
+                                      size: 60, // Réduit de 80 à 60
                                       color: Colors.black54,
                                     ),
                                   );
@@ -2348,9 +2358,9 @@ Widget buildPubsALaUneCarousel() {
                           ],
                         )
                       : Container(
-                          height: 260,
+                          height: 180,
                           color: Colors.grey[300],
-                          child: const Icon(Icons.image, size: 120),
+                          child: const Icon(Icons.image, size: 80), // Réduit de 120 à 80
                         ),
                 ),
               ),
@@ -2374,7 +2384,7 @@ Widget buildPubsALaUneCarousel() {
           },
         ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 6), // Espace réduit
       if (pubsALaUne.length > 1)
         SmoothPageIndicator(
           controller: _pageController,
@@ -2382,8 +2392,8 @@ Widget buildPubsALaUneCarousel() {
           effect: JumpingDotEffect(
             activeDotColor: Color(0xFFF8BF13),
             dotColor: Colors.grey.shade300,
-            dotHeight: 10,
-            dotWidth: 10,
+            dotHeight: 8, // Points légèrement plus petits
+            dotWidth: 8,
           ),
         ),
     ],

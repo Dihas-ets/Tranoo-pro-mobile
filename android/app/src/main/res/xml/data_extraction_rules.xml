@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Inclure les données utilisateur pour la sauvegarde cloud -->
+        <include domain="sharedpref" path="." />
+        <include domain="database" path="." />
+        <include domain="file" path="." />
+        
+        <!-- Exclure les données temporaires ou sensibles -->
+        <exclude domain="sharedpref" path="temp_data.xml" />
+        <exclude domain="file" path="cache/" />
+    </cloud-backup>
+    
+    <device-transfer>
+        <!-- Inclure toutes les données pour le transfert d'appareil -->
+        <include domain="sharedpref" path="." />
+        <include domain="database" path="." />
+        <include domain="file" path="." />
+    </device-transfer>
+</data-extraction-rules>

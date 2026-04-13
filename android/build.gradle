@@ -1,47 +1,94 @@
 // Force NDK version for all subprojects (ex: rive_common)
+
 subprojects {
+
     afterEvaluate { project ->
+
         if (project.hasProperty("android")) {
+
             project.android.ndkVersion = "26.2.11394342"
+
         }
+
     }
+
 }
+
 buildscript {
+
     repositories {
+
         google()
+
         mavenCentral()
+
     }
+
     dependencies {
+
         classpath 'com.android.tools.build:gradle:8.6.0'
+
     }
+
 }
+
+
 
 allprojects {
+
     repositories {
+
         google()
+
         mavenCentral()
+
     }
+
+
 
     // Forcer une version compatible d'androidx.core pour éviter core-ktx 1.17.0
+
     configurations.all {
+
         resolutionStrategy.eachDependency { details ->
+
             if (details.requested.group == "androidx.core" &&
+
                     (details.requested.name == "core" || details.requested.name == "core-ktx")) {
+
                 details.useVersion "1.15.0"
+
                 details.because("Forcer androidx.core/core-ktx 1.15.0 pour rester compatible avec AGP 8.6.0")
+
             }
+
         }
+
     }
+
 }
+
+
 
 rootProject.buildDir = "../build"
+
 subprojects {
+
     project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(":app")
+
 }
 
-tasks.register("clean", Delete) {
-    delete rootProject.buildDir
+subprojects {
+
+    project.evaluationDependsOn(":app")
+
 }
+
+
+
+tasks.register("clean", Delete) {
+
+    delete rootProject.buildDir
+
+}
+

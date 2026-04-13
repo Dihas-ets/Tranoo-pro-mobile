@@ -9,7 +9,7 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:confetti/confetti.dart';
-import 'une.dart'; // Import pour la page de demande de pub
+import 'une.dart' as pub_page; // Import pour la page de demande de pub avec préfixe
 import 'dart:developer';
 import 'verification_payment.dart'; // Import pour la page de vérification de paiement
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
@@ -1661,7 +1661,7 @@ class _CarsinfoState extends State<CarsInfo> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => Une(
+                    builder: (context) => pub_page.Une(
                       articleId: widget.id, // Utiliser l'ID réel de l'article
                       articleType: 'voiture',
                       isStandalone: false,
@@ -1688,7 +1688,7 @@ class _CarsinfoState extends State<CarsInfo> {
                 ),
               ),
               child: const Text(
-                'Faire une pub pour cette voiture',
+                'Boostez vos ventes',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

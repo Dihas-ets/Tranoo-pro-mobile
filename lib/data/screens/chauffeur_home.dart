@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:intl/intl.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,10 +10,14 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/data/screens/wallet_screen.dart';
-import 'package:tranoo_pro/data/screens/settings_page.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
-import 'package:tranoo_pro/data/screens/chauffeur_ride_notification.dart';
+import 'package:tranoo_pro/data/screens/mes_livraisons_page.dart';
+import 'package:tranoo_pro/data/screens/suivi_gps_page.dart';
+import 'package:tranoo_pro/data/screens/delivery_notification_banner.dart';
+import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
+import 'package:tranoo_pro/widgets/location_permission_dialog.dart';
 import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
+import 'package:tranoo_pro/data/screens/settings_page.dart';
 import 'dart:async';
 
 class ChauffeurHomePage extends StatefulWidget {
@@ -100,10 +105,20 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
   }
 
   Future<void> _requestLocationPermission() async {
-    final status = await Permission.location.request();
-    if (status.isGranted) {
-      _getCurrentLocation();
-    }
+    // Afficher d'abord le dialogue de divulgation
+    showDialog(
+      context: context,
+      builder: (context) => LocationPermissionDialog(
+        userRole: 'chauffeur',
+        onPermissionGranted: () {
+          _getCurrentLocation();
+        },
+        onPermissionDenied: () {
+          // Gérer le cas où l'utilisateur refuse la permission
+          print('Localisation refusée pour le chauffeur');
+        },
+      ),
+    );
   }
 
   Future<void> _getCurrentLocation() async {
@@ -473,9 +488,11 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
                     ),
               // Notification de course
               if (_isOnline && _currentRideNotification != null)
-                ChauffeurRideNotificationBanner(
-                  ride: _currentRideNotification!,
-                  onAccepted: (acceptedRide) {
+                DeliveryNotificationBanner(
+                  delivery: _currentRideNotification!,
+                  isOnline: _isOnline,
+                  currentPosition: _currentPosition,
+                  onAccepted: (acceptedDelivery) {
                     setState(() {
                       _currentRideNotification = null;
                     });
@@ -787,7 +804,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ChauffeurTricycleHomePage(),
+                        builder: (context) => ChauffeurTricycleHomePage(),
                       ),
                     );
                   },
@@ -819,7 +836,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const SettingsPage(),
+                        builder: (context) => SettingsPage(),
                       ),
                     );
                   },

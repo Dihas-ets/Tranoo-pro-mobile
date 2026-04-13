@@ -10,14 +10,18 @@ import 'package:tranoo_pro/utils/role_redirect.dart';
 // import 'package:tranoo_pro/data/screens/paymentscreen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io'; // Pour la validation de fichier
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tranoo_pro/data/screens/succes6.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:developer';
-import 'une.dart'; // Import pour la page de demande de pub
+import 'une.dart' as pub_page; // Import pour la page de demande de pub avec préfixe
 // import 'verification_payment.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart'; // Pour la sélection d'images
+import 'package:flutter/services.dart'; // Pour decodeImageFromList
+import 'package:flutter/painting.dart'; // Pour instantiateImageCodec
 
 class MastervacPage extends StatefulWidget {
   final String? id;
@@ -26,7 +30,7 @@ class MastervacPage extends StatefulWidget {
   final String year;
   final String description;
   final String company;
-  final String location;
+  final String? location;
   final String price;
   final String? fuelType;
   final String? model;
@@ -44,7 +48,7 @@ class MastervacPage extends StatefulWidget {
     required this.year,
     required this.description,
     required this.company,
-    required this.location,
+    this.location, // Rendu optionnel
     required this.price,
     this.fuelType,
     this.model,
@@ -68,6 +72,17 @@ class _MastervacPageState extends State<MastervacPage> {
   // Champs de livraison/lieu supprimés - gérés dans OrderSummaryPage
   late ConfettiController _confettiController;
   bool _isOnline = false;
+  
+  // Variables pour la gestion des images
+  List<File> _selectedImages = [];
+  bool _isUploading = false;
+  final ImagePicker _imagePicker = ImagePicker();
+  
+  // Constantes pour la validation
+  static const int _maxImageSize = 5 * 1024 * 1024; // 5MB
+  static const int _maxImageWidth = 1920;
+  static const int _maxImageHeight = 1080;
+  static const List<String> _allowedFormats = ['jpg', 'jpeg', 'png', 'webp'];
 
   @override
   void initState() {
@@ -77,6 +92,187 @@ class _MastervacPageState extends State<MastervacPage> {
     );
     _pageController = PageController(initialPage: _currentImageIndex);
     _loadArticleStatut();
+  }
+
+  // Fonction pour valider la taille et le format d'une image
+  Future<Map<String, dynamic>> _validateImage(File imageFile) async {
+    final fileSize = await imageFile.length();
+    final fileName = imageFile.path.toLowerCase();
+    final extension = fileName.split('.').last;
+    
+    // Validation du format
+    if (!_allowedFormats.contains(extension)) {
+      return {
+        'isValid': false,
+        'error': 'Format non supporté. Formats acceptés: ${_allowedFormats.join(', ')}'
+      };
+    }
+    
+    // Validation de la taille
+    if (fileSize > _maxImageSize) {
+      return {
+        'isValid': false,
+        'error': 'Image trop volumineuse. Taille maximale: ${_maxImageSize ~/ (1024 * 1024)}MB'
+      };
+    }
+    
+    // Validation des dimensions
+    try {
+      final imageBytes = imageFile.readAsBytesSync();
+      final decodedImage = await decodeImageFromList(imageBytes);
+      if (decodedImage != null) {
+        final width = decodedImage.width;
+        final height = decodedImage.height;
+        
+        if (width > _maxImageWidth || height > _maxImageHeight) {
+          return {
+            'isValid': false,
+            'error': 'Dimensions trop grandes. Maximum: ${_maxImageWidth}x${_maxImageHeight}px'
+          };
+        }
+      }
+    } catch (e) {
+      return {
+        'isValid': false,
+        'error': 'Image corrompue ou invalide'
+      };
+    }
+    
+    return {'isValid': true, 'error': null};
+  }
+
+  // Fonction pour sélectionner plusieurs images
+  Future<void> _pickImages() async {
+    if (_isUploading) return;
+    
+    try {
+      final List<XFile>? pickedFiles = await _imagePicker.pickMultiImage(
+        imageQuality: 85,
+        maxWidth: _maxImageWidth.toDouble(),
+        maxHeight: _maxImageHeight.toDouble(),
+      );
+      
+      if (pickedFiles != null) {
+        setState(() => _isUploading = true);
+        
+        List<File> validImages = [];
+        List<String> errors = [];
+        
+        for (final pickedFile in pickedFiles) {
+          final file = File(pickedFile.path);
+          final validation = await _validateImage(file);
+          
+          if (validation['isValid']) {
+            validImages.add(file);
+          } else {
+            errors.add('${pickedFile.name}: ${validation['error']}');
+          }
+        }
+        
+        if (!mounted) return;
+        
+        setState(() {
+          _selectedImages = validImages;
+          _isUploading = false;
+        });
+        
+        if (errors.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Certaines images n\'ont pas pu être ajoutées:', 
+                         style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  ...errors.map((error) => Text('• $error', 
+                         style: const TextStyle(fontSize: 12))),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else if (validImages.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${validImages.length} image(s) ajoutée(s) avec succès'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUploading = false);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Fonction pour sélectionner une seule image
+  Future<void> _pickSingleImage() async {
+    if (_isUploading) return;
+    
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: _maxImageWidth.toDouble(),
+        maxHeight: _maxImageHeight.toDouble(),
+      );
+      
+      if (pickedFile != null) {
+        setState(() => _isUploading = true);
+        
+        final file = File(pickedFile.path);
+        final validation = await _validateImage(file);
+        
+        if (!mounted) return;
+        
+        setState(() => _isUploading = false);
+        
+        if (validation['isValid']) {
+          setState(() {
+            _selectedImages.add(file);
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Image ajoutée: ${pickedFile.name}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(validation['error']),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUploading = false);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _loadArticleStatut() async {
@@ -494,7 +690,7 @@ class _MastervacPageState extends State<MastervacPage> {
         ),
         _buildSpecCard(
           'Localisation',
-          (widget.location.isNotEmpty) ? widget.location : 'Non renseigné',
+          (widget.location?.isNotEmpty == true) ? widget.location! : 'Non renseigné',
           Icons.location_on,
         ),
       ],
@@ -702,7 +898,7 @@ class _MastervacPageState extends State<MastervacPage> {
                         'annee': widget.year,
                         'description': widget.description,
                         'entreprise': widget.company,
-                        'lieu': widget.location,
+                        'lieu': widget.location ?? 'Non renseigné',
                         'prix': widget.price,
                         'typeMoteur': widget.fuelType,
                         'modele': widget.model,
@@ -781,7 +977,7 @@ class _MastervacPageState extends State<MastervacPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => Une(
+                    builder: (context) => pub_page.Une(
                       articleId: null,
                       articleType: 'piece',
                       isStandalone: false,
@@ -801,7 +997,7 @@ class _MastervacPageState extends State<MastervacPage> {
                 );
               },
               child: const Text(
-                'Faire une pub pour cette pièce',
+                'Boostez vos ventes',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

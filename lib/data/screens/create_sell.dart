@@ -35,11 +35,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
   String? _selectedModel; // Modèle
   String? _selectedMarques;
   int? _selectedPorte; // Portes
-  // int? _selectedVitesse; // Vitesse
-  // int? _selectedCarburant; // Carburant
-  // int? _selectedClimatiseur; // Climatiseur
-  // int? _selectedDistance; // Distance
-  // int? _selectedSieges; // Sièges
   String? _selectedBoiteVitesse;
   String? _selectedCarburantDropdown;
   String? _selectedClimatiseurDropdown;
@@ -72,7 +67,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
   String? _customModel; // Ajouté pour la saisie personnalisée du modèle
   String? _customMarque; // Ajouté pour la saisie personnalisée de la marque
   String? _selectedCouleur; // Couleur sélectionnée
-  bool? _dedouanement; // Dédouanement (true = Oui, false = Non)
 
   final List<String> _conditions = ['Nouveau', 'Occasion']; // Reste en String
 
@@ -172,8 +166,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
     'Anthracite': const Color(0xFF36454F),
     'Perle': const Color(0xFFEAE0C8),
   };
-
-  // Supprimer la déclaration, l'utilisation et l'affichage du champ 'lieu' (dropdown, TextField, variables _selectedLieu, _customLieu, _lieux, etc.)
 
   Future<void> _pickImage(int startIndex) async {
     final ImagePicker picker = ImagePicker();
@@ -359,14 +351,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
   void _onConditionChanged(String? value) {
     setState(() {
       _selectedCondition = value;
-      // Synchronise les checkboxes
-      // isNew = value == 'Nouveau';
-      // isOccasion = value == 'Occasion';
     });
   }
-
-  // Supprimer les variables isNew, isOccasion, _onCheckboxChanged, et la Row avec les Checkbox
-  // Après le Dropdown de la condition, ne pas afficher de checkboxes
 
   void _onValidate() {
     // Debug logs
@@ -405,7 +391,9 @@ class _CreateSellPageState extends State<CreateSellPage> {
       );
       return;
     }
+    
     // Vérifie que tous les champs obligatoires sont remplis
+    // Description et Dédouanement ne sont plus obligatoires
     if (_titleController.text.isEmpty ||
         _yearController.text.isEmpty ||
         _selectedCondition == null ||
@@ -423,11 +411,9 @@ class _CreateSellPageState extends State<CreateSellPage> {
         _selectedCarburantDropdown == null ||
         _selectedClimatiseurDropdown == null ||
         _selectedCouleur == null ||
-        _dedouanement == null ||
         _distanceController.text.isEmpty ||
         _siegesController.text.isEmpty ||
         _priceController.text.isEmpty ||
-        _descriptionController.text.isEmpty ||
         _companyController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -436,17 +422,17 @@ class _CreateSellPageState extends State<CreateSellPage> {
       );
       return;
     }
+    
     // Détermine la marque et le modèle à utiliser
     String? marque =
         _selectedMarques == 'Autre' ? _customMarque : _selectedMarques;
     String? modele;
     if (_selectedMarques == 'Autre') {
-      // Si marque "Autre", utiliser directement le modèle personnalisé
       modele = _customModel;
     } else {
-      // Sinon, utiliser le modèle sélectionné ou personnalisé si "Autre"
       modele = _selectedModel == 'Autre' ? _customModel : _selectedModel;
     }
+    
     // Passe toutes les infos à cars_info.dart
     final imagesList = _cloudinaryImageUrls.whereType<String>().toList();
     final videosList = _cloudinaryVideoUrls.whereType<String>().toList();
@@ -457,7 +443,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       MaterialPageRoute(
         builder: (context) => CarsInfo(
           titre: _titleController.text,
-          description: _descriptionController.text,
+          description: _descriptionController.text.isNotEmpty ? _descriptionController.text : 'Description non renseignée',
           marque: marque,
           modele: modele,
           annee: _yearController.text,
@@ -471,7 +457,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
           portes: _selectedPorte?.toString(),
           cylindre: _cylindreController.text,
           couleur: _selectedCouleur,
-          dedouanement: _dedouanement,
+          dedouanement: false, // Dédouanement retiré, valeur par défaut
           images: imagesList,
           video: videosList.isNotEmpty ? videosList.first : null,
           videos: videosList,
@@ -479,6 +465,439 @@ class _CreateSellPageState extends State<CreateSellPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildLabel(String text, {bool isRequired = true}) {
+    return Text(
+      isRequired ? '$text *' : text,
+      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required T? value,
+    required String hint,
+    required List<T> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F2F2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          hint: Text(
+            hint,
+            style: const TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+          isExpanded: true,
+          items: items.map((T item) {
+            return DropdownMenuItem<T>(
+              value: item,
+              child: Text(item.toString()),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVerificationButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      child: ElevatedButton(
+        onPressed: _isAnyUploading ? null : _onValidate,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFFFCC00),
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          elevation: 0,
+        ),
+        child: _isAnyUploading
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Upload en cours...'),
+                ],
+              )
+            : const Text(
+                'Aperçu',
+                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+              ),
+      ),
+    );
+  }
+
+  // Widget moderne pour la section images
+  Widget _buildModernImageSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Bouton d'upload unique
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _pickMultipleImages(),
+            icon: const Icon(Icons.add_photo_alternate, size: 20),
+            label: const Text('Ajouter des images'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF8BF13),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Affichage des images uploadées
+        if (_cloudinaryImageUrls.where((url) => url != null && url!.isNotEmpty).isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(_maxMediaSlots, (index) {
+              final hasImage = _cloudinaryImageUrls[index] != null && _cloudinaryImageUrls[index]!.isNotEmpty;
+              final isUploading = _isUploadingImage[index];
+              
+              if (!hasImage && !isUploading) return const SizedBox.shrink();
+              
+              return Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (hasImage)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          _cloudinaryImageUrls[index]!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
+                    else
+                      const Icon(
+                        Icons.image,
+                        color: Colors.grey,
+                      ),
+                    if (isUploading)
+                      const Positioned.fill(
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    if (hasImage)
+                      Positioned(
+                        right: 2,
+                        top: 2,
+                        child: GestureDetector(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ),
+      ],
+    );
+  }
+
+  // Widget pour la section vidéo
+  Widget _buildVideoSection() {
+    return Container(
+      height: 150,
+      child: PageView.builder(
+        controller: _videoPageController,
+        itemCount: _maxVideoSlots,
+        onPageChanged: (idx) => setState(() => _currentVideoIndex = idx),
+        itemBuilder: (context, index) {
+          final hasVideo = _cloudinaryVideoUrls[index] != null;
+          final isUploading = _isUploadingVideo[index];
+          final progress = _videoUploadProgress[index];
+          
+          return GestureDetector(
+            onTap: hasVideo
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => Movie(videoUrl: _cloudinaryVideoUrls[index]!),
+                      ),
+                    );
+                  }
+                : () => _pickVideo(index),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: hasVideo ? Colors.green : Colors.blue,
+                  width: 2,
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (hasVideo)
+                    Container(
+                      color: Colors.black87,
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
+                          SizedBox(height: 8),
+                          Text('Vidéo prête', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    )
+                  else
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.video_call, color: Colors.grey, size: 40),
+                        const SizedBox(height: 6),
+                        Text('Emplacement ${index + 1}', style: const TextStyle(color: Colors.grey)),
+                        const SizedBox(height: 4),
+                        const Text('Appuyer pour ajouter', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ],
+                    ),
+                  if (isUploading)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black54,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: CircularProgressIndicator(
+                                  value: progress > 0 ? progress : null,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                progress < 0.85 ? 'Envoi...' : 'Traitement...',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${(progress * 100).toStringAsFixed(0)}%',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (hasVideo)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: GestureDetector(
+                        onTap: () => _removeVideo(index),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                          child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Fonctions pour l'upload d'images
+  Future<void> _pickMultipleImages() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final List<XFile>? images = await picker.pickMultiImage();
+      
+      if (images != null) {
+        for (int i = 0; i < images.length && i < _maxMediaSlots; i++) {
+          final image = images[i];
+          final emptyIndex = _cloudinaryImageUrls.indexWhere((url) => url == null || url!.isEmpty);
+          
+          if (emptyIndex != -1 && emptyIndex < _maxMediaSlots) {
+            await _processImageUpload(image, emptyIndex);
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sélection: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickSingleImage() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      
+      if (image != null) {
+        final emptyIndex = _cloudinaryImageUrls.indexWhere((url) => url == null || url!.isEmpty);
+        
+        if (emptyIndex != -1 && emptyIndex < _maxMediaSlots) {
+          await _processImageUpload(image, emptyIndex);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Maximum d\'images atteint (12 images)'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sélection: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _processImageUpload(XFile image, int index) async {
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _uploadedImagesWeb[index] = bytes;
+        _isUploadingImage[index] = true;
+      });
+      
+      try {
+        final url = await uploadImageToCloudinaryWeb(
+          bytes,
+          folder: CloudinaryFolders.vehicleImages,
+        );
+        if (!mounted) return;
+        
+        setState(() {
+          _cloudinaryImageUrls[index] = url;
+          _uploadedImagesWeb[index] = null;
+          _isUploadingImage[index] = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image ajoutée: ${image.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isUploadingImage[index] = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur upload: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _uploadedImages[index] = File(image.path);
+        _isUploadingImage[index] = true;
+      });
+      
+      try {
+        final currentFile = _uploadedImages[index];
+        final url = currentFile != null
+            ? await uploadImageToCloudinary(
+                currentFile,
+                folder: CloudinaryFolders.vehicleImages,
+              )
+            : null;
+            
+        if (!mounted) return;
+        
+        if (url != null) {
+          setState(() {
+            _cloudinaryImageUrls[index] = url;
+            _uploadedImages[index] = null;
+            _isUploadingImage[index] = false;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Image uploadée: ${image.name}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          setState(() => _isUploadingImage[index] = false);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isUploadingImage[index] = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur upload: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -494,6 +913,18 @@ class _CreateSellPageState extends State<CreateSellPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // IMAGES EN PREMIER
+                    _buildLabel('Images (max 12)', isRequired: false),
+                    const SizedBox(height: 8),
+                    _buildModernImageSection(),
+                    const SizedBox(height: 24),
+                    
+                    // VIDÉO EN DEUXIÈME
+                    _buildLabel('Vidéo (optionnelle, max 500 Mo)', isRequired: false),
+                    const SizedBox(height: 8),
+                    _buildVideoSection(),
+                    const SizedBox(height: 24),
+                    
                     // Titre
                     _buildLabel('Titre'),
                     const SizedBox(height: 8),
@@ -506,10 +937,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
                         ),
                       ),
                     ),
@@ -555,10 +982,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                     borderRadius: BorderRadius.circular(8),
                                     borderSide: BorderSide.none,
                                   ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
                                 ),
                               ),
                             ],
@@ -587,7 +1010,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                     if (value != 'Autre') {
                                       _customMarque = null;
                                     }
-                                    // Réinitialiser le modèle quand la marque change
                                     _selectedModel = null;
                                     _customModel = null;
                                   });
@@ -602,9 +1024,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                       filled: true,
                                       fillColor: Color(0xFFF2F2F2),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                          Radius.circular(8),
-                                        ),
+                                        borderRadius: BorderRadius.all(Radius.circular(8)),
                                         borderSide: BorderSide.none,
                                       ),
                                     ),
@@ -625,7 +1045,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                             children: [
                               _buildLabel('Modèle'),
                               const SizedBox(height: 8),
-                              // Si marque "Autre", afficher directement le champ texte
                               if (_selectedMarques == 'Autre')
                                 TextField(
                                   decoration: const InputDecoration(
@@ -633,9 +1052,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                     filled: true,
                                     fillColor: Color(0xFFF2F2F2),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.all(
-                                        Radius.circular(8),
-                                      ),
+                                      borderRadius: BorderRadius.all(Radius.circular(8)),
                                       borderSide: BorderSide.none,
                                     ),
                                   ),
@@ -646,7 +1063,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                   },
                                 )
                               else
-                                // Sinon, afficher le dropdown avec les modèles de la marque
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -657,25 +1073,20 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                       onChanged: (value) {
                                         setState(() {
                                           _selectedModel = value;
-                                          if (value != 'Autre')
-                                            _customModel = null;
+                                          if (value != 'Autre') _customModel = null;
                                         });
                                       },
                                     ),
                                     if (_selectedModel == 'Autre')
                                       Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 8.0),
+                                        padding: const EdgeInsets.only(top: 8.0),
                                         child: TextField(
                                           decoration: const InputDecoration(
-                                            hintText:
-                                                'Entrez le modèle personnalisé',
+                                            hintText: 'Entrez le modèle personnalisé',
                                             filled: true,
                                             fillColor: Color(0xFFF2F2F2),
                                             border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.all(
-                                                Radius.circular(8),
-                                              ),
+                                              borderRadius: BorderRadius.all(Radius.circular(8)),
                                               borderSide: BorderSide.none,
                                             ),
                                           ),
@@ -716,10 +1127,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide.none,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
                           ),
                         ),
                       ],
@@ -740,20 +1147,15 @@ class _CreateSellPageState extends State<CreateSellPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: GridView.builder(
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 6,
                               crossAxisSpacing: 8,
                               mainAxisSpacing: 8,
                             ),
                             itemCount: _couleurs.length,
                             itemBuilder: (context, index) {
-                              final couleurNom = _couleurs.keys.elementAt(
-                                index,
-                              );
-                              final couleurValeur = _couleurs.values.elementAt(
-                                index,
-                              );
+                              final couleurNom = _couleurs.keys.elementAt(index);
+                              final couleurValeur = _couleurs.values.elementAt(index);
                               final isSelected = _selectedCouleur == couleurNom;
 
                               return GestureDetector(
@@ -767,34 +1169,10 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                     shape: BoxShape.circle,
                                     color: couleurValeur,
                                     border: Border.all(
-                                      color: isSelected
-                                          ? Colors.amber
-                                          : Colors.grey,
+                                      color: isSelected ? Colors.amber : Colors.grey,
                                       width: isSelected ? 3 : 1,
                                     ),
-                                    boxShadow: isSelected
-                                        ? [
-                                            BoxShadow(
-                                              color: Colors.amber.withOpacity(
-                                                0.5,
-                                              ),
-                                              blurRadius: 4,
-                                              spreadRadius: 1,
-                                            ),
-                                          ]
-                                        : null,
                                   ),
-                                  child: couleurValeur == Colors.white
-                                      ? Container(
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.grey.shade300,
-                                              width: 1,
-                                            ),
-                                          ),
-                                        )
-                                      : null,
                                 ),
                               );
                             },
@@ -805,62 +1183,9 @@ class _CreateSellPageState extends State<CreateSellPage> {
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
                               'Couleur sélectionnée: $_selectedCouleur',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey,
-                              ),
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Dédouanement
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Dédouanement'),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF2F2F2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: RadioListTile<bool>(
-                                  title: const Text('Oui'),
-                                  value: true,
-                                  groupValue: _dedouanement,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _dedouanement = value;
-                                    });
-                                  },
-                                  contentPadding: EdgeInsets.zero,
-                                  dense: true,
-                                ),
-                              ),
-                              Expanded(
-                                child: RadioListTile<bool>(
-                                  title: const Text('Non'),
-                                  value: false,
-                                  groupValue: _dedouanement,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _dedouanement = value;
-                                    });
-                                  },
-                                  contentPadding: EdgeInsets.zero,
-                                  dense: true,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -981,10 +1306,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                     borderRadius: BorderRadius.circular(8),
                                     borderSide: BorderSide.none,
                                   ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
                                 ),
                               ),
                             ],
@@ -1012,10 +1333,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                     borderRadius: BorderRadius.circular(8),
                                     borderSide: BorderSide.none,
                                   ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
                                 ),
                               ),
                             ],
@@ -1042,39 +1359,31 @@ class _CreateSellPageState extends State<CreateSellPage> {
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide.none,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
 
-                    // Description
-                    _buildLabel('Description'),
+                    // Description (optionnelle)
+                    _buildLabel('Description', isRequired: false),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _descriptionController,
                       maxLines: 5,
                       decoration: InputDecoration(
-                        hintText: 'Entrer une description de votre voiture',
+                        hintText: 'Entrer une description de votre voiture (optionnel)',
                         filled: true,
                         fillColor: const Color(0xFFF2F2F2),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
 
-                    // Nom de l'entreprise possédant le BL
+                    // Nom de l'entreprise
                     _buildLabel('Nom de l\'entreprise possédant le BL'),
                     const SizedBox(height: 8),
                     TextField(
@@ -1087,384 +1396,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Télécharger des images optionnelles
-                    _buildLabel('Images (optionnel, max 12)',
-                        isRequired: false),
-                    const SizedBox(height: 8),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 1.2,
-                      ),
-                      itemCount: _maxMediaSlots,
-                      itemBuilder: (context, index) {
-                        return GestureDetector(
-                          onTap: () => _pickImage(index),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.amber),
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                if (kIsWeb && _uploadedImagesWeb[index] != null)
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.memory(
-                                      _uploadedImagesWeb[index]!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  )
-                                else if (!kIsWeb &&
-                                    _uploadedImages[index] != null)
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.file(
-                                      _uploadedImages[index]!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  )
-                                else
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.add_a_photo,
-                                        color: Colors.grey,
-                                        size: 30,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${index + 1}',
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                if (_isUploadingImage[index])
-                                  const Positioned.fill(
-                                    child: Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  ),
-                                if (_cloudinaryImageUrls[index] != null)
-                                  Positioned(
-                                    right: 4,
-                                    top: 4,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.green,
-                                          size: 16,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        GestureDetector(
-                                          onTap: () => _removeImage(index),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(2),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    // Upload vidéo (optionnelle)
-                    _buildLabel('Vidéo (optionnelle, max 500 Mo)',
-                        isRequired: false),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 150,
-                      child: Stack(
-                        children: [
-                          PageView.builder(
-                            controller: _videoPageController,
-                            itemCount: _maxVideoSlots,
-                            onPageChanged: (idx) =>
-                                setState(() => _currentVideoIndex = idx),
-                            itemBuilder: (context, index) {
-                              final cloudUrl = _cloudinaryVideoUrls[index];
-                              final isUploading = _isUploadingVideo[index];
-                              final progress = _videoUploadProgress[index];
-                              final hasVideo = cloudUrl != null;
-                              return GestureDetector(
-                                onTap: hasVideo
-                                    ? () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                Movie(videoUrl: cloudUrl),
-                                          ),
-                                        );
-                                      }
-                                    : () => _pickVideo(index),
-                      child: Container(
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                                      color: hasVideo ? Colors.green : Colors.blue,
-                            width: 2,
-                          ),
-                        ),
-                                  clipBehavior: Clip.hardEdge,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                                      if (hasVideo)
-                                        Container(
-                                  color: Colors.black87,
-                                          child: const Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.play_circle_fill,
-                                          color: Colors.white,
-                                          size: 40,
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                                'Vidéo prête',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                              )
-                            else
-                              Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.video_call,
-                                    color: Colors.grey,
-                                    size: 40,
-                                  ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              'Emplacement ${index + 1}',
-                                              style: const TextStyle(
-                                                color: Colors.grey,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                  const Text(
-                                              'Appuyer pour ajouter',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                                fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                                      if (isUploading)
-                              Positioned.fill(
-                                child: Container(
-                                  color: Colors.black54,
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 40,
-                                          height: 40,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      value: progress > 0
-                                                          ? progress
-                                                : null,
-                                            color: Colors.blue,
-                                                      backgroundColor:
-                                                          Colors.white24,
-                                            strokeWidth: 3,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                                    progress < 0.85
-                                              ? 'Envoi...'
-                                              : 'Traitement...',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                                    '${(progress * 100).toStringAsFixed(0)}%',
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 10,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Container(
-                                                    width: 140,
-                                          height: 3,
-                                          decoration: BoxDecoration(
-                                            color: Colors.white24,
-                                            borderRadius:
-                                                          BorderRadius.circular(
-                                                        2,
-                                                      ),
-                                          ),
-                                          child: FractionallySizedBox(
-                                                      alignment:
-                                                          Alignment.centerLeft,
-                                                      widthFactor: progress,
-                                            child: Container(
-                                                        decoration:
-                                                            BoxDecoration(
-                                                color: Colors.blue,
-                                                borderRadius:
-                                                              BorderRadius
-                                                                  .circular(2),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                                      if (hasVideo)
-                              Positioned(
-                                right: 8,
-                                top: 8,
-                                child: GestureDetector(
-                                            onTap: () => _removeVideo(index),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                                ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            bottom: 8,
-                            left: 0,
-                            right: 0,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(
-                                _maxVideoSlots,
-                                (index) => Container(
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 4),
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _currentVideoIndex == index
-                                        ? Colors.blue
-                                        : Colors.grey[400],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Fichier téléchargé
-                    if (_hasUploadedFile)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF2F2F2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _uploadedFileName!,
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const Icon(Icons.image, size: 24),
-                          ],
-                        ),
-                      ),
-                    // Affichage de l'image uploadée depuis Cloudinary
-                    if (_cloudinaryUrl != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Image.network(
-                          _cloudinaryUrl!,
-                          height: 120,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -1472,78 +1405,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
             _buildVerificationButton(context),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text, {bool isRequired = true}) {
-    return Text(
-      isRequired ? '$text *' : text,
-      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-    );
-  }
-
-  Widget _buildDropdown<T>({
-    required T? value,
-    required String hint,
-    required List<T> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          hint: Text(
-            hint,
-            style: const TextStyle(color: Colors.grey, fontSize: 14),
-          ),
-          isExpanded: true,
-          items: items.map((T item) {
-            return DropdownMenuItem<T>(
-              value: item,
-              child: Text(item.toString()),
-            );
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVerificationButton(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 16),
-      child: ElevatedButton(
-        onPressed: _isAnyUploading ? null : _onValidate,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFFFCC00),
-          foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          elevation: 0,
-        ),
-        child: _isAnyUploading
-            ? const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: 12),
-                  Text('Upload en cours...'),
-                ],
-              )
-            : const Text(
-                'Valider',
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-              ),
       ),
     );
   }
@@ -1558,6 +1419,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
     _distanceController.dispose();
     _siegesController.dispose();
     _priceController.dispose();
+    _videoPageController.dispose();
     super.dispose();
   }
 }
@@ -1592,4 +1454,30 @@ Future<String?> uploadImageToCloudinaryWeb(
   }
 }
 
-// Fonction locale supprimée - utiliser celle importée depuis cloudinary_upload.dart
+// Fonction d'upload vidéo pour Web
+Future<String?> uploadVideoToCloudinaryWeb(
+  Uint8List bytes, {
+  String folder = CloudinaryFolders.vehicleVideos,
+}) async {
+  const String cloudName = 'dy0raj5bh';
+  const String uploadPreset = 'unsigned_preset';
+  final url = Uri.parse(
+    'https://api.cloudinary.com/v1_1/$cloudName/video/upload',
+  );
+
+  final request = http.MultipartRequest('POST', url)
+    ..fields['upload_preset'] = uploadPreset
+    ..fields['folder'] = folder
+    ..files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: 'video.mp4'),
+    );
+
+  final response = await request.send();
+  if (response.statusCode == 200) {
+    final respStr = await response.stream.bytesToString();
+    final json = jsonDecode(respStr) as Map<String, dynamic>;
+    return json['secure_url'] as String?;
+  } else {
+    return null;
+  }
+}

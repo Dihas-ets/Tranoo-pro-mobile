@@ -1,16 +1,22 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class LocalNotificationService {
-  static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+
   static bool _initialized = false;
+
   static const String tricycleChannelId = 'tricycle_channel';
-  static const String tricycleSoundAndroid = 'driver_request_sound'; // res/raw/driver_request_sound.*
+  static const String tricycleSoundAndroid = 'driver_request_sound';
   static const String tricycleSoundIOS = 'driver_request_sound.wav';
 
+  /// INIT
   static Future<void> initialize() async {
     if (_initialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -25,15 +31,14 @@ class LocalNotificationService {
     await _notifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (details) {
-        // Gérer le tap sur notification
         print('Notification tapée: ${details.payload}');
       },
     );
 
-    // Créer le channel Tricycle avec son custom (Android 8+)
-    final androidPlugin =
-        _notifications.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    // Android channel setup
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
     if (androidPlugin != null) {
       await androidPlugin.createNotificationChannel(
         const AndroidNotificationChannel(
@@ -42,7 +47,9 @@ class LocalNotificationService {
           description: 'Notifications Tricycle (demandes, annulations, rejets)',
           importance: Importance.high,
           playSound: true,
-          sound: RawResourceAndroidNotificationSound(tricycleSoundAndroid),
+          sound: RawResourceAndroidNotificationSound(
+            tricycleSoundAndroid,
+          ),
         ),
       );
     }
@@ -50,16 +57,22 @@ class LocalNotificationService {
     _initialized = true;
   }
 
+  /// BACKGROUND TAP HANDLER
+  @pragma('vm:entry-point')
+  static void notificationTapBackground(NotificationResponse response) {
+    print('📩 Background notification: ${response.payload}');
+  }
+
+  /// OTP NOTIFICATION
   static Future<void> showOTPNotification(String code) async {
     await initialize();
 
     const androidDetails = AndroidNotificationDetails(
       'otp_channel',
       'Codes OTP',
-      channelDescription: 'Notifications pour les codes de vérification OTP',
+      channelDescription: 'Notifications pour les codes OTP',
       importance: Importance.high,
       priority: Priority.high,
-      showWhen: true,
       icon: '@mipmap/ic_launcher',
     );
 
@@ -75,21 +88,22 @@ class LocalNotificationService {
     );
 
     await _notifications.show(
-      1001, // ID unique
-      '🔐 Code de vérification Tranoo',
-      'Votre code : $code',
+      1001,
+      'Code de vérification Tranoo',
+      'Votre code: $code',
       details,
-      payload: code,
+      payload: 'otp_code',
     );
   }
 
+  /// GENERAL NOTIFICATION
   static Future<void> showNotification(String title, String body) async {
     await initialize();
 
     const androidDetails = AndroidNotificationDetails(
       'general_channel',
       'Notifications générales',
-      channelDescription: 'Notifications générales de l\'application',
+      channelDescription: 'Notifications générales de l\'app',
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
       icon: '@mipmap/ic_launcher',
@@ -110,18 +124,24 @@ class LocalNotificationService {
     );
   }
 
-  static Future<void> showTricycleNotification(String title, String body) async {
+  /// TRICYCLE NOTIFICATION (SOUND CUSTOM)
+  static Future<void> showTricycleNotification(
+    String title,
+    String body,
+  ) async {
     await initialize();
 
     const androidDetails = AndroidNotificationDetails(
       tricycleChannelId,
       'Tricycle',
-      channelDescription: 'Notifications Tricycle (demandes, annulations, rejets)',
+      channelDescription: 'Notifications Tricycle',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
       playSound: true,
-      sound: RawResourceAndroidNotificationSound(tricycleSoundAndroid),
+      sound: RawResourceAndroidNotificationSound(
+        tricycleSoundAndroid,
+      ),
     );
 
     const iosDetails = DarwinNotificationDetails(

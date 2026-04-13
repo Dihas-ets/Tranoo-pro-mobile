@@ -35,9 +35,9 @@ class RoleRestrictionDialogPro extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDarkMode 
-              ? [Colors.grey[800]!, Colors.grey[900]!]
-              : [Colors.white, Colors.grey[50]!,
+            colors: isDarkMode
+                ? [Colors.grey[800]!, Colors.grey[900]!]
+                : [Colors.white, Colors.grey[50]!],
           ),
         ),
         child: Column(

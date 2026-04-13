@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:tranoo_pro/widgets/location_permission_dialog.dart';
 import 'package:dio/dio.dart';
 
 class MapPickerScreen extends StatefulWidget {
@@ -97,14 +99,24 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        // Afficher le dialogue de divulgation avant de demander la permission
+        await showDialog(
+          context: context,
+          builder: (context) => LocationPermissionDialog(
+            userRole: 'vendeur', // Utilisateur par défaut pour le map picker
+            onPermissionGranted: () async {
+              // La permission sera demandée dans le dialogue
+            },
+            onPermissionDenied: () {
+              setState(() => _isLoading = false);
+            },
+          ),
+        );
+        
+        // Vérifier à nouveau si la permission a été accordée
+        permission = await Geolocator.checkPermission();
         if (permission == LocationPermission.denied) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Permission de localisation refusée'),
-            ),
-          );
           setState(() => _isLoading = false);
           return;
         }

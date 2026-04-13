@@ -20,6 +20,9 @@ import 'package:tranoo_pro/services/blocked_user_service.dart';
 import 'package:tranoo_pro/services/push_otp_service.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
 import 'package:tranoo_pro/providers/locale_provider.dart';
+import 'package:tranoo_pro/widgets/location_permission_dialog.dart';
+import 'package:tranoo_pro/widgets/first_launch_location_dialog.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // import 'package:flutter/services.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
@@ -501,6 +504,17 @@ class _AppInitializerState extends State<AppInitializer>
     // Définir le contexte pour BlockedUserService
     BlockedUserService.setContext(context);
 
+    // Vérifier si c'est le premier lancement pour afficher la divulgation de localisation
+    final prefs = await SharedPreferences.getInstance();
+    final bool isFirstLaunch = prefs.getBool('is_first_launch') ?? true;
+
+    if (isFirstLaunch) {
+      // Afficher la divulgation de localisation au premier lancement
+      await _showLocationDisclosure();
+      // Marquer que ce n'est plus le premier lancement
+      await prefs.setBool('is_first_launch', false);
+    }
+
     // Vérifier le statut de blocage
     final userService = UserService();
     final isBlocked = await userService.checkUserBlockedStatus();
@@ -538,6 +552,19 @@ class _AppInitializerState extends State<AppInitializer>
     } catch (e) {
       print('Erreur lors de la détection du parrainage: $e');
     }
+  }
+
+  Future<void> _showLocationDisclosure() async {
+    // Afficher la divulgation de localisation au premier lancement
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // Empêcher la fermeture par clic extérieur
+      builder: (context) => FirstLaunchLocationDialog(
+        onDismissed: () {
+          // Continuer le processus normal après que l'utilisateur ait fait son choix
+        },
+      ),
+    );
   }
 
   void _showReferralNotification(String referralCode) {

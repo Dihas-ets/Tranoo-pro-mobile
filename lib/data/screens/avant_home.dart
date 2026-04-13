@@ -224,7 +224,7 @@ class _AvantHomeState extends State<AvantHome> {
           _updateLastLoginTime();
         }
 
-        // Ajusté pour 4 onglets (Accueil, Publicité, Vendre, Pièces)
+        // Ajusté pour 4 onglets (Accueil, Publicité, Voitures, Pièces)
         if (role == 'vendeur' && _selectedIndex > 3) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             setState(() {
@@ -479,8 +479,8 @@ class _AvantHomeState extends State<AvantHome> {
                             label: 'Publicité',
                           ),
                           BottomNavigationBarItem(
-                            icon: Icon(Icons.sell, size: iconSize),
-                            label: 'Vendre',
+                            icon: Icon(Icons.directions_car, size: iconSize),
+                            label: 'Voitures',
                           ),
                           BottomNavigationBarItem(
                             icon: Icon(Icons.build, size: iconSize),
