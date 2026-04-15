@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/services/subscription_access_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'mastervacpage.dart';
 import 'create_sell2.dart';
+import 'seller_subscription_page.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 
@@ -39,6 +41,10 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
   late int _budgetTabIndex;
 
   final UserService _userService = UserService();
+  final SubscriptionAccessService _subscriptionService =
+      SubscriptionAccessService();
+  SellerAccessStatus? _accessStatus;
+  bool _loadingAccessStatus = true;
 
   @override
   void initState() {
@@ -65,11 +71,36 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
     });
 
     fetchPieces();
+    _refreshAccessStatus();
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text.toLowerCase();
       });
     });
+  }
+
+  Future<void> _refreshAccessStatus() async {
+    setState(() {
+      _loadingAccessStatus = true;
+    });
+    try {
+      final status = await _subscriptionService.getSellerAccessStatus();
+      if (!mounted) return;
+      setState(() {
+        _accessStatus = status;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _accessStatus = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingAccessStatus = false;
+        });
+      }
+    }
   }
 
   @override
@@ -134,6 +165,16 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _deletePiece(String articleId, int index) async {
+    if (_accessStatus?.canCreateArticle == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Abonnement inactif: suppression des pieces desactivee.',
+          ),
+        ),
+      );
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -180,6 +221,122 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Erreur réseau ou serveur.')),
       );
+    }
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return '--';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Future<void> _handleAddPieceWithSubscription() async {
+    SellerAccessStatus status;
+    try {
+      status = await _subscriptionService.getSellerAccessStatus();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de verifier le plan d\'abonnement.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    final bool canContinue = status.canCreateArticle;
+    final bool isFree = status.freeTrialActive && !status.paidPlanActive;
+    final String subtitle = isFree
+        ? 'Vous etes dans le ${status.currentPlanLabel}. Fin de l\'essai: ${_formatDate(status.freeTrialEndsAt)}.'
+        : status.paidPlanActive
+            ? 'Votre Plan Pro est actif jusqu\'au ${_formatDate(status.paidPlanEndsAt)}.'
+            : 'Votre essai gratuit est termine. Activez un abonnement pour continuer.';
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: Row(
+            children: [
+              const Icon(Icons.workspace_premium, color: Color(0xFFF8BF13)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  canContinue ? 'Plan actif' : 'Abonnement requis',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Plan actuel: ${status.currentPlanLabel}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(subtitle),
+              const SizedBox(height: 10),
+              Text(
+                'Tarif Plan Pro: ${status.monthlyPriceFcfa} FCFA / mois',
+                style: const TextStyle(color: Color(0xFFB45309)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('Fermer'),
+            ),
+            if (!canContinue)
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, 'subscribe'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF8BF13),
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Voir abonnement'),
+              ),
+            if (canContinue)
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, 'continue'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF8BF13),
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Continuer'),
+              ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    if (action == 'continue' && canContinue) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const CreateSellPage2(),
+        ),
+      ).then((_) => fetchPieces());
+      return;
+    }
+
+    if (action == 'subscribe') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const SellerSubscriptionPage(),
+        ),
+      ).then((_) async {
+        await _refreshAccessStatus();
+        if (mounted) fetchPieces();
+      });
     }
   }
 
@@ -690,17 +847,36 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
         title: Text(isVendeur ? 'Ajouter une pièce' : 'Pièces détachées'),
         backgroundColor: Colors.amber,
         actions: [
+          if (isVendeur && !_loadingAccessStatus)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: (_accessStatus?.canCreateArticle ?? false)
+                      ? Colors.green.shade100
+                      : Colors.red.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Center(
+                  child: Text(
+                    _accessStatus?.currentPlanLabel ?? 'Plan inconnu',
+                    style: TextStyle(
+                      color: (_accessStatus?.canCreateArticle ?? false)
+                          ? Colors.green.shade800
+                          : Colors.red.shade800,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (isVendeur)
             IconButton(
               icon: const Icon(Icons.add_circle, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CreateSellPage2(),
-                  ),
-                ).then((_) => fetchPieces());
-              },
+              onPressed: _handleAddPieceWithSubscription,
               tooltip: 'Ajouter une pièce',
             ),
         ],
@@ -711,6 +887,28 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
               ? Center(child: Text(error!))
               : Column(
                   children: [
+                    if (isVendeur &&
+                        !_loadingAccessStatus &&
+                        (_accessStatus?.showExpiryWarning ?? false))
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF4CC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFF8BF13)),
+                        ),
+                        child: Text(
+                          _accessStatus?.paidPlanActive == true
+                              ? 'Attention: votre Plan Pro expire dans ${_accessStatus?.paidPlanRemainingDays ?? 0} jour(s).'
+                              : 'Votre Plan Decouverte se termine dans ${_accessStatus?.freeTrialRemainingDays ?? 0} jour(s).',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF8A6D3B),
+                          ),
+                        ),
+                      ),
                     // Barre de recherche
                     Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -799,6 +997,8 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                 itemBuilder: (context, index) {
                                   final piece = filteredPieces[index];
                                   final pieceId = piece['_id'] ?? '';
+                                  final canManagePieces =
+                                      _accessStatus?.canCreateArticle ?? true;
                                   return AnimatedOpacity(
                                     opacity: _isVisible.length > index &&
                                             _isVisible[index]
@@ -807,7 +1007,19 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                     duration: const Duration(milliseconds: 400),
                                     child: Stack(
                                       children: [
-                                        GestureDetector(
+                                        ColorFiltered(
+                                          colorFilter: isVendeur && !canManagePieces
+                                              ? const ColorFilter.matrix(<double>[
+                                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                                  0, 0, 0, 1, 0,
+                                                ])
+                                              : const ColorFilter.mode(
+                                                  Colors.transparent,
+                                                  BlendMode.dst,
+                                                ),
+                                          child: GestureDetector(
                                           onTap: () {
                                             Navigator.push(
                                               context,
@@ -961,6 +1173,37 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                             ),
                                           ),
                                         ),
+                                        ),
+                                        if (isVendeur && !canManagePieces)
+                                          Positioned.fill(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(0.45),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black54,
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                ),
+                                                child: const Text(
+                                                  'Abonnement expire',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         if (isVendeur)
                                           Positioned(
                                             top: 6,
@@ -968,8 +1211,12 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                             child: IconButton(
                                               icon: const Icon(Icons.close,
                                                   color: Colors.red, size: 20),
-                                              onPressed: () =>
-                                                  _deletePiece(pieceId, index),
+                                              onPressed: canManagePieces
+                                                  ? () => _deletePiece(
+                                                        pieceId,
+                                                        index,
+                                                      )
+                                                  : null,
                                             ),
                                           ),
                                       ],

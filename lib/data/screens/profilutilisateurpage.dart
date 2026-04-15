@@ -14,6 +14,7 @@ import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
+import 'package:tranoo_pro/services/subscription_access_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -49,6 +50,11 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
   double? _walletBalance;
   String _walletCurrency = "XOF";
   bool _walletLoading = true;
+  final SubscriptionAccessService _subscriptionService =
+      SubscriptionAccessService();
+  SellerAccessStatus? _subscriptionStatus;
+  List<Map<String, dynamic>> _subscriptionHistory = [];
+  bool _subscriptionLoading = true;
   
   // Animation pour alerte photo manquante
   late AnimationController _alertController;
@@ -59,6 +65,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
     super.initState();
     fetchUser();
     _loadWallet();
+    _loadSubscriptionData();
     
     // Initialiser l'animation d'alerte
     _alertController = AnimationController(
@@ -72,6 +79,40 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
         curve: Curves.easeInOut,
       ),
     );
+  }
+
+  Future<void> _loadSubscriptionData() async {
+    setState(() {
+      _subscriptionLoading = true;
+    });
+    try {
+      final status = await _subscriptionService.getSellerAccessStatus();
+      final history = await _subscriptionService.getSubscriptionHistory(limit: 10);
+      if (!mounted) return;
+      setState(() {
+        _subscriptionStatus = status;
+        _subscriptionHistory = history;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _subscriptionStatus = null;
+        _subscriptionHistory = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _subscriptionLoading = false;
+        });
+      }
+    }
+  }
+
+  String _formatDateShort(dynamic raw) {
+    if (raw == null) return '--';
+    final dt = DateTime.tryParse(raw.toString());
+    if (dt == null) return '--';
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
   
   @override
@@ -381,6 +422,8 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
             const SizedBox(height: 50),
             _buildAccountOptions(),
             const SizedBox(height: 20),
+            _buildSubscriptionSection(),
+            const SizedBox(height: 20),
             const Text(
               "Plus",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -389,6 +432,103 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
             _buildMoreOptions(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionSection() {
+    if (_subscriptionLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final status = _subscriptionStatus;
+    final warning = status?.showExpiryWarning == true;
+    final warningText = status?.paidPlanActive == true
+        ? 'Votre abonnement expire dans ${status?.paidPlanRemainingDays ?? 0} jour(s).'
+        : 'Votre periode gratuite se termine dans ${status?.freeTrialRemainingDays ?? 0} jour(s).';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Abonnement vendeur',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Plan actuel: ${status?.currentPlanLabel ?? 'Inconnu'}',
+            style: const TextStyle(
+              color: Color(0xFF0461B6),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (warning) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4CC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF8BF13)),
+              ),
+              child: Text(
+                warningText,
+                style: const TextStyle(
+                  color: Color(0xFF8A6D3B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          const Text(
+            'Historique (10 derniers)',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (_subscriptionHistory.isEmpty)
+            const Text(
+              'Aucun paiement d\'abonnement pour le moment.',
+              style: TextStyle(color: Colors.grey),
+            )
+          else
+            ..._subscriptionHistory.map((tx) {
+              final amount = tx['amount']?.toString() ?? '--';
+              final status = tx['status']?.toString() ?? '--';
+              final createdAt = _formatDateShort(tx['createdAt']);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEDEDED)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.receipt_long, color: Color(0xFFF8BF13)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '$amount FCFA - $status',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text(
+                      createdAt,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
       ),
     );
   }

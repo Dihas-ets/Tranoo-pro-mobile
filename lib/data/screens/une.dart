@@ -152,8 +152,8 @@ class _UneState extends State<Une> {
     super.initState();
     _loadPrixConfig(); // Charger les prix depuis le backend
     if (widget.isStandalone) {
-      _selectedVoiture = null; // Valeur par défaut pour standalone
-      _descriptionController.text = 'Description de la publicité ';
+      _selectedVoiture = 'À la une';
+      _descriptionController.text = 'Publicité À la une';
     } else {
       _selectedVoiture = 'À la une'; // Par défaut pour les pubs d'articles
     }
@@ -466,12 +466,12 @@ class _UneState extends State<Une> {
         maxWidth: 1920.0,
         maxHeight: 1080.0,
       );
-      
+
       if (images != null) {
         for (int i = 0; i < images.length && i < 11; i++) {
           final image = images[i];
           final emptyIndex = _uploadedImages.indexWhere((img) => img == null);
-          
+
           if (emptyIndex != -1 && emptyIndex < 11) {
             await _processImageUpload(image, emptyIndex);
           }
@@ -497,10 +497,10 @@ class _UneState extends State<Une> {
         maxWidth: 1920.0,
         maxHeight: 1080.0,
       );
-      
+
       if (image != null) {
         final emptyIndex = _uploadedImages.indexWhere((img) => img == null);
-        
+
         if (emptyIndex != -1 && emptyIndex < 11) {
           await _processImageUpload(image, emptyIndex);
         } else {
@@ -527,51 +527,53 @@ class _UneState extends State<Une> {
     // Validation de la taille
     final fileSize = await image.length();
     const maxFileSize = 5 * 1024 * 1024; // 5MB
-    
+
     if (fileSize > maxFileSize) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Image trop volumineuse: ${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB (max: 5MB)'),
+          content: Text(
+              'Image trop volumineuse: ${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB (max: 5MB)'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 3),
         ),
       );
       return;
     }
-    
+
     // Validation du format
     final fileName = image.path.toLowerCase();
     final allowedFormats = ['jpg', 'jpeg', 'png', 'webp'];
     final extension = fileName.split('.').last;
-    
+
     if (!allowedFormats.contains(extension)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Format non supporté: $extension. Formats: ${allowedFormats.join(', ')}'),
+          content: Text(
+              'Format non supporté: $extension. Formats: ${allowedFormats.join(', ')}'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 3),
         ),
       );
       return;
     }
-    
+
     if (kIsWeb) {
       final bytes = await image.readAsBytes();
       setState(() {
         _uploadedImagesWeb[index] = bytes;
         _isUploadingImage[index] = true;
       });
-      
+
       try {
         final url = await uploadImageToCloudinaryWeb(bytes);
         if (!mounted) return;
-        
+
         setState(() {
           _cloudinaryImageUrls[index] = url;
           _uploadedImagesWeb[index] = null;
           _isUploadingImage[index] = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Image ajoutée: ${image.name}'),
@@ -582,7 +584,7 @@ class _UneState extends State<Une> {
       } catch (e) {
         if (!mounted) return;
         setState(() => _isUploadingImage[index] = false);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur upload: ${e.toString()}'),
@@ -595,7 +597,7 @@ class _UneState extends State<Une> {
         _uploadedImages[index] = File(image.path);
         _isUploadingImage[index] = true;
       });
-      
+
       try {
         final currentFile = _uploadedImages[index];
         final url = currentFile != null
@@ -604,16 +606,16 @@ class _UneState extends State<Une> {
                 folder: _imageFolder,
               )
             : null;
-            
+
         if (!mounted) return;
-        
+
         if (url != null) {
           setState(() {
             _cloudinaryImageUrls[index] = url;
             _uploadedImages[index] = null;
             _isUploadingImage[index] = false;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Image uploadée: ${image.name}'),
@@ -627,7 +629,7 @@ class _UneState extends State<Une> {
       } catch (e) {
         if (!mounted) return;
         setState(() => _isUploadingImage[index] = false);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur upload: ${e.toString()}'),
@@ -921,11 +923,12 @@ class _UneState extends State<Une> {
     setState(() {
       _userAddress = address;
       _loadingAddress = false;
-      _carLocationController.text = address; // Mettre à jour le champ de localisation
+      _carLocationController.text =
+          address; // Mettre à jour le champ de localisation
     });
   }
 
-  Future<void> _getCurrentLocation () async {
+  Future<void> _getCurrentLocation() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -942,7 +945,7 @@ class _UneState extends State<Une> {
             },
           ),
         );
-        
+
         // Vérifier à nouveau si la permission a été accordée
         permission = await Geolocator.checkPermission();
       }
@@ -968,7 +971,8 @@ class _UneState extends State<Une> {
       // Utiliser une API de géocodification (ici nous simulons)
       // En production, vous pourriez utiliser l'API Google Maps ou OpenStreetMap Nominatim
       final response = await http.get(
-        Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&accept-language=fr'),
+        Uri.parse(
+            'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&accept-language=fr'),
       );
 
       if (response.statusCode == 200) {
@@ -979,13 +983,13 @@ class _UneState extends State<Une> {
           final suburb = address['suburb'] ?? '';
           final city = address['city'] ?? address['town'] ?? '';
           final postcode = address['postcode'] ?? '';
-          
+
           String fullAddress = '';
           if (road.isNotEmpty) fullAddress += '$road, ';
           if (suburb.isNotEmpty) fullAddress += '$suburb, ';
           if (city.isNotEmpty) fullAddress += city;
           if (postcode.isNotEmpty) fullAddress += ' $postcode';
-          
+
           return fullAddress.isNotEmpty ? fullAddress : '$lat, $lng';
         }
       }
@@ -1002,7 +1006,7 @@ class _UneState extends State<Une> {
         builder: (context) => const MapPickerScreen(),
       ),
     );
-    
+
     if (result != null && result is Map<String, dynamic>) {
       final lat = result['latitude'];
       final lng = result['longitude'];
@@ -1034,7 +1038,7 @@ class _UneState extends State<Une> {
     _selectedVoiture = currentType;
 
     // Vérification stricte : au moins une image doit être présente
-    final pubImages = _cloudinaryImageUrls.whereType<String>().toList();
+    List<String> pubImages = _cloudinaryImageUrls.whereType<String>().toList();
     final lienValue = _linkController.text.trim();
     final lien = lienValue.isEmpty ? null : lienValue;
     if (pubImages.isEmpty) {
@@ -1064,7 +1068,6 @@ class _UneState extends State<Une> {
           _carYearController.text.trim().isEmpty ||
           _carLocationController.text.trim().isEmpty ||
           _carPriceController.text.trim().isEmpty ||
-          _carDescriptionController.text.trim().isEmpty ||
           _carCompanyController.text.trim().isEmpty ||
           (_selectedCarFuelType == null || _selectedCarFuelType!.isEmpty) ||
           (_selectedCarModel == null || _selectedCarModel!.isEmpty) ||
@@ -1090,6 +1093,8 @@ class _UneState extends State<Une> {
         );
         return;
       }
+      // "À la une" = flyer principal uniquement
+      pubImages = [_cloudinaryImageUrls[0]!];
     }
 
     setState(() {
@@ -1120,20 +1125,23 @@ class _UneState extends State<Une> {
           'vendeur': user?.uid,
           'articleId': null, // Pas d'article associé pour standalone
           'isStandalone': true, // Marquer comme standalone
-          // Ajouter les données de l'offre standalone
-          'titre': _carNameController.text.trim(),
-          'annee': _carYearController.text.trim(),
-          'descriptionOffre': _carDescriptionController.text.trim(),
-          'entreprise': _carCompanyController.text.trim(),
-          'localisation': _carLocationController.text.trim(),
-          'prixOffre': _carPriceController.text.trim(),
-          'typeMoteur': _selectedCarFuelType,
-          'modele': _selectedCarModel,
-          'pieceType': _selectedCarType,
           'video': _cloudinaryVideoUrl,
           'type': widget.articleType ?? 'voiture',
           'lien': lien,
         };
+        if (currentType == 'Sponsorisée') {
+          pubData.addAll({
+            'titre': _carNameController.text.trim(),
+            'annee': _carYearController.text.trim(),
+            'descriptionOffre': _carDescriptionController.text.trim(),
+            'entreprise': _carCompanyController.text.trim(),
+            'localisation': _carLocationController.text.trim(),
+            'prixOffre': _carPriceController.text.trim(),
+            'typeMoteur': _selectedCarFuelType,
+            'modele': _selectedCarModel,
+            'pieceType': _selectedCarType,
+          });
+        }
 
         // Créer la publicité standalone
         final response = await http.post(
@@ -1345,16 +1353,19 @@ class _UneState extends State<Une> {
         ),
         const SizedBox(height: 16),
         // Affichage des images uploadées
-        if (_cloudinaryImageUrls.where((url) => url != null && url!.isNotEmpty).isNotEmpty)
+        if (_cloudinaryImageUrls
+            .where((url) => url?.isNotEmpty == true)
+            .isNotEmpty)
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: List.generate(11, (index) {
-              final hasImage = _cloudinaryImageUrls[index] != null && _cloudinaryImageUrls[index]!.isNotEmpty;
+              final hasImage = _cloudinaryImageUrls[index] != null &&
+                  _cloudinaryImageUrls[index]!.isNotEmpty;
               final isUploading = _isUploadingImage[index];
-              
+
               if (!hasImage && !isUploading) return const SizedBox.shrink();
-              
+
               return Container(
                 width: 80,
                 height: 80,
@@ -1374,7 +1385,8 @@ class _UneState extends State<Une> {
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
                           ),
@@ -1460,7 +1472,9 @@ class _UneState extends State<Une> {
                           width: 35,
                           height: 35,
                           child: CircularProgressIndicator(
-                            value: _videoUploadProgress > 0 ? _videoUploadProgress : null,
+                            value: _videoUploadProgress > 0
+                                ? _videoUploadProgress
+                                : null,
                             color: Colors.blue,
                             backgroundColor: Colors.white24,
                             strokeWidth: 3,
@@ -1558,7 +1572,7 @@ class _UneState extends State<Une> {
     // LOGS DEBUG pour les listes d'images
     log('[UNE][build] _cloudinaryImageUrls.length = ${_cloudinaryImageUrls.length}');
     log('[UNE][build] _isUploadingImage.length = ${_isUploadingImage.length}');
-    
+
     // Correction : toujours 11 éléments dans les listes
     while (_cloudinaryImageUrls.length < 11) {
       _cloudinaryImageUrls.add(null);
@@ -1646,7 +1660,7 @@ class _UneState extends State<Une> {
                           const SizedBox(height: 8),
                           Text(
                             widget.isStandalone
-                                ? 'Publicité À la une indépendante. Téléchargez un flyer (1080 x 1350 px recommandé) et ajoutez un lien optionnel vers votre site ou votre catalogue.'
+                                ? 'Publicité À la une indépendante. Téléchargez un flyer (1080 x 720 px recommandé) et ajoutez un lien optionnel vers votre site ou votre catalogue.'
                                 : widget.articleId == null
                                     ? 'Publication non existante. Vous créez une publication non existante. Les utilisateurs pourront cliquer pour voir les détails de votre offre.'
                                     : 'Vous créez une publicité pour un article existant. Les utilisateurs pourront cliquer pour voir l\'article complet.',
@@ -1737,44 +1751,51 @@ class _UneState extends State<Une> {
                         labelText: 'Description',
                         border: OutlineInputBorder(),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Veuillez entrer une description';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 20),
 
                     // Type de publicité
-                    DropdownButtonFormField<String>(
-                      value: _selectedVoiture,
-                      items: voitures
-                          .map(
-                            (voiture) => DropdownMenuItem(
-                              value: voiture,
-                              child: Text(voiture),
-                            ),
-                          )
-                          .toList(),
-                      decoration: const InputDecoration(
-                        labelText: 'Type de publicité',
-                        border: OutlineInputBorder(),
+                    if (!widget.isStandalone) ...[
+                      DropdownButtonFormField<String>(
+                        value: _selectedVoiture,
+                        items: voitures
+                            .map(
+                              (voiture) => DropdownMenuItem(
+                                value: voiture,
+                                child: Text(voiture),
+                              ),
+                            )
+                            .toList(),
+                        decoration: const InputDecoration(
+                          labelText: 'Type de publicité',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Veuillez sélectionner un type';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedVoiture = value;
+                            _updatePrix();
+                            if (value == 'À la une') {
+                              for (int i = 1;
+                                  i < _cloudinaryImageUrls.length;
+                                  i++) {
+                                _cloudinaryImageUrls[i] = null;
+                                _uploadedImages[i] = null;
+                                _uploadedImagesWeb[i] = null;
+                                _isUploadingImage[i] = false;
+                              }
+                              _removeVideo();
+                            }
+                          });
+                        },
                       ),
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Veuillez sélectionner un type';
-                        }
-                        return null;
-                      },
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedVoiture = value;
-                          _updatePrix();
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Durée de la pub
                     DropdownButtonFormField<String>(
@@ -1828,8 +1849,9 @@ class _UneState extends State<Une> {
                       ),
                     const SizedBox(height: 30),
 
-                    // Lien externe (pour publicité standalone)
-                    if (widget.isStandalone) ...[
+                    // Lien externe (optionnel pour "À la une")
+                    if (widget.isStandalone ||
+                        _selectedVoiture == 'À la une') ...[
                       TextFormField(
                         controller: _linkController,
                         decoration: const InputDecoration(
@@ -1841,8 +1863,8 @@ class _UneState extends State<Une> {
                       const SizedBox(height: 20),
                     ],
 
-                    // SECTION DYNAMIQUE : Informations concernant la voiture (toujours affichées pour standalone)
-                    if (widget.isStandalone) ...[
+                    // SECTION DYNAMIQUE : Informations détaillées seulement pour sponsorisée
+                    if (_selectedVoiture == 'Sponsorisée') ...[
                       const Divider(height: 40, thickness: 2),
                       const Text(
                         'Informations concernant la voiture',
@@ -1891,18 +1913,20 @@ class _UneState extends State<Une> {
                         children: [
                           const Text(
                             'Localisation',
-                            style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w500, fontSize: 14),
                           ),
                           const SizedBox(height: 8),
-                          
+
                           // Boutons de localisation
                           Row(
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: _getCurrentLocation ,
+                                  onPressed: _getCurrentLocation,
                                   icon: const Icon(Icons.my_location),
-                                  label: const Text('Utiliser ma position actuelle'),
+                                  label: const Text(
+                                      'Utiliser ma position actuelle'),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -1916,7 +1940,7 @@ class _UneState extends State<Une> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          
+
                           // Affichage de la localisation
                           Container(
                             width: double.infinity,
@@ -1958,7 +1982,8 @@ class _UneState extends State<Une> {
                                       SizedBox(
                                         width: 16,
                                         height: 16,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
                                       ),
                                       SizedBox(width: 8),
                                       Text('Recherche de l\'adresse...'),
@@ -1972,12 +1997,13 @@ class _UneState extends State<Une> {
                                 else
                                   const Text(
                                     'Localisation non définie',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey),
                                   ),
                               ],
                             ),
                           ),
-                          
+
                           // Champ caché pour la validation
                           TextFormField(
                             controller: _carLocationController,
@@ -2020,12 +2046,6 @@ class _UneState extends State<Une> {
                           labelText: 'Description de la voiture',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Veuillez entrer une description';
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 20),
 
@@ -2107,16 +2127,19 @@ class _UneState extends State<Une> {
                       if (_selectedCarModel == 'Autre') ...[
                         const SizedBox(height: 10),
                         TextFormField(
-                          controller: TextEditingController(text: _customCarModel ?? ''),
+                          controller: TextEditingController(
+                              text: _customCarModel ?? ''),
                           decoration: const InputDecoration(
                             labelText: 'Précisez le modèle',
                             border: OutlineInputBorder(),
                           ),
                           onChanged: (value) {
-                            _customCarModel = value.trim().isEmpty ? null : value.trim();
+                            _customCarModel =
+                                value.trim().isEmpty ? null : value.trim();
                           },
                           validator: (value) {
-                            if (_selectedCarModel == 'Autre' && (value == null || value.trim().isEmpty)) {
+                            if (_selectedCarModel == 'Autre' &&
+                                (value == null || value.trim().isEmpty)) {
                               return 'Veuillez préciser le modèle';
                             }
                             return null;
@@ -2163,7 +2186,7 @@ class _UneState extends State<Une> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Dimensions recommandées : 1080 x 1350 px (PNG/JPG)',
+                        'Dimensions recommandées : 1080 x 720 px (PNG/JPG)',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
@@ -2230,7 +2253,7 @@ class _UneState extends State<Une> {
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: const Text(
-                                    '1080 x 1350 px',
+                                    '1080 x 720 px',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
