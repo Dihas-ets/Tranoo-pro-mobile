@@ -144,6 +144,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       if (permission == LocationPermission.denied) {
         await showDialog(
           context: context,
+          barrierDismissible: false,
           builder: (context) => LocationPermissionDialog(
             userRole: 'vendeur',
             onPermissionGranted: () async {},

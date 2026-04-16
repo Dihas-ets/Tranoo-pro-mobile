@@ -108,6 +108,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
     // Afficher d'abord le dialogue de divulgation
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => LocationPermissionDialog(
         userRole: 'chauffeur',
         onPermissionGranted: () {

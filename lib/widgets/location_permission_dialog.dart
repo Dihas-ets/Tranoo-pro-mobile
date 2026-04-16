@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:geolocator/geolocator.dart';
 
 class LocationPermissionDialog extends StatelessWidget {
   final String userRole;
@@ -48,16 +47,17 @@ class LocationPermissionDialog extends StatelessWidget {
                     children: [
                       Text(
                         'Localisation requise',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
                       ),
                       Text(
                         'Autorisation nécessaire',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                              color: Colors.grey[600],
+                            ),
                       ),
                     ],
                   ),
@@ -70,9 +70,9 @@ class LocationPermissionDialog extends StatelessWidget {
             Text(
               _getRoleSpecificMessage(),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.black87,
-                height: 1.5,
-              ),
+                    color: Colors.black87,
+                    height: 1.5,
+                  ),
             ),
             const SizedBox(height: 16),
 
@@ -90,33 +90,36 @@ class LocationPermissionDialog extends StatelessWidget {
                   Text(
                     'Ce que nous utilisons :',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   ..._getUsagePoints().map((point) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.check_circle,
-                          size: 16,
-                          color: Colors.green[600],
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            point,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.black87,
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 16,
+                              color: Colors.green[600],
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                point,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: Colors.black87,
+                                    ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  )),
+                      )),
                 ],
               ),
             ),
@@ -142,8 +145,8 @@ class LocationPermissionDialog extends StatelessWidget {
                     child: Text(
                       'La localisation est utilisée même lorsque l\'application est en arrière-plan pour assurer un suivi continu.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.orange[700],
-                      ),
+                            color: Colors.orange[700],
+                          ),
                     ),
                   ),
                 ],
@@ -154,22 +157,6 @@ class LocationPermissionDialog extends StatelessWidget {
             // Boutons
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      onPermissionDenied();
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Refuser'),
-                  ),
-                ),
-                const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
@@ -184,7 +171,8 @@ class LocationPermissionDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Autoriser'),
+                    // Neutral button label before the system permission prompt.
+                    child: const Text('Continuer'),
                   ),
                 ),
               ],
@@ -259,19 +247,20 @@ class LocationPermissionDialog extends StatelessWidget {
     }
   }
 
-  Future<void> _requestPermissions(BuildContext context, VoidCallback onGranted) async {
+  Future<void> _requestPermissions(
+      BuildContext context, VoidCallback onGranted) async {
     try {
       // Demander d'abord la permission de localisation fine
       var status = await Permission.location.request();
-      
+
       if (status.isGranted) {
         // Vérifier si on a besoin de la permission d'arrière-plan
         bool needsBackground = await _needsBackgroundPermission();
-        
+
         if (needsBackground) {
           // Demander la permission d'arrière-plan
           var backgroundStatus = await Permission.locationAlways.request();
-          
+
           if (backgroundStatus.isGranted) {
             onGranted();
           } else {
@@ -294,7 +283,8 @@ class LocationPermissionDialog extends StatelessWidget {
     return ['livreur', 'chauffeur'].contains(userRole.toLowerCase());
   }
 
-  void _showBackgroundPermissionDialog(BuildContext context, VoidCallback onGranted) {
+  void _showBackgroundPermissionDialog(
+      BuildContext context, VoidCallback onGranted) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -346,7 +336,8 @@ class LocationPermissionDialog extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Erreur'),
-        content: Text('Une erreur est survenue lors de la demande de permission: $error'),
+        content: Text(
+            'Une erreur est survenue lors de la demande de permission: $error'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

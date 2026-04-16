@@ -194,6 +194,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
     // Afficher d'abord le dialogue de divulgation
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => LocationPermissionDialog(
         userRole: 'livreur',
         onPermissionGranted: () {

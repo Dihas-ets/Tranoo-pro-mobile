@@ -166,40 +166,9 @@ class FirstLaunchLocationDialog extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 6.0),
                           child: Center(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                Navigator.of(context).pop();
-                                await _requestPermissions();
-                                onDismissed();
-                              },
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                side: const BorderSide(color: Colors.blue),
-                              ),
-                              child: const Text(
-                                'Continuer sans autoriser',
-                                style: TextStyle(color: Colors.blue),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Card(
-                        margin: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 6.0),
-                          child: Center(
                             child: ElevatedButton(
                               onPressed: () async {
+                                // Dismiss the custom dialog and immediately trigger the system prompt.
                                 Navigator.of(context).pop();
                                 await _requestPermissions();
                                 onDismissed();
@@ -212,7 +181,7 @@ class FirstLaunchLocationDialog extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                              child: const Text('Autoriser la localisation'),
+                              child: const Text('Continuer'),
                             ),
                           ),
                         ),

@@ -55,6 +55,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
   SellerAccessStatus? _subscriptionStatus;
   List<Map<String, dynamic>> _subscriptionHistory = [];
   bool _subscriptionLoading = true;
+  bool _subscriptionHistoryLoading = false;
   
   // Animation pour alerte photo manquante
   late AnimationController _alertController;
@@ -65,7 +66,6 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
     super.initState();
     fetchUser();
     _loadWallet();
-    _loadSubscriptionData();
     
     // Initialiser l'animation d'alerte
     _alertController = AnimationController(
@@ -86,23 +86,52 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
       _subscriptionLoading = true;
     });
     try {
-      final status = await _subscriptionService.getSellerAccessStatus();
-      final history = await _subscriptionService.getSubscriptionHistory(limit: 10);
+      final dynamic rawDate =
+          userData?['dateInscription'] ?? userData?['createdAt'];
+      final inscriptionDate =
+          rawDate != null ? DateTime.tryParse(rawDate.toString()) : null;
+      final status = await _subscriptionService.getSellerAccessStatus(
+        inscriptionDate: inscriptionDate,
+      );
       if (!mounted) return;
       setState(() {
         _subscriptionStatus = status;
-        _subscriptionHistory = history;
       });
+      _loadSubscriptionHistory();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _subscriptionStatus = null;
-        _subscriptionHistory = [];
       });
     } finally {
       if (mounted) {
         setState(() {
           _subscriptionLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSubscriptionHistory() async {
+    if (_subscriptionHistoryLoading) return;
+    setState(() {
+      _subscriptionHistoryLoading = true;
+    });
+    try {
+      final history = await _subscriptionService.getSubscriptionHistory(limit: 10);
+      if (!mounted) return;
+      setState(() {
+        _subscriptionHistory = history;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _subscriptionHistory = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _subscriptionHistoryLoading = false;
         });
       }
     }
@@ -154,6 +183,9 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
         loading = false;
         errorMsg = null;
       });
+      if (userData?['role'] == 'vendeur') {
+        _loadSubscriptionData();
+      }
     } catch (e) {
       setState(() {
         loading = false;
@@ -196,6 +228,141 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
       setState(() {
         _walletLoading = false;
       });
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(child: Text('Suppression du compte')),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Cette action est irreversible.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Assurez-vous de ne plus avoir besoin de ce compte avant de confirmer.',
+              style: TextStyle(color: Colors.black54),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: SizedBox(
+          height: 40,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+    );
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      debugPrint('[delete-account][profil-vendeur] currentUser=${user?.uid}');
+      final idToken = await user?.getIdToken();
+      if (idToken == null) {
+        debugPrint('[delete-account][profil-vendeur] idToken null');
+        if (context.mounted) Navigator.of(context).pop(); // close progress
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Session invalide. Reconnectez-vous.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: getBaseUrl(),
+          headers: {'Authorization': 'Bearer $idToken'},
+          connectTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(seconds: 20),
+        ),
+      );
+
+      debugPrint(
+        '[delete-account][profil-vendeur] DELETE ${getBaseUrl()}/users/me',
+      );
+      final response = await dio.delete('/users/me');
+      debugPrint(
+        '[delete-account][profil-vendeur] success status=${response.statusCode} data=${response.data}',
+      );
+
+      if (context.mounted) Navigator.of(context).pop(); // close progress
+      await Provider.of<local_auth.AuthProvider>(context, listen: false)
+          .logout();
+
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const ConnexionPage()),
+        (route) => false,
+      );
+    } on DioException catch (e) {
+      debugPrint(
+        '[delete-account][profil-vendeur] DioException type=${e.type} status=${e.response?.statusCode} data=${e.response?.data}',
+      );
+      if (context.mounted) Navigator.of(context).pop(); // close progress
+      final message = e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.receiveTimeout ||
+              e.type == DioExceptionType.sendTimeout
+          ? 'Le serveur met trop de temps a repondre. Reessaie dans un instant.'
+          : e.type == DioExceptionType.connectionError
+              ? 'Impossible de joindre le serveur. Verifie ta connexion et l\'URL du backend.'
+              : (e.response?.data is Map &&
+                      (e.response?.data as Map)['message'] != null)
+                  ? (e.response?.data as Map)['message'].toString()
+                  : 'La suppression du compte a echoue. Reessaie plus tard.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (e) {
+      debugPrint('[delete-account][profil-vendeur] unexpected error=$e');
+      if (context.mounted) Navigator.of(context).pop(); // close progress
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Une erreur inattendue est survenue pendant la suppression.'),
+        ),
+      );
     }
   }
 
@@ -492,7 +659,12 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          if (_subscriptionHistory.isEmpty)
+          if (_subscriptionHistoryLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_subscriptionHistory.isEmpty)
             const Text(
               'Aucun paiement d\'abonnement pour le moment.',
               style: TextStyle(color: Colors.grey),
@@ -621,6 +793,12 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
                 MaterialPageRoute(builder: (context) => const WalletScreen()),
               );
             },
+          ),
+          _buildListTile(
+            title: "Suppression de compte",
+            icon: Icons.delete_forever,
+            color: Colors.red,
+            onTap: () => _deleteAccount(),
           ),
           _buildListTile(
             title: "Déconnexion",

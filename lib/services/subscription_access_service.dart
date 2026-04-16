@@ -49,7 +49,9 @@ class SellerAccessStatus {
 class SubscriptionAccessService {
   final UserService _userService = UserService();
 
-  Future<SellerAccessStatus> getSellerAccessStatus() async {
+  Future<SellerAccessStatus> getSellerAccessStatus({
+    DateTime? inscriptionDate,
+  }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return const SellerAccessStatus(
@@ -81,36 +83,35 @@ class SubscriptionAccessService {
     int monthlyPrice = 5000;
     int currentMonths = 1;
 
-    try {
-      final meResponse = await dio.get('/protected/me');
-      final userData = (meResponse.data as Map<String, dynamic>)['user'];
-      final dynamic rawDate =
-          userData['dateInscription'] ?? userData['createdAt'];
-      if (rawDate != null) {
-        inscriptionDate = DateTime.tryParse(rawDate.toString());
-      }
-    } catch (_) {}
+    final futures = <Future<void>>[
+      () async {
+        try {
+          final subResponse = await dio.get('/subscription/me');
+          final data = subResponse.data as Map<String, dynamic>;
+          paidPlanActive = data['hasSubscription'] == true;
+          currentMonths = (data['months'] as num?)?.toInt() ?? 1;
+          if (data['expiresAt'] != null) {
+            paidPlanEndsAt = DateTime.tryParse(data['expiresAt'].toString());
+          }
+          monthlyPrice = (data['monthlyPrice'] as num?)?.toInt() ?? monthlyPrice;
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          final pricingResponse = await dio.get('/admin/subscription-pricing');
+          final data = pricingResponse.data as Map<String, dynamic>;
+          monthlyPrice = (data['prixMensuel'] as num?)?.toInt() ?? monthlyPrice;
+        } catch (_) {}
+      }(),
+    ];
 
-    if (inscriptionDate != null) {
-      freeTrialEndsAt = inscriptionDate.add(const Duration(days: 90));
+    await Future.wait(futures);
+
+    final trialStartDate = inscriptionDate;
+    if (trialStartDate != null) {
+      freeTrialEndsAt = trialStartDate.add(const Duration(days: 90));
       freeTrialActive = DateTime.now().isBefore(freeTrialEndsAt);
     }
-
-    try {
-      final subResponse = await dio.get('/subscription/me');
-      final data = subResponse.data as Map<String, dynamic>;
-      paidPlanActive = data['hasSubscription'] == true;
-      currentMonths = (data['months'] as num?)?.toInt() ?? 1;
-      if (data['expiresAt'] != null) {
-        paidPlanEndsAt = DateTime.tryParse(data['expiresAt'].toString());
-      }
-    } catch (_) {}
-
-    try {
-      final pricingResponse = await dio.get('/admin/subscription-pricing');
-      final data = pricingResponse.data as Map<String, dynamic>;
-      monthlyPrice = (data['prixMensuel'] as num?)?.toInt() ?? 5000;
-    } catch (_) {}
 
     return SellerAccessStatus(
       freeTrialActive: freeTrialActive,

@@ -102,6 +102,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         // Afficher le dialogue de divulgation avant de demander la permission
         await showDialog(
           context: context,
+          barrierDismissible: false,
           builder: (context) => LocationPermissionDialog(
             userRole: 'vendeur', // Utilisateur par défaut pour le map picker
             onPermissionGranted: () async {

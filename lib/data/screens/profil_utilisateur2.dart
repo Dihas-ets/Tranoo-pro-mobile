@@ -75,6 +75,141 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
     }
   }
 
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(child: Text('Suppression du compte')),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Cette action est irreversible.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Assurez-vous de ne plus avoir besoin de ce compte avant de confirmer.',
+              style: TextStyle(color: Colors.black54),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: SizedBox(
+          height: 40,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+    );
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      debugPrint('[delete-account][profil-transitaire] currentUser=${user?.uid}');
+      final idToken = await user?.getIdToken();
+      if (idToken == null) {
+        debugPrint('[delete-account][profil-transitaire] idToken null');
+        if (context.mounted) Navigator.of(context).pop(); // close progress
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Session invalide. Reconnectez-vous.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: getBaseUrl(),
+          headers: {'Authorization': 'Bearer $idToken'},
+          connectTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(seconds: 20),
+        ),
+      );
+
+      debugPrint(
+        '[delete-account][profil-transitaire] DELETE ${getBaseUrl()}/users/me',
+      );
+      final response = await dio.delete('/users/me');
+      debugPrint(
+        '[delete-account][profil-transitaire] success status=${response.statusCode} data=${response.data}',
+      );
+
+      if (context.mounted) Navigator.of(context).pop(); // close progress
+      await Provider.of<local_auth.AuthProvider>(context, listen: false)
+          .logout();
+
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const ConnexionPage()),
+        (route) => false,
+      );
+    } on DioException catch (e) {
+      debugPrint(
+        '[delete-account][profil-transitaire] DioException type=${e.type} status=${e.response?.statusCode} data=${e.response?.data}',
+      );
+      if (context.mounted) Navigator.of(context).pop(); // close progress
+      final message = e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.receiveTimeout ||
+              e.type == DioExceptionType.sendTimeout
+          ? 'Le serveur met trop de temps a repondre. Reessaie dans un instant.'
+          : e.type == DioExceptionType.connectionError
+              ? 'Impossible de joindre le serveur. Verifie ta connexion et l\'URL du backend.'
+              : (e.response?.data is Map &&
+                      (e.response?.data as Map)['message'] != null)
+                  ? (e.response?.data as Map)['message'].toString()
+                  : 'La suppression du compte a echoue. Reessaie plus tard.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (e) {
+      debugPrint('[delete-account][profil-transitaire] unexpected error=$e');
+      if (context.mounted) Navigator.of(context).pop(); // close progress
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Une erreur inattendue est survenue pendant la suppression.'),
+        ),
+      );
+    }
+  }
+
   Future<void> fetchUser() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -358,6 +493,12 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
                 MaterialPageRoute(builder: (context) => const WalletScreen()),
               ).then((_) => _loadWallet()); // Recharger après retour
             },
+          ),
+          _buildListTile(
+            title: "Suppression de compte",
+            icon: Icons.delete_forever,
+            color: Colors.red,
+            onTap: () => _deleteAccount(),
           ),
           _buildListTile(
             title: "Déconnexion",

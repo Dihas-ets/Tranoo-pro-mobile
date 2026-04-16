@@ -5,7 +5,9 @@ import 'package:tranoo_pro/data/screens/wallet_vendeur_screen.dart';
 import 'package:tranoo_pro/data/screens/marque.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/piece.dart';
-import 'package:tranoo_pro/data/screens/profile.dart';
+import 'package:tranoo_pro/data/screens/profil3.dart';
+import 'package:tranoo_pro/data/screens/profilutilisateurpage.dart';
+import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
 import 'package:tranoo_pro/data/screens/vendre.dart';
@@ -80,24 +82,24 @@ class _AvantHomeState extends State<AvantHome> {
     if (role == 'chauffeur' && index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const Profile()),
+        MaterialPageRoute(builder: (context) => const Profil3()),
       );
     } else if (role == 'livreur' && index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const Profile()),
+        MaterialPageRoute(builder: (context) => const Profil3()),
       );
     }
   }
 
   final List<Widget> _pagesChauffeur = [
     const ChauffeurHomePage(),
-    const Profile(),
+    const Profil3(),
   ];
 
   final List<Widget> _pagesLivreur = [
     const LivreurHomePage(),
-    const Profile(),
+    const Profil3(),
   ];
 
   final List<Widget> _pagesTransitaire = [
@@ -398,13 +400,37 @@ class _AvantHomeState extends State<AvantHome> {
                                     size: iconSize,
                                   ),
                                 ),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    24,
+                                    16,
+                                    8,
+                                  ),
+                                  child: Text(
+                                    'Compte',
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      fontSize: fontSize,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                                 _buildDrawerButton(
                                   context,
                                   text: 'Profil',
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const Profile(),
+                                      builder: (context) {
+                                        if (role == 'vendeur') {
+                                          return const ProfilUtilisateurPage();
+                                        }
+                                        if (role == 'transitaire') {
+                                          return const ProfilUtilisateur2();
+                                        }
+                                        return const Profil3();
+                                      },
                                     ),
                                   ),
                                   icon: Icon(
