@@ -49,6 +49,23 @@ class SellerAccessStatus {
 class SubscriptionAccessService {
   final UserService _userService = UserService();
 
+  int _extractMonthlyPrice(dynamic data, {int fallback = 5000}) {
+    if (data is Map<String, dynamic>) {
+      final directPrix = data['prixMensuel'];
+      if (directPrix is num) return directPrix.toInt();
+
+      final directMonthly = data['monthlyPrice'];
+      if (directMonthly is num) return directMonthly.toInt();
+
+      final nestedPricing = data['pricing'];
+      if (nestedPricing is Map<String, dynamic>) {
+        final nestedPrix = nestedPricing['prixMensuel'];
+        if (nestedPrix is num) return nestedPrix.toInt();
+      }
+    }
+    return fallback;
+  }
+
   Future<SellerAccessStatus> getSellerAccessStatus({
     DateTime? inscriptionDate,
   }) async {
@@ -93,14 +110,14 @@ class SubscriptionAccessService {
           if (data['expiresAt'] != null) {
             paidPlanEndsAt = DateTime.tryParse(data['expiresAt'].toString());
           }
-          monthlyPrice = (data['monthlyPrice'] as num?)?.toInt() ?? monthlyPrice;
+          monthlyPrice = _extractMonthlyPrice(data, fallback: monthlyPrice);
         } catch (_) {}
       }(),
       () async {
         try {
           final pricingResponse = await dio.get('/admin/subscription-pricing');
           final data = pricingResponse.data as Map<String, dynamic>;
-          monthlyPrice = (data['prixMensuel'] as num?)?.toInt() ?? monthlyPrice;
+          monthlyPrice = _extractMonthlyPrice(data, fallback: monthlyPrice);
         } catch (_) {}
       }(),
     ];

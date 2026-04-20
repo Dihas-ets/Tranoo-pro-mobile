@@ -5,9 +5,7 @@ import 'package:tranoo_pro/data/screens/wallet_vendeur_screen.dart';
 import 'package:tranoo_pro/data/screens/marque.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/piece.dart';
-import 'package:tranoo_pro/data/screens/profil3.dart';
-import 'package:tranoo_pro/data/screens/profilutilisateurpage.dart';
-import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
+import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
 import 'package:tranoo_pro/data/screens/vendre.dart';
@@ -82,24 +80,24 @@ class _AvantHomeState extends State<AvantHome> {
     if (role == 'chauffeur' && index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const Profil3()),
+        MaterialPageRoute(builder: (context) => const Profile()),
       );
     } else if (role == 'livreur' && index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const Profil3()),
+        MaterialPageRoute(builder: (context) => const Profile()),
       );
     }
   }
 
   final List<Widget> _pagesChauffeur = [
     const ChauffeurHomePage(),
-    const Profil3(),
+    const Profile(),
   ];
 
   final List<Widget> _pagesLivreur = [
     const LivreurHomePage(),
-    const Profil3(),
+    const Profile(),
   ];
 
   final List<Widget> _pagesTransitaire = [
@@ -226,7 +224,7 @@ class _AvantHomeState extends State<AvantHome> {
           _updateLastLoginTime();
         }
 
-        // Ajusté pour 4 onglets (Accueil, Publicité, Voitures, Pièces)
+        // Ajusté pour 4 onglets (Accueil, Publicité, Vendre, Pièces)
         if (role == 'vendeur' && _selectedIndex > 3) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             setState(() {
@@ -400,37 +398,13 @@ class _AvantHomeState extends State<AvantHome> {
                                     size: iconSize,
                                   ),
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    24,
-                                    16,
-                                    8,
-                                  ),
-                                  child: Text(
-                                    'Compte',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: fontSize,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
                                 _buildDrawerButton(
                                   context,
                                   text: 'Profil',
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) {
-                                        if (role == 'vendeur') {
-                                          return const ProfilUtilisateurPage();
-                                        }
-                                        if (role == 'transitaire') {
-                                          return const ProfilUtilisateur2();
-                                        }
-                                        return const Profil3();
-                                      },
+                                      builder: (context) => const Profile(),
                                     ),
                                   ),
                                   icon: Icon(
@@ -505,8 +479,8 @@ class _AvantHomeState extends State<AvantHome> {
                             label: 'Publicité',
                           ),
                           BottomNavigationBarItem(
-                            icon: Icon(Icons.directions_car, size: iconSize),
-                            label: 'Voitures',
+                            icon: Icon(Icons.sell, size: iconSize),
+                            label: 'Vendre',
                           ),
                           BottomNavigationBarItem(
                             icon: Icon(Icons.build, size: iconSize),

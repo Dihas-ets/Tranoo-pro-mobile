@@ -15,7 +15,6 @@ import 'package:tranoo_pro/data/screens/mes_livraisons_page.dart';
 import 'package:tranoo_pro/data/screens/suivi_gps_page.dart';
 import 'package:tranoo_pro/data/screens/delivery_notification_banner.dart';
 import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
-import 'package:tranoo_pro/widgets/location_permission_dialog.dart';
 import 'dart:async';
 
 class LivreurHomePage extends StatefulWidget {
@@ -191,21 +190,10 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
   }
 
   Future<void> _requestLocationPermission() async {
-    // Afficher d'abord le dialogue de divulgation
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => LocationPermissionDialog(
-        userRole: 'livreur',
-        onPermissionGranted: () {
-          _getCurrentLocation();
-        },
-        onPermissionDenied: () {
-          // Gérer le cas où l'utilisateur refuse la permission
-          print('Localisation refusée pour le livreur');
-        },
-      ),
-    );
+    final status = await Permission.location.request();
+    if (status.isGranted) {
+      _getCurrentLocation();
+    }
   }
 
   Future<void> _getCurrentLocation() async {

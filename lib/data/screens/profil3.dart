@@ -7,13 +7,11 @@ import 'package:tranoo_pro/data/screens/connexion_page.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/parrainage_page.dart';
-import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
-import 'package:tranoo_pro/services/subscription_access_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -45,11 +43,6 @@ class Profil3State extends State<Profil3> {
   double? _walletBalance;
   String _walletCurrency = "XOF";
   bool _walletLoading = true;
-  final SubscriptionAccessService _subscriptionService =
-      SubscriptionAccessService();
-  SellerAccessStatus? _subscriptionStatus;
-  List<Map<String, dynamic>> _subscriptionHistory = [];
-  bool _subscriptionLoading = true;
   // SUPPRIME : Map<String, dynamic>? userData;
   // SUPPRIME : bool loading = true;
   // SUPPRIME : String? errorMsg;
@@ -58,41 +51,6 @@ class Profil3State extends State<Profil3> {
   void initState() {
     super.initState();
     _loadWallet();
-    _loadSubscriptionData();
-  }
-
-  Future<void> _loadSubscriptionData() async {
-    setState(() {
-      _subscriptionLoading = true;
-    });
-    try {
-      final status = await _subscriptionService.getSellerAccessStatus();
-      final history = await _subscriptionService.getSubscriptionHistory(limit: 10);
-      if (!mounted) return;
-      setState(() {
-        _subscriptionStatus = status;
-        _subscriptionHistory = history;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _subscriptionStatus = null;
-        _subscriptionHistory = [];
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _subscriptionLoading = false;
-        });
-      }
-    }
-  }
-
-  String _formatDateShort(dynamic raw) {
-    if (raw == null) return '--';
-    final dt = DateTime.tryParse(raw.toString());
-    if (dt == null) return '--';
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 
   Future<void> _loadWallet() async {
@@ -128,138 +86,6 @@ class Profil3State extends State<Profil3> {
         _walletLoading = false;
         _walletBalance = 0.0;
       });
-    }
-  }
-
-  Future<void> _deleteAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
-            SizedBox(width: 8),
-            Expanded(child: Text('Suppression du compte')),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Cette action est irreversible.',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Assurez-vous de ne plus avoir besoin de ce compte avant de confirmer.',
-              style: TextStyle(color: Colors.black54),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
-        content: SizedBox(
-          height: 40,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ),
-    );
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      debugPrint('[delete-account][profil3] currentUser=${user?.uid}');
-      final idToken = await user?.getIdToken();
-      if (idToken == null) {
-        debugPrint('[delete-account][profil3] idToken null');
-        if (context.mounted) Navigator.of(context).pop(); // close progress
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Session invalide. Reconnectez-vous.'),
-            ),
-          );
-        }
-        return;
-      }
-
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: getBaseUrl(),
-          headers: {'Authorization': 'Bearer $idToken'},
-          connectTimeout: const Duration(seconds: 20),
-          receiveTimeout: const Duration(seconds: 20),
-        ),
-      );
-
-      debugPrint('[delete-account][profil3] DELETE ${getBaseUrl()}/users/me');
-      final response = await dio.delete('/users/me');
-      debugPrint(
-        '[delete-account][profil3] success status=${response.statusCode} data=${response.data}',
-      );
-
-      if (context.mounted) Navigator.of(context).pop(); // close progress
-      await Provider.of<myauth.AuthProvider>(context, listen: false).logout();
-
-      if (!context.mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const ConnexionPage()),
-        (route) => false,
-      );
-    } on DioException catch (e) {
-      debugPrint(
-        '[delete-account][profil3] DioException type=${e.type} status=${e.response?.statusCode} data=${e.response?.data}',
-      );
-      if (context.mounted) Navigator.of(context).pop(); // close progress
-      final message = e.type == DioExceptionType.connectionTimeout ||
-              e.type == DioExceptionType.receiveTimeout ||
-              e.type == DioExceptionType.sendTimeout
-          ? 'Le serveur met trop de temps a repondre. Reessaie dans un instant.'
-          : e.type == DioExceptionType.connectionError
-              ? 'Impossible de joindre le serveur. Verifie ta connexion et l\'URL du backend.'
-              : (e.response?.data is Map &&
-                      (e.response?.data as Map)['message'] != null)
-                  ? (e.response?.data as Map)['message'].toString()
-                  : 'La suppression du compte a echoue. Reessaie plus tard.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (e) {
-      debugPrint('[delete-account][profil3] unexpected error=$e');
-      if (context.mounted) Navigator.of(context).pop(); // close progress
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Une erreur inattendue est survenue pendant la suppression.'),
-        ),
-      );
     }
   }
 
@@ -301,10 +127,6 @@ class Profil3State extends State<Profil3> {
             const SizedBox(height: 50),
             _buildAccountOptions(),
             const SizedBox(height: 20),
-            if ((userData["role"] ?? "").toString().toLowerCase() == "vendeur")
-              _buildSubscriptionSection(),
-            if ((userData["role"] ?? "").toString().toLowerCase() == "vendeur")
-              const SizedBox(height: 20),
             const Text(
               "Plus",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -534,12 +356,6 @@ class Profil3State extends State<Profil3> {
             },
           ),
           _buildListTile(
-            title: "Suppression de compte",
-            icon: Icons.delete_forever,
-            color: Colors.red,
-            onTap: () => _deleteAccount(),
-          ),
-          _buildListTile(
             title: "Déconnexion",
             icon: Icons.logout,
             color: Color(0xFFFFCE31),
@@ -596,118 +412,6 @@ class Profil3State extends State<Profil3> {
               onPressed: () => _showCurrencyDialog(context),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubscriptionSection() {
-    if (_subscriptionLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final status = _subscriptionStatus;
-    final warning = status?.showExpiryWarning == true;
-    final warningText = status?.paidPlanActive == true
-        ? 'Votre abonnement expire dans ${status?.paidPlanRemainingDays ?? 0} jour(s).'
-        : 'Votre periode gratuite se termine dans ${status?.freeTrialRemainingDays ?? 0} jour(s).';
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Abonnement vendeur',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Plan actuel: ${status?.currentPlanLabel ?? 'Inconnu'}',
-            style: const TextStyle(
-              color: Color(0xFF0461B6),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (warning) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF4CC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFF8BF13)),
-              ),
-              child: Text(
-                warningText,
-                style: const TextStyle(
-                  color: Color(0xFF8A6D3B),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SellerSubscriptionPage(),
-                  ),
-                ).then((_) => _loadSubscriptionData());
-              },
-              child: const Text('Gerer mon abonnement'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Historique (10 derniers)',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          if (_subscriptionHistory.isEmpty)
-            const Text(
-              'Aucun paiement d\'abonnement pour le moment.',
-              style: TextStyle(color: Colors.grey),
-            )
-          else
-            ..._subscriptionHistory.map((tx) {
-              final amount = tx['amount']?.toString() ?? '--';
-              final txStatus = tx['status']?.toString() ?? '--';
-              final createdAt = _formatDateShort(tx['createdAt']);
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFEDEDED)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.receipt_long, color: Color(0xFFF8BF13)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '$amount FCFA - $txStatus',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Text(
-                      createdAt,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              );
-            }),
         ],
       ),
     );

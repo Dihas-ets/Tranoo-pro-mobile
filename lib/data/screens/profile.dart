@@ -10,8 +10,6 @@ import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart'; // Importer le composant d'upload Cloudinary
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
-import 'package:tranoo_pro/services/subscription_access_service.dart';
-import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -38,11 +36,6 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   String? editedPhone;
   String? newPassword;
   bool isSaving = false;
-  final SubscriptionAccessService _subscriptionService =
-      SubscriptionAccessService();
-  SellerAccessStatus? _subscriptionStatus;
-  List<Map<String, dynamic>> _subscriptionHistory = [];
-  bool _subscriptionLoading = true;
   
   // Animation pour alerte photo manquante
   late AnimationController _alertController;
@@ -59,7 +52,6 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
     fetchUser();
-    _loadSubscriptionData();
     
     // Initialiser l'animation d'alerte
     _alertController = AnimationController(
@@ -73,40 +65,6 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
         curve: Curves.easeInOut,
       ),
     );
-  }
-
-  Future<void> _loadSubscriptionData() async {
-    setState(() {
-      _subscriptionLoading = true;
-    });
-    try {
-      final status = await _subscriptionService.getSellerAccessStatus();
-      final history = await _subscriptionService.getSubscriptionHistory(limit: 10);
-      if (!mounted) return;
-      setState(() {
-        _subscriptionStatus = status;
-        _subscriptionHistory = history;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _subscriptionStatus = null;
-        _subscriptionHistory = [];
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _subscriptionLoading = false;
-        });
-      }
-    }
-  }
-
-  String _formatDateShort(dynamic raw) {
-    if (raw == null) return '--';
-    final dt = DateTime.tryParse(raw.toString());
-    if (dt == null) return '--';
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
   
   @override
@@ -588,136 +546,10 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                           ),
                         ],
                       ),
-                      if ((userData?['role'] ?? '').toString().toLowerCase() ==
-                          'vendeur') ...[
-                        SizedBox(height: spacing * 2),
-                        _buildSubscriptionSection(),
-                      ],
                     ],
                   ),
                 ),
               ),
-    );
-  }
-
-  Widget _buildSubscriptionSection() {
-    if (_subscriptionLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final status = _subscriptionStatus;
-    final warning = status?.showExpiryWarning == true;
-    final warningText = status?.paidPlanActive == true
-        ? 'Votre abonnement expire dans ${status?.paidPlanRemainingDays ?? 0} jour(s).'
-        : 'Votre periode gratuite se termine dans ${status?.freeTrialRemainingDays ?? 0} jour(s).';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 25),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Abonnement vendeur',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Plan actuel: ${status?.currentPlanLabel ?? 'Inconnu'}',
-            style: const TextStyle(
-              color: Color(0xFF0461B6),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (warning) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF4CC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFF8BF13)),
-              ),
-              child: Text(
-                warningText,
-                style: const TextStyle(
-                  color: Color(0xFF8A6D3B),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SellerSubscriptionPage(),
-                  ),
-                ).then((_) => _loadSubscriptionData());
-              },
-              child: const Text('Gerer mon abonnement'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Historique (10 derniers)',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          if (_subscriptionHistory.isEmpty)
-            const Text(
-              'Aucun paiement d\'abonnement pour le moment.',
-              style: TextStyle(color: Colors.grey),
-            )
-          else
-            ..._subscriptionHistory.map((tx) {
-              final amount = tx['amount']?.toString() ?? '--';
-              final txStatus = tx['status']?.toString() ?? '--';
-              final createdAt = _formatDateShort(tx['createdAt']);
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFEDEDED)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.receipt_long, color: Color(0xFFF8BF13)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '$amount FCFA - $txStatus',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Text(
-                      createdAt,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
     );
   }
 
