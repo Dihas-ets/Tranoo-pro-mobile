@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:developer' as developer;
 import 'package:tranoo_pro/services/user_service.dart';
 
 class SellerAccessStatus {
@@ -67,7 +68,7 @@ class SubscriptionAccessService {
   }
 
   Future<SellerAccessStatus> getSellerAccessStatus({
-    DateTime? inscriptionDate,
+    DateTime? inscriptionDateOverride,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -103,31 +104,76 @@ class SubscriptionAccessService {
     final futures = <Future<void>>[
       () async {
         try {
+          developer.log(
+            '[SUB_ACCESS] GET /subscription/me baseUrl=${_userService.dio.options.baseUrl}',
+          );
           final subResponse = await dio.get('/subscription/me');
-          final data = subResponse.data as Map<String, dynamic>;
+          developer.log('[SUB_ACCESS] /subscription/me status=${subResponse.statusCode} data=${subResponse.data}');
+          final data = subResponse.data is Map<String, dynamic>
+              ? subResponse.data as Map<String, dynamic>
+              : <String, dynamic>{};
           paidPlanActive = data['hasSubscription'] == true;
           currentMonths = (data['months'] as num?)?.toInt() ?? 1;
           if (data['expiresAt'] != null) {
             paidPlanEndsAt = DateTime.tryParse(data['expiresAt'].toString());
           }
           monthlyPrice = _extractMonthlyPrice(data, fallback: monthlyPrice);
-        } catch (_) {}
+        } catch (e) {
+          developer.log('[SUB_ACCESS] /subscription/me error=$e');
+        }
       }(),
       () async {
         try {
+          developer.log(
+            '[SUB_ACCESS] GET /protected/me baseUrl=${_userService.dio.options.baseUrl}',
+          );
+          final meResponse = await dio.get('/protected/me');
+          developer.log('[SUB_ACCESS] /protected/me status=${meResponse.statusCode} data=${meResponse.data}');
+          final payload = meResponse.data is Map<String, dynamic>
+              ? meResponse.data as Map<String, dynamic>
+              : <String, dynamic>{};
+          final userMap = payload['user'] is Map<String, dynamic>
+              ? payload['user'] as Map<String, dynamic>
+              : <String, dynamic>{};
+          final rawInscription = userMap['dateInscription'] ?? userMap['createdAt'];
+          if (rawInscription != null) {
+            inscriptionDate = DateTime.tryParse(rawInscription.toString());
+          }
+        } catch (e) {
+          developer.log('[SUB_ACCESS] /protected/me error=$e');
+        }
+      }(),
+      () async {
+        try {
+          developer.log(
+            '[SUB_ACCESS] GET /admin/subscription-pricing baseUrl=${_userService.dio.options.baseUrl}',
+          );
           final pricingResponse = await dio.get('/admin/subscription-pricing');
-          final data = pricingResponse.data as Map<String, dynamic>;
+          developer.log('[SUB_ACCESS] /admin/subscription-pricing status=${pricingResponse.statusCode} data=${pricingResponse.data}');
+          final data = pricingResponse.data is Map<String, dynamic>
+              ? pricingResponse.data as Map<String, dynamic>
+              : <String, dynamic>{};
           monthlyPrice = _extractMonthlyPrice(data, fallback: monthlyPrice);
-        } catch (_) {}
+        } catch (e) {
+          developer.log('[SUB_ACCESS] /admin/subscription-pricing error=$e');
+        }
       }(),
     ];
 
     await Future.wait(futures);
 
-    final trialStartDate = inscriptionDate;
+    final trialStartDate = inscriptionDateOverride ?? inscriptionDate;
     if (trialStartDate != null) {
       freeTrialEndsAt = trialStartDate.add(const Duration(days: 90));
-      freeTrialActive = DateTime.now().isBefore(freeTrialEndsAt);
+      final now = DateTime.now();
+      freeTrialActive = now.isBefore(
+        freeTrialEndsAt.add(const Duration(days: 1)),
+      );
+      developer.log(
+        '[SUB_ACCESS] trial start=$trialStartDate end=$freeTrialEndsAt now=$now active=$freeTrialActive',
+      );
+    } else {
+      developer.log('[SUB_ACCESS] Aucune date inscription trouvee');
     }
 
     return SellerAccessStatus(

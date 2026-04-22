@@ -5,12 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
 
-import 'mastervacpage.dart'; // Importez la page MastervacPage
+import 'mastervacpage.dart';
 import '../../utils/cloudinary_upload.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'dart:developer';
 import 'map_picker_screen.dart';
+import '../../widgets/location_permission_dialog.dart';
+import 'movie.dart';
 
 class CreateSellPage2 extends StatefulWidget {
   const CreateSellPage2({super.key});
@@ -27,9 +29,9 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   final TextEditingController _prixController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _companyController = TextEditingController();
+  
   // Infos fournisseur
-  final TextEditingController _fournisseurTelController =
-      TextEditingController();
+  final TextEditingController _fournisseurTelController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   double? _fournisseurLatitude;
   double? _fournisseurLongitude;
@@ -37,8 +39,9 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   String _fournisseurCity = '';
   bool _useSupplierCurrentLocation = false;
   bool _loadingSupplierAddress = false;
-  String? _selectedPieceType; // Nouveau/Occasion
-  String? _selectedFuelType; // Essence/Gazoil/Diezel/Electrique/Hybride
+  String? _selectedPieceType;
+  String? _selectedFuelType;
+  
   // Variables pour l'upload d'images - Liste dynamique
   List<File?> _uploadedImages = [];
   List<String?> _cloudinaryUrls = [];
@@ -47,16 +50,15 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   // Variables pour l'upload de vidéo
   String? _cloudinaryVideoUrl;
   bool _isUploadingVideo = false;
-  double _videoUploadProgress = 0.0; // Progression de l'upload vidéo
+  double _videoUploadProgress = 0.0;
 
-  bool get _isAnyUploading =>
-      _isUploadingImage.contains(true) || _isUploadingVideo;
+  bool get _isAnyUploading => _isUploadingImage.contains(true) || _isUploadingVideo;
 
   final List<String> _pieceTypes = ['Nouveau', 'Occasion'];
   final List<String> _fuelTypes = [
     'Essence',
     'Gazoil',
-    'Diezel',
+    'Diesel',
     'Electrique',
     'Hybride',
     'Aucun',
@@ -72,10 +74,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
       ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 14,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 
@@ -96,9 +95,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
           'addressdetails': 1,
         },
         options: Options(
-          headers: {
-            'User-Agent': 'TranooPro/1.0',
-          },
+          headers: {'User-Agent': 'TranooPro/1.0'},
         ),
       );
 
@@ -145,7 +142,16 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => LocationPermissionDialog(
+            userRole: 'vendeur',
+            onPermissionGranted: () async {},
+            onPermissionDenied: () {},
+          ),
+        );
+        permission = await Geolocator.checkPermission();
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
@@ -175,16 +181,13 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   Future<void> _addNewImage() async {
     if (_uploadedImages.length >= _maxMediaSlots) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vous avez atteint le maximum de 12 images'),
-        ),
+        const SnackBar(content: Text('Vous avez atteint le maximum de 12 images')),
       );
       return;
     }
 
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
     if (image == null) return;
 
     final file = File(image.path);
@@ -208,10 +211,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Erreur lors de l\'upload de l\'image. Veuillez réessayer.'),
-          ),
+          const SnackBar(content: Text('Erreur lors de l\'upload de l\'image.')),
         );
         setState(() {
           _uploadedImages.removeAt(newIndex);
@@ -249,6 +249,21 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
     if (video == null) return;
 
+    // Vérification de la taille (500 Mo max)
+    final int maxSizeBytes = 500 * 1024 * 1024;
+    final int videoSize = await video.length();
+    final double videoSizeMB = videoSize / (1024 * 1024);
+
+    if (videoSize > maxSizeBytes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('La vidéo est trop lourde (${videoSizeMB.toStringAsFixed(2)} Mo). Limite: 500 Mo.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isUploadingVideo = true;
       _videoUploadProgress = 0.0;
@@ -270,12 +285,12 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         setState(() {
           _cloudinaryVideoUrl = url;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vidéo uploadée avec succès !'), backgroundColor: Colors.green),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Erreur lors de l\'upload de la vidéo. Veuillez réessayer.'),
-          ),
+          const SnackBar(content: Text('Erreur lors de l\'upload de la vidéo.')),
         );
       }
     } catch (e) {
@@ -292,709 +307,10 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 400;
-    final isMediumScreen = screenWidth >= 400 && screenWidth < 800;
-    final isLargeScreen = screenWidth >= 800;
-
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Titre
-                    _buildLabel(
-                      'Nom de la pièce',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _titleController,
-                      decoration: InputDecoration(
-                        hintText: 'Nom de la pièce',
-                        filled: true,
-                        fillColor: const Color(0xFFF2F2F2),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // --- INFOS FOURNISSEUR ---
-                    const Text(
-                      'Informations du fournisseur',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLabel(
-                      'Téléphone',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _fournisseurTelController,
-                      keyboardType: TextInputType.phone,
-                      decoration: _inputDecoration('Téléphone du fournisseur'),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel(
-                      'Localisation fournisseur',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _useCurrentSupplierLocation,
-                        icon: const Icon(Icons.my_location),
-                        label: const Text('Utiliser ma position actuelle'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push<Map<String, double>>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => MapPickerScreen(
-                                initialLatitude: _fournisseurLatitude,
-                                initialLongitude: _fournisseurLongitude,
-                              ),
-                            ),
-                          );
-                          if (result != null) {
-                            final lat = result['latitude'];
-                            final lng = result['longitude'];
-                            if (lat != null && lng != null) {
-                              await _setSupplierLocation(
-                                lat: lat,
-                                lng: lng,
-                                fromCurrent: false,
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.map_outlined),
-                        label: const Text('Choisir sur la carte'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_fournisseurLatitude != null &&
-                        _fournisseurLongitude != null)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFCC00).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: const Color(0xFFFFCC00).withOpacity(0.65),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  _useSupplierCurrentLocation
-                                      ? Icons.my_location
-                                      : Icons.map,
-                                  size: 16,
-                                  color: const Color(0xFFB45309),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _useSupplierCurrentLocation
-                                      ? 'Position actuelle'
-                                      : 'Position sélectionnée',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFFB45309),
-                                  ),
-                                ),
-                                if (_fournisseurCity.isNotEmpty) ...[
-                                  const Spacer(),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFCC00),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      _fournisseurCity,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            if (_loadingSupplierAddress)
-                              const Text(
-                                'Récupération de l’adresse...',
-                                style: TextStyle(color: Colors.black54),
-                              )
-                            else
-                              Text(
-                                _fournisseurAddress.isNotEmpty
-                                    ? _fournisseurAddress
-                                    : 'Adresse non disponible',
-                                style: const TextStyle(color: Colors.black87),
-                              ),
-                          ],
-                        ),
-                      )
-                    else
-                      const Text(
-                        'Localisation fournisseur non définie',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    const SizedBox(height: 24),
-
-                    // Type et Année
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel(
-                                'Type',
-                                isSmallScreen,
-                                isMediumScreen,
-                                isLargeScreen,
-                              ),
-                              const SizedBox(height: 8),
-                              // Utilisation de MediaQuery pour détecter la taille de l'écran
-                              Builder(
-                                builder: (context) {
-                                  // Récupération de la largeur de l'écran
-                                  final screenWidth =
-                                      MediaQuery.of(context).size.width;
-
-                                  // Si l'écran est petit (moins de 400px), on utilise Wrap
-                                  // Sinon, on utilise Row pour une meilleure performance
-                                  if (screenWidth < 400) {
-                                    return Wrap(
-                                      spacing:
-                                          8, // Espacement horizontal entre les éléments
-                                      children: _pieceTypes.map((type) {
-                                        return Row(
-                                          mainAxisSize: MainAxisSize
-                                              .min, // Réduit la taille au minimum nécessaire
-                                          children: [
-                                            Radio<String>(
-                                              value: type,
-                                              groupValue: _selectedPieceType,
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  _selectedPieceType = value;
-                                                });
-                                              },
-                                              activeColor: Colors.amber,
-                                              materialTapTargetSize:
-                                                  MaterialTapTargetSize
-                                                      .shrinkWrap, // Réduit la zone de toucher
-                                            ),
-                                            Text(
-                                              type,
-                                              style: TextStyle(
-                                                fontSize: isSmallScreen
-                                                    ? 14
-                                                    : isMediumScreen
-                                                        ? 16
-                                                        : 18, // Ajustement de la taille du texte
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      }).toList(),
-                                    );
-                                  } else {
-                                    // Pour les grands écrans, on utilise Row
-                                    return Row(
-                                      children: _pieceTypes.map((type) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 16,
-                                          ), // Espacement entre les radio buttons
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Radio<String>(
-                                                value: type,
-                                                groupValue: _selectedPieceType,
-                                                onChanged: (value) {
-                                                  setState(() {
-                                                    _selectedPieceType = value;
-                                                  });
-                                                },
-                                                activeColor: Colors.amber,
-                                              ),
-                                              Text(
-                                                type,
-                                                style: TextStyle(
-                                                  fontSize: isSmallScreen
-                                                      ? 14
-                                                      : isMediumScreen
-                                                          ? 16
-                                                          : 18,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }).toList(),
-                                    );
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel(
-                                'Année',
-                                isSmallScreen,
-                                isMediumScreen,
-                                isLargeScreen,
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _anneeController,
-                                decoration: InputDecoration(
-                                  hintText: 'Entrer l\'année',
-                                  filled: true,
-                                  fillColor: const Color(0xFFF2F2F2),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Type et Modèle
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel(
-                                'Type de moteur',
-                                isSmallScreen,
-                                isMediumScreen,
-                                isLargeScreen,
-                              ),
-                              const SizedBox(height: 8),
-                              _buildDropdown(
-                                value: _selectedFuelType,
-                                hint: 'Type de moteur',
-                                items: _fuelTypes,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedFuelType = value;
-                                    if (value != 'Aucun')
-                                      _customFuelType = null;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_selectedFuelType == 'Aucun')
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: TextField(
-                              decoration: const InputDecoration(
-                                hintText: 'Entrez le type de moteur',
-                                filled: true,
-                                fillColor: Color(0xFFF2F2F2),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(8),
-                                  ),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              onChanged: (val) {
-                                setState(() {
-                                  _customFuelType = val;
-                                });
-                              },
-                            ),
-                          ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel(
-                                'Modèle',
-                                isSmallScreen,
-                                isMediumScreen,
-                                isLargeScreen,
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _modelController,
-                                decoration: _inputDecoration('Ex: Corolla, Hilux...'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    _buildLabel(
-                      'Caracéristiques',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Emplacement et Prix
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel(
-                                'Emplacement',
-                                isSmallScreen,
-                                isMediumScreen,
-                                isLargeScreen,
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _localisationController,
-                                decoration: InputDecoration(
-                                  hintText: 'Localisation',
-                                  filled: true,
-                                  fillColor: const Color(0xFFF2F2F2),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel(
-                                'Prix',
-                                isSmallScreen,
-                                isMediumScreen,
-                                isLargeScreen,
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _prixController,
-                                decoration: InputDecoration(
-                                  hintText: 'Saisir le Prix',
-                                  filled: true,
-                                  fillColor: const Color(0xFFF2F2F2),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Description
-                    _buildLabel(
-                      'Description',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _descriptionController,
-                      maxLines: 5,
-                      decoration: InputDecoration(
-                        hintText: 'Entrer une description de votre pièce',
-                        filled: true,
-                        fillColor: const Color(0xFFF2F2F2),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Nom de l'entreprise
-                    _buildLabel(
-                      'Nom de l\'entreprise possédant le BL',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _companyController,
-                      decoration: InputDecoration(
-                        hintText: 'Entrer le nom de l\'entreprise',
-                        filled: true,
-                        fillColor: const Color(0xFFF2F2F2),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    _buildLabel(
-                      'Images (optionnel, max 12)',
-                      isSmallScreen,
-                      isMediumScreen,
-                      isLargeScreen,
-                      isRequired: false,
-                    ),
-                    const SizedBox(height: 8),
-                    // Liste des images avec scroll horizontal
-                    if (_uploadedImages.isNotEmpty)
-                      SizedBox(
-                        height: 120,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _uploadedImages.length,
-                          itemBuilder: (context, index) {
-                            final file = _uploadedImages[index];
-                            final uploadedUrl = _cloudinaryUrls[index];
-                            return Container(
-                              width: 120,
-                              margin: const EdgeInsets.only(right: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.amber),
-                              ),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  if (uploadedUrl != null)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        uploadedUrl,
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                      ),
-                                    )
-                                  else if (file != null)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(
-                                        file,
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                      ),
-                                    ),
-                                  if (_isUploadingImage[index])
-                                    const Positioned.fill(
-                                      child: Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    ),
-                                  Positioned(
-                                    right: 4,
-                                    top: 4,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (uploadedUrl != null)
-                                          const Icon(
-                                            Icons.check_circle,
-                                            color: Colors.green,
-                                            size: 16,
-                                          ),
-                                        const SizedBox(width: 4),
-                                        GestureDetector(
-                                          onTap: () => _removeImage(index),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(2),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    // Bouton pour ajouter des images
-                    if (_uploadedImages.length < _maxMediaSlots)
-                      GestureDetector(
-                        onTap: _addNewImage,
-                        child: Container(
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: const Color(0xFFFFCC00),
-                              width: 2,
-                              style: BorderStyle.solid,
-                            ),
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFFFCC00),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.add,
-                                    color: Colors.black,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Ajouter une image (${_uploadedImages.length}/$_maxMediaSlots)',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    // Upload vidéo avec aperçu
-                    _buildVideoUploadSection(
-                      isSmallScreen: isSmallScreen,
-                      isMediumScreen: isMediumScreen,
-                      isLargeScreen: isLargeScreen,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildVerificationButton(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(
-    String text,
-    bool isSmallScreen,
-    bool isMediumScreen,
-    bool isLargeScreen, {
-    bool isRequired = true,
-  }) {
+  Widget _buildLabel(String text, {bool isRequired = true}) {
     return Text(
       isRequired ? '$text *' : text,
-      style: TextStyle(
-        fontWeight: FontWeight.w500,
-        fontSize: isSmallScreen
-            ? 14
-            : isMediumScreen
-                ? 16
-                : 18,
-      ),
+      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
     );
   }
 
@@ -1012,10 +328,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          hint: Text(
-            hint,
-            style: const TextStyle(color: Colors.grey, fontSize: 14),
-          ),
+          hint: Text(hint, style: const TextStyle(color: Colors.grey, fontSize: 14)),
           isExpanded: true,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           items: items.map((String item) {
@@ -1027,179 +340,107 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     );
   }
 
-  Widget _buildVideoUploadSection({
-    required bool isSmallScreen,
-    required bool isMediumScreen,
-    required bool isLargeScreen,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel(
-          'Vidéo (optionnelle)',
-          isSmallScreen,
-          isMediumScreen,
-          isLargeScreen,
-          isRequired: false,
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _cloudinaryVideoUrl == null ? _pickVideo : null,
-          child: Container(
-            height: 120,
-            width: double.infinity,
-            clipBehavior: Clip.hardEdge,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _cloudinaryVideoUrl == null ? Colors.blue : Colors.green,
-                width: 2,
-              ),
-            ),
-            child: Stack(
-              clipBehavior: Clip.hardEdge,
-              children: [
-                if (_cloudinaryVideoUrl != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      color: Colors.black87,
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.play_circle_fill,
-                              color: Colors.white,
-                              size: 40,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Vidéo uploadée',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.video_call,
-                          color: Colors.grey,
-                          size: 40,
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Ajouter une vidéo',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
-                        ),
-                      ],
-                    ),
+  // Widget vidéo identique à celui de create_sell
+  Widget _buildVideoSection() {
+    return Container(
+      height: 150,
+      width: double.infinity,
+      child: GestureDetector(
+        onTap: _cloudinaryVideoUrl != null
+            ? () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => Movie(videoUrl: _cloudinaryVideoUrl!),
                   ),
-                if (_isUploadingVideo)
-                  Positioned.fill(
-                    child: Container(
-                      color: Colors.black54,
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 40,
-                              height: 40,
-                              child: CircularProgressIndicator(
-                                value: _videoUploadProgress > 0
-                                    ? _videoUploadProgress
-                                    : null,
-                                color: Colors.blue,
-                                backgroundColor: Colors.white24,
-                                strokeWidth: 3,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              _videoUploadProgress < 0.85
-                                  ? 'Envoi...'
-                                  : 'Traitement...',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              '${(_videoUploadProgress * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // Barre de progression linéaire
-                            Container(
-                              width: 160,
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: Colors.white24,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: _videoUploadProgress,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                if (_cloudinaryVideoUrl != null)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: GestureDetector(
-                      onTap: _removeVideo,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+                );
+              }
+            : _pickVideo,
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _cloudinaryVideoUrl != null ? Colors.green : Colors.blue,
+              width: 2,
             ),
           ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (_cloudinaryVideoUrl != null)
+                Container(
+                  color: Colors.black87,
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
+                      SizedBox(height: 8),
+                      Text('Vidéo prête', style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                )
+              else
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.video_call, color: Colors.grey, size: 40),
+                    const SizedBox(height: 6),
+                    const Text('Ajouter une vidéo', style: TextStyle(color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    const Text('Appuyer pour ajouter', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                  ],
+                ),
+              if (_isUploadingVideo)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black54,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: CircularProgressIndicator(
+                              value: _videoUploadProgress > 0 ? _videoUploadProgress : null,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _videoUploadProgress < 0.85 ? 'Envoi...' : 'Traitement...',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${(_videoUploadProgress * 100).toStringAsFixed(0)}%',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (_cloudinaryVideoUrl != null)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: GestureDetector(
+                    onTap: _removeVideo,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: const Icon(Icons.close, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 
@@ -1226,14 +467,11 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   SizedBox(width: 12),
-                  Text(
-                    'Upload en cours...',
-                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-                  ),
+                  Text('Upload en cours...'),
                 ],
               )
             : const Text(
-                'Vérification',
+                'Aperçu',
                 style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
               ),
       ),
@@ -1241,101 +479,421 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   }
 
   void _onValidate() {
-    // Vérification des champs obligatoires
     final title = _titleController.text.trim();
     final annee = _anneeController.text.trim();
-    final localisation = _localisationController.text.trim();
     final prix = _prixController.text.trim();
-    final description = _descriptionController.text.trim();
+    final description = _descriptionController.text.trim().isNotEmpty 
+        ? _descriptionController.text.trim() 
+        : 'Description non renseignée';
     final company = _companyController.text.trim();
     final pieceType = _selectedPieceType;
-    final fuelType =
-        _selectedFuelType == 'Aucun' ? _customFuelType : _selectedFuelType;
+    final fuelType = _selectedFuelType == 'Aucun' ? _customFuelType : _selectedFuelType;
     final model = _modelController.text.trim();
-    log('[DEBUG] title: "$title" (empty: ${title.isEmpty})');
-    log('[DEBUG] pieceType: "$pieceType" (null: ${pieceType == null})');
-    log('[DEBUG] annee: "$annee" (empty: ${annee.isEmpty})');
-    log(
-      '[DEBUG] fuelType: "$fuelType" (null/empty:  ${fuelType == null || fuelType.isEmpty})',
-    );
-    log('[DEBUG] model: "$model" (empty: ${model.isEmpty})');
-    log(
-      '[DEBUG] localisation: "$localisation" (empty: ${localisation.isEmpty})',
-    );
-    log('[DEBUG] prix: "$prix" (empty: ${prix.isEmpty})');
-    log('[DEBUG] description: "$description" (empty: ${description.isEmpty})');
-    log('[DEBUG] company: "$company" (empty: ${company.isEmpty})');
 
     if (title.isEmpty ||
         pieceType == null ||
         annee.isEmpty ||
         (fuelType == null || fuelType.isEmpty) ||
         model.isEmpty ||
-        localisation.isEmpty ||
         prix.isEmpty ||
-        description.isEmpty ||
         company.isEmpty) {
-      log('[DEBUG] Validation échouée, un ou plusieurs champs sont invalides.');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Veuillez remplir tous les champs obligatoires.',
-          ),
-        ),
+        const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires.')),
       );
       return;
     }
 
-    // Vérifier qu'au moins un média (image ou vidéo) est présent
-    final imagesCount = _cloudinaryUrls
-        .whereType<String>()
-        .where((url) => url.isNotEmpty)
-        .length;
+    final imagesCount = _cloudinaryUrls.whereType<String>().where((url) => url.isNotEmpty).length;
     final hasImages = imagesCount > 0;
-    final hasVideo =
-        _cloudinaryVideoUrl != null && _cloudinaryVideoUrl!.isNotEmpty;
+    final hasVideo = _cloudinaryVideoUrl != null && _cloudinaryVideoUrl!.isNotEmpty;
+    
     if (!hasImages && !hasVideo) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez ajouter au moins une image ou une vidéo.'),
-        ),
+        const SnackBar(content: Text('Veuillez ajouter au moins une image ou une vidéo.')),
       );
       return;
     }
 
-    log('[DEBUG] Validation OK, navigation vers MastervacPage.');
-    final userService = UserService();
-    final isChauffeur = userService.currentRole == UserRole.chauffeur ||
-        userService.currentRole == UserRole.livreur;
-    final images = _cloudinaryUrls
-        .whereType<String>()
-        .where((url) => url.isNotEmpty)
-        .toList();
-
+    final images = _cloudinaryUrls.whereType<String>().where((url) => url.isNotEmpty).toList();
     final fournisseur = {
       'telephone': _fournisseurTelController.text.trim(),
       'latitude': _fournisseurLatitude,
       'longitude': _fournisseurLongitude,
     };
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => MastervacPage(
-          isAcheteur: isChauffeur,
+          isAcheteur: false,
           title: title,
           year: annee,
           description: description,
           company: company,
-          location: localisation,
+          location: _fournisseurAddress.isNotEmpty ? _fournisseurAddress : null,
           price: prix,
           fuelType: fuelType,
           model: model,
           pieceType: pieceType,
           images: images,
           video: _cloudinaryVideoUrl,
-          fournisseur: fournisseur, // Passage des infos du fournisseur
+          fournisseur: fournisseur,
         ),
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // IMAGES
+                    _buildLabel('Images (max 12)', isRequired: false),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _addNewImage,
+                        icon: const Icon(Icons.add_photo_alternate, size: 20),
+                        label: Text('Ajouter des images (${_uploadedImages.length}/$_maxMediaSlots)'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF8BF13),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Affichage des images uploadées
+                    if (_uploadedImages.isNotEmpty)
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _uploadedImages.length,
+                          itemBuilder: (context, index) {
+                            final file = _uploadedImages[index];
+                            final uploadedUrl = _cloudinaryUrls[index];
+                            return Container(
+                              width: 100,
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.amber),
+                              ),
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  if (uploadedUrl != null && uploadedUrl.isNotEmpty)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        uploadedUrl,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
+                                      ),
+                                    )
+                                  else if (file != null)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(file, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                                    )
+                                  else
+                                    const Icon(Icons.image, color: Colors.grey),
+                                  if (_isUploadingImage[index])
+                                    const Positioned.fill(
+                                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                    ),
+                                  if (uploadedUrl != null && uploadedUrl.isNotEmpty)
+                                    Positioned(
+                                      right: 4,
+                                      top: 4,
+                                      child: GestureDetector(
+                                        onTap: () => _removeImage(index),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                          child: const Icon(Icons.close, color: Colors.white, size: 14),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    
+                    // VIDÉO
+                    _buildLabel('Vidéo (optionnelle, max 500 Mo)', isRequired: false),
+                    const SizedBox(height: 8),
+                    _buildVideoSection(),
+                    const SizedBox(height: 24),
+                    
+                    // Titre
+                    _buildLabel('Nom de la pièce'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _titleController,
+                      decoration: _inputDecoration('Nom de la pièce'),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Infos fournisseur
+                    const Text('Informations du fournisseur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 12),
+                    _buildLabel('Téléphone'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _fournisseurTelController,
+                      keyboardType: TextInputType.phone,
+                      decoration: _inputDecoration('Téléphone du fournisseur'),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildLabel('Localisation fournisseur'),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _useCurrentSupplierLocation,
+                            icon: const Icon(Icons.my_location),
+                            label: const Text('Position actuelle'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final result = await Navigator.push<Map<String, double>>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MapPickerScreen(
+                                    initialLatitude: _fournisseurLatitude,
+                                    initialLongitude: _fournisseurLongitude,
+                                  ),
+                                ),
+                              );
+                              if (result != null) {
+                                final lat = result['latitude'];
+                                final lng = result['longitude'];
+                                if (lat != null && lng != null) {
+                                  await _setSupplierLocation(lat: lat, lng: lng, fromCurrent: false);
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.map_outlined),
+                            label: const Text('Choisir sur carte'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_fournisseurLatitude != null && _fournisseurLongitude != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFCC00).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFFCC00).withOpacity(0.65)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(_useSupplierCurrentLocation ? Icons.my_location : Icons.map, size: 16, color: const Color(0xFFB45309)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _useSupplierCurrentLocation ? 'Position actuelle' : 'Position sélectionnée',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFB45309)),
+                                ),
+                                if (_fournisseurCity.isNotEmpty) ...[
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(color: const Color(0xFFFFCC00), borderRadius: BorderRadius.circular(12)),
+                                    child: Text(_fournisseurCity, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_loadingSupplierAddress)
+                              const Text('Récupération de l\'adresse...', style: TextStyle(color: Colors.black54))
+                            else
+                              Text(_fournisseurAddress.isNotEmpty ? _fournisseurAddress : 'Adresse non disponible', style: const TextStyle(color: Colors.black87)),
+                          ],
+                        ),
+                      )
+                    else
+                      const Text('Localisation fournisseur non définie', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 20),
+
+                    // Type et Année
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Type'),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                children: _pieceTypes.map((type) {
+                                  return Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Radio<String>(
+                                        value: type,
+                                        groupValue: _selectedPieceType,
+                                        onChanged: (value) => setState(() => _selectedPieceType = value),
+                                        activeColor: Colors.amber,
+                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      Text(type, style: const TextStyle(fontSize: 14)),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Année'),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _anneeController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration('Ex: 2020'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Type moteur et Modèle
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Type de moteur'),
+                              const SizedBox(height: 8),
+                              _buildDropdown(
+                                value: _selectedFuelType,
+                                hint: 'Type de moteur',
+                                items: _fuelTypes,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedFuelType = value;
+                                    if (value != 'Aucun') _customFuelType = null;
+                                  });
+                                },
+                              ),
+                              if (_selectedFuelType == 'Aucun')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: TextField(
+                                    decoration: _inputDecoration('Précisez le type'),
+                                    onChanged: (val) => setState(() => _customFuelType = val),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Modèle'),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _modelController,
+                                decoration: _inputDecoration('Ex: Corolla, Hilux...'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Prix
+                    _buildLabel('Prix'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _prixController,
+                      keyboardType: TextInputType.number,
+                      decoration: _inputDecoration('Prix en FCFA'),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Description (optionnelle)
+                    _buildLabel('Description de la pièce', isRequired: false),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _descriptionController,
+                      maxLines: 4,
+                      decoration: _inputDecoration('Description (optionnel)'),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Nom de l'entreprise
+                    _buildLabel('Nom de l\'entreprise'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _companyController,
+                      decoration: _inputDecoration('Nom de l\'entreprise'),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+            // Bouton Aperçu toujours visible
+            _buildVerificationButton(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _anneeController.dispose();
+    _localisationController.dispose();
+    _prixController.dispose();
+    _descriptionController.dispose();
+    _companyController.dispose();
+    _fournisseurTelController.dispose();
+    _modelController.dispose();
+    super.dispose();
   }
 }

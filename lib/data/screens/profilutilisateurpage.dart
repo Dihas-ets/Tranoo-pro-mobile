@@ -91,7 +91,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
       final inscriptionDate =
           rawDate != null ? DateTime.tryParse(rawDate.toString()) : null;
       final status = await _subscriptionService.getSellerAccessStatus(
-        inscriptionDate: inscriptionDate,
+        inscriptionDateOverride: inscriptionDate,
       );
       if (!mounted) return;
       setState(() {

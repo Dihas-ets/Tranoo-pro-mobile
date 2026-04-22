@@ -19,6 +19,9 @@ import 'package:tranoo_pro/data/screens/second_page.dart';
 import 'package:tranoo_pro/data/screens/une.dart';
 import 'package:tranoo_pro/data/screens/livreur_home.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_home.dart';
+import 'package:tranoo_pro/data/screens/profilutilisateurpage.dart';
+import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
+import 'package:tranoo_pro/data/screens/profil3.dart';
 
 class AvantHome extends StatefulWidget {
   const AvantHome({super.key});
@@ -180,6 +183,14 @@ class _AvantHomeState extends State<AvantHome> {
     } else {
       return const Center(child: CircularProgressIndicator());
     }
+  }
+
+  Widget _profilePageForRole(String? role) {
+    final normalized = role?.toLowerCase();
+    if (normalized == 'vendeur') return const ProfilUtilisateurPage();
+    if (normalized == 'transitaire') return const ProfilUtilisateur2();
+    if (normalized == 'acheteur') return const Profil3();
+    return const Profile();
   }
 
   @override
@@ -404,7 +415,8 @@ class _AvantHomeState extends State<AvantHome> {
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const Profile(),
+                                      builder: (context) =>
+                                          _profilePageForRole(role),
                                     ),
                                   ),
                                   icon: Icon(
