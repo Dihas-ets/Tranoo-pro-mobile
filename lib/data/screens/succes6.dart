@@ -82,13 +82,19 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                             style: TextStyle(fontSize: 14, height: 1.5),
                             children: [
                               TextSpan(
-                                text:
-                                    'Votre paiement a été effectué avec succès ! ',
-                                style: TextStyle(color: Colors.black),
+                                text: 'Votre publication de piece a bien ete envoyee. ',
+                                style: TextStyle(color: Colors.black87),
+                              ),
+                              TextSpan(
+                                text: 'Elle sera d abord validee par un administrateur, ',
+                                style: TextStyle(
+                                  color: Color(0xFF1F2937),
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               TextSpan(
                                 text:
-                                    'Votre article sera mis en avant dès validation par notre équipe. Vous recevrez une notification de confirmation.',
+                                    'puis automatiquement mise en ligne apres approbation.',
                                 style: TextStyle(color: Color(0xFF00D67D)),
                               ),
                             ],

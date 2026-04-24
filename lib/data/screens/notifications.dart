@@ -7,8 +7,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
 import '../../services/user_service.dart';
+import '../../providers/counter_provider.dart';
+import 'create_sell.dart';
+import 'create_sell2.dart';
+import 'cars_info.dart';
+import 'mastervacpage.dart';
 
 // --------- HELPERS SÉCURISÉS ----------
 List<String> getNotifImages(Map notif) {
@@ -211,15 +215,16 @@ class VerificationDetailPage extends StatelessWidget {
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: () async {
-                        // Ouvre dans le navigateur / viewer du téléphone
                         try {
                           final uri = Uri.parse(url);
                           if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Impossible d\'ouvrir le document'),
+                                content:
+                                    Text('Impossible d\'ouvrir le document'),
                               ),
                             );
                           }
@@ -290,21 +295,20 @@ class VerificationDetailPage extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () async {
                       await _postVerificationAction(context, 'approve');
-                      // Extraire articleId et aller vers paiement
                       String? articleId = _safeGetStringLocal(
                           notification['verificationData'], 'articleId');
                       articleId ??= _safeGetStringLocal(
                               notification['relatedId'], '_id') ??
                           _safeGetStringLocal(notification, 'relatedId');
                       if (articleId != null && articleId.isNotEmpty) {
-                        // ignore: use_build_context_synchronously
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Cette fonctionnalité n\'est plus disponible'),
+                            content: Text(
+                                'Cette fonctionnalité n\'est plus disponible'),
                           ),
                         );
+                        Navigator.pop(context);
                       } else {
-                        // ignore: use_build_context_synchronously
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Article introuvable')),
                         );
@@ -319,11 +323,9 @@ class VerificationDetailPage extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () async {
                       await _postVerificationAction(context, 'reject');
-                      // ignore: use_build_context_synchronously
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Demande rejetée')),
                       );
-                      // ignore: use_build_context_synchronously
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
@@ -346,7 +348,6 @@ class VerificationDetailPage extends StatelessWidget {
     return 'Il y a ${diff.inMinutes} minutes';
   }
 
-  // Méthode helper sécurisée pour mapper les images
   static List<Widget> _safeMapImages(List<String> images) {
     try {
       return images
@@ -403,7 +404,6 @@ class NotificationProvider with ChangeNotifier {
         final data = json.decode(response.body);
         _notifications.clear();
 
-        // Vérifier que data['notifications'] est une liste
         final notificationsList = data['notifications'];
         if (notificationsList is List) {
           for (var notif in notificationsList) {
@@ -507,6 +507,15 @@ class NotificationsBody extends StatefulWidget {
 }
 
 class _NotificationsBodyState extends State<NotificationsBody> {
+  void _syncUnreadCountWithHeader(NotificationProvider provider) {
+    final unreadCount =
+        provider.notifications.where((n) => !(n['isRead'] ?? false)).length;
+    Provider.of<CounterProvider>(
+      context,
+      listen: false,
+    ).updateNotificationsCount(unreadCount);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -519,7 +528,10 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     if (user != null) {
       user.getIdToken().then((token) {
         if (token != null) {
-          provider.loadNotificationsFromAPI(token);
+          provider.loadNotificationsFromAPI(token).then((_) {
+            if (!mounted) return;
+            _syncUnreadCountWithHeader(provider);
+          });
         }
       });
     } else {
@@ -556,6 +568,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                       final token = await user.getIdToken();
                       if (token != null) {
                         await provider.loadNotificationsFromAPI(token);
+                        if (mounted) {
+                          _syncUnreadCountWithHeader(provider);
+                        }
                       }
                     }
                   },
@@ -570,7 +585,6 @@ class _NotificationsBodyState extends State<NotificationsBody> {
         padding: const EdgeInsets.only(top: 10, bottom: 10),
         itemCount: provider.notifications.length,
         itemBuilder: (ctx, index) {
-          // Vérification de sécurité pour l'index
           if (index < 0 || index >= provider.notifications.length) {
             return const SizedBox.shrink();
           }
@@ -578,8 +592,18 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           final notif = provider.notifications[index];
           final isVerification =
               _safeGetString(notif, 'type') == 'verification';
-          final isTricycle = _safeGetString(notif, 'type') == 'tricycle';
           final isUnread = !(notif['isRead'] ?? false);
+          final notifData = (notif['data'] is Map)
+              ? Map<String, dynamic>.from(notif['data'])
+              : <String, dynamic>{};
+          final requestType = (notifData['requestType'] ?? '').toString();
+          final isAlert = _safeGetString(notif, 'type') == 'alerte' ||
+              requestType == 'vehicle_search' ||
+              requestType == 'piece_search';
+          final isProposalNotification =
+              (notifData['action'] ?? '').toString() == 'view_proposal';
+          final proposalThumb = (notifData['thumbnailUrl'] ?? '').toString();
+          final proposalTitle = (notifData['articleTitle'] ?? '').toString();
 
           return GestureDetector(
             onTap: () async {
@@ -588,6 +612,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                 final notificationId = _safeGetString(notif, '_id');
                 if (token != null && notificationId != null) {
                   await provider.markNotificationAsRead(notificationId, token);
+                  if (mounted) {
+                    _syncUnreadCountWithHeader(provider);
+                  }
                 }
                 Navigator.push(
                   context,
@@ -599,26 +626,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               } else {
                 final token = await user?.getIdToken();
                 if (token != null) {
-                  if (isTricycle) {
-                    final notificationId = _safeGetString(notif, '_id');
-                    if (notificationId != null) {
-                      await provider.markNotificationAsRead(notificationId, token);
-                    }
-
-                    final relatedId =
-                        _safeGetString(notif['relatedId'], '_id') ??
-                            _safeGetString(notif, 'relatedId');
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (ctx) => ChauffeurTricycleHomePage(
-                          initialContactId: relatedId,
-                        ),
-                      ),
-                    );
-                  } else {
-                    _showNotificationDetail(context, notif, provider, token);
+                  _showNotificationDetail(context, notif, provider, token);
+                  if (mounted) {
+                    _syncUnreadCountWithHeader(provider);
                   }
                 }
               }
@@ -626,8 +636,15 @@ class _NotificationsBodyState extends State<NotificationsBody> {
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               decoration: BoxDecoration(
-                color: isVerification ? Colors.amber[50] : Colors.blue[50],
+                color: isVerification
+                    ? Colors.amber[50]
+                    : (isAlert ? const Color(0xFFFFF1F1) : Colors.blue[50]),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isAlert
+                      ? const Color(0xFFE57373).withOpacity(0.35)
+                      : Colors.transparent,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black12,
@@ -641,12 +658,40 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                   horizontal: 14,
                   vertical: 10,
                 ),
-                leading: CircleAvatar(
-                  backgroundColor: isVerification ? Colors.amber : Colors.blue,
-                  child: Icon(
-                      isVerification ? Icons.verified : Icons.notifications,
-                      color: Colors.white),
-                ),
+                leading: isProposalNotification && proposalThumb.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          proposalThumb,
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              CircleAvatar(
+                            backgroundColor: isVerification
+                                ? Colors.amber
+                                : (isAlert
+                                    ? const Color(0xFFE57373)
+                                    : Colors.blue),
+                            child: Icon(
+                              isVerification
+                                  ? Icons.verified
+                                  : Icons.notifications,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      )
+                    : CircleAvatar(
+                        backgroundColor: isVerification
+                            ? Colors.amber
+                            : (isAlert ? const Color(0xFFE57373) : Colors.blue),
+                        child: Icon(
+                            isVerification
+                                ? Icons.verified
+                                : Icons.notifications,
+                            color: Colors.white),
+                      ),
                 title: Row(
                   children: [
                     Expanded(
@@ -657,7 +702,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                               isUnread ? FontWeight.bold : FontWeight.normal,
                           color: isVerification
                               ? Colors.amber[800]
-                              : Colors.blue[800],
+                              : (isAlert
+                                  ? const Color(0xFFB91C1C)
+                                  : Colors.blue[800]),
                           fontSize: 15,
                         ),
                       ),
@@ -679,14 +726,31 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                       ),
                   ],
                 ),
-                subtitle: Text(
-                  _safeGetString(notif, 'message') != null
-                      ? (_safeGetString(notif, 'message')!.length > 52
-                          ? _safeGetString(notif, 'message')!.substring(0, 52) +
-                              '...'
-                          : _safeGetString(notif, 'message')!)
-                      : '-',
-                  maxLines: 2,
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isProposalNotification && proposalTitle.isNotEmpty)
+                      Text(
+                        proposalTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    Text(
+                      _safeGetString(notif, 'message') != null
+                          ? (_safeGetString(notif, 'message')!.length > 52
+                              ? _safeGetString(notif, 'message')!
+                                      .substring(0, 52) +
+                                  '...'
+                              : _safeGetString(notif, 'message')!)
+                          : '-',
+                      maxLines: 2,
+                    ),
+                  ],
                 ),
                 trailing: Text(
                   notif['date'] is DateTime ? _formatDate(notif['date']) : '',
@@ -712,7 +776,6 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     return 'Il y a ${diff.inMinutes} minutes';
   }
 
-  // Méthode helper sécurisée pour récupérer les strings
   String? _safeGetString(dynamic obj, String key) {
     try {
       if (obj is Map && obj.containsKey(key)) {
@@ -727,6 +790,119 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     }
   }
 
+  Future<void> _openProposalArticle(
+    BuildContext context, {
+    required String articleId,
+    String? typeHint,
+  }) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+      if (token == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session expirée. Reconnectez-vous.')),
+        );
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('${getBaseUrl()}/articles/$articleId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Impossible de charger la proposition.')),
+        );
+        return;
+      }
+
+      final article = jsonDecode(response.body);
+      final articleType =
+          (article['type'] ?? typeHint ?? '').toString().toLowerCase();
+
+      if (!mounted) return;
+      if (articleType == 'piece') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MastervacPage(
+              id: article['_id']?.toString(),
+              isAcheteur: true,
+              title: (article['titre'] ?? '').toString(),
+              year: (article['annee'] ?? '').toString(),
+              description: (article['description'] ?? '').toString(),
+              company: (article['entreprise'] ?? '').toString(),
+              location:
+                  (article['lieu'] ?? article['localisation'] ?? '').toString(),
+              price: (article['prix'] ?? '').toString(),
+              fuelType: article['typeMoteur']?.toString(),
+              model: article['modele']?.toString(),
+              pieceType:
+                  (article['pieceType'] ?? article['condition'])?.toString(),
+              images: (article['photos'] is List)
+                  ? (article['photos'] as List)
+                      .map((e) => e?.toString())
+                      .toList()
+                  : const [],
+              video: article['video']?.toString(),
+              fournisseur: (article['fournisseur'] is Map)
+                  ? Map<String, dynamic>.from(article['fournisseur'])
+                  : null,
+            ),
+          ),
+        );
+      } else {
+        final photos = (article['photos'] is List)
+            ? (article['photos'] as List)
+                .map((e) => e?.toString() ?? '')
+                .where((e) => e.isNotEmpty)
+                .toList()
+            : <String>[];
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CarsInfo(
+              id: article['_id']?.toString(),
+              titre: article['titre']?.toString(),
+              description: article['description']?.toString(),
+              marque: article['marque']?.toString(),
+              modele: article['modele']?.toString(),
+              annee: article['annee']?.toString(),
+              prix: article['prix']?.toString(),
+              condition: article['condition']?.toString(),
+              boiteVitesse: article['boiteVitesse']?.toString(),
+              carburant: article['carburant']?.toString(),
+              climatiseur: article['climatiseur']?.toString(),
+              distance: article['distance']?.toString(),
+              sieges: article['sieges']?.toString(),
+              portes: article['portes']?.toString(),
+              cylindre: article['cylindre']?.toString(),
+              couleur: article['couleur']?.toString(),
+              dedouanement: article['dedouanement'] == true,
+              lieu: (article['lieu'] ?? article['localisation'])?.toString(),
+              images: photos,
+              videos: const [],
+              video: article['video']?.toString(),
+              entreprise: article['entreprise']?.toString(),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de l\'ouverture: $e')),
+      );
+    }
+  }
+
   void _showNotificationDetail(
     BuildContext context,
     Map<String, dynamic> notification,
@@ -734,11 +910,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     String token,
   ) async {
     try {
-      // Marquer comme lu dès l'ouverture
       if (!(notification['isRead'] ?? false)) {
         final notificationId = _safeGetString(notification, '_id');
         if (notificationId != null) {
           await provider.markNotificationAsRead(notificationId, token);
+          if (mounted) {
+            _syncUnreadCountWithHeader(provider);
+          }
         }
       }
 
@@ -748,7 +926,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           final isVerification =
               _safeGetString(notification, 'type') == 'verification';
           final isPromo = _safeGetString(notification, 'type') == 'promotion';
-          final isAlert = _safeGetString(notification, 'type') == 'alerte';
+          final dataMap = (notification['data'] is Map)
+              ? Map<String, dynamic>.from(notification['data'])
+              : <String, dynamic>{};
+          final requestType = (dataMap['requestType'] ?? '').toString();
+          final isAlert = _safeGetString(notification, 'type') == 'alerte' ||
+              requestType == 'vehicle_search' ||
+              requestType == 'piece_search';
           final images = getNotifImages(notification);
           final stampUrl = getStampUrl(notification);
           final signatureUrl = getSignatureUrl(notification);
@@ -889,7 +1073,6 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                       token,
                     );
                   }
-                  // Récupérer l'articleId depuis la notif
                   String? articleId = _safeGetString(
                       notification['verificationData'], 'articleId');
                   if (articleId == null) {
@@ -898,14 +1081,14 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                             _safeGetString(notification, 'relatedId');
                   }
                   if (articleId != null && articleId.isNotEmpty) {
-                    // ignore: use_build_context_synchronously
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Cette fonctionnalité n\'est plus disponible'),
+                        content:
+                            Text('Cette fonctionnalité n\'est plus disponible'),
                       ),
                     );
+                    Navigator.pop(context);
                   } else {
-                    // ignore: use_build_context_synchronously
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                           content:
@@ -948,38 +1131,357 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     );
   }
 
+  // ========== NOUVEAU DESIGN DES ALERTES ==========
   Widget _buildAlertContent(
       Map<String, dynamic> notification, String bodyHtml) {
+    final dataMap = (notification['data'] is Map)
+        ? Map<String, dynamic>.from(notification['data'])
+        : <String, dynamic>{};
+    final requestType = (dataMap['requestType'] ?? '').toString();
+    final fallbackMessage =
+        (_safeGetString(notification, 'message') ?? '').toLowerCase();
+    final isPiece = requestType == 'piece_search' ||
+        fallbackMessage.contains('pièce') ||
+        fallbackMessage.contains('piece');
+
+    // Construction des caractéristiques
+    final List<MapEntry<String, String>> characteristics = [];
+
+    if ((dataMap['marque'] ?? '').toString().isNotEmpty) {
+      characteristics.add(MapEntry('Marque', dataMap['marque'].toString()));
+    }
+    if ((dataMap['modele'] ?? '').toString().isNotEmpty) {
+      characteristics.add(MapEntry('Modèle', dataMap['modele'].toString()));
+    }
+    if ((dataMap['pieceName'] ?? '').toString().isNotEmpty && isPiece) {
+      characteristics
+          .add(MapEntry('Pièce recherchée', dataMap['pieceName'].toString()));
+    }
+    if ((dataMap['annee'] ?? '').toString().isNotEmpty && isPiece) {
+      characteristics.add(MapEntry('Année', dataMap['annee'].toString()));
+    }
+    if ((dataMap['anneeMin'] ?? '').toString().isNotEmpty && !isPiece) {
+      characteristics
+          .add(MapEntry('Année min', dataMap['anneeMin'].toString()));
+    }
+    if ((dataMap['anneeMax'] ?? '').toString().isNotEmpty && !isPiece) {
+      characteristics
+          .add(MapEntry('Année max', dataMap['anneeMax'].toString()));
+    }
+    if ((dataMap['budgetMax'] ?? '').toString().isNotEmpty) {
+      characteristics
+          .add(MapEntry('Budget max', '${dataMap['budgetMax']} FCFA'));
+    }
+    if ((dataMap['localisation'] ?? '').toString().isNotEmpty) {
+      characteristics
+          .add(MapEntry('Localisation', dataMap['localisation'].toString()));
+    }
+    if ((dataMap['urgence'] ?? '').toString().isNotEmpty) {
+      characteristics.add(MapEntry('Urgence', dataMap['urgence'].toString()));
+    }
+    if ((dataMap['etat'] ?? '').toString().isNotEmpty && !isPiece) {
+      characteristics.add(MapEntry('État', dataMap['etat'].toString()));
+    }
+
+    final description = (dataMap['description'] ?? '').toString();
+
+    const primaryAmber = Color(0xFFE57373);
+    const borderColor = Color(0xFFE5E7EB);
+    const bgColor = Color(0xFFF9FAFB);
+    const textPrimary = Color(0xFF111827);
+    const textSecondary = Color(0xFF4B5563);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.red[600],
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
       ),
-      padding: const EdgeInsets.all(17),
+      padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.warning, color: Colors.white, size: 46),
-          const SizedBox(height: 10),
-          Text(
-            _safeGetString(notification, 'title') ?? '-',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 19,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1F1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: primaryAmber.withOpacity(0.35)),
+                ),
+                child: Icon(
+                  isPiece ? Icons.build_circle : Icons.directions_car,
+                  color: primaryAmber,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isPiece ? "Alerte piece detachee" : "Alerte vehicule",
+                      style: const TextStyle(
+                        color: textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Nouvelle demande d'achat",
+                      style: const TextStyle(
+                        color: textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Text(
+              isPiece
+                  ? "Un acheteur recherche activement une pièce détachée. Voici les détails de sa demande :"
+                  : "Un acheteur souhaite acquérir un véhicule. Consultez les critères de sa recherche :",
+              style: const TextStyle(
+                color: textPrimary,
+                fontSize: 14,
+                height: 1.4,
+              ),
             ),
           ),
-          const SizedBox(height: 15),
-          Html(
-            data: bodyHtml,
-            style: {
-              '.': Style(color: Colors.white, fontSize: FontSize(16)),
-            },
+
+          const SizedBox(height: 20),
+
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: primaryAmber,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "Détails de la demande",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: textPrimary,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          if (characteristics.isNotEmpty)
+            Container(
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: characteristics.map((char) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: borderColor,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getIconForField(char.key),
+                          size: 14,
+                          color: primaryAmber,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "${char.key}: ",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: textSecondary,
+                          ),
+                        ),
+                        Text(
+                          char.value,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Information complementaire",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 20),
+
+          // Bouton "Proposer une offre"
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                final sourceNotificationId =
+                    _safeGetString(notification, '_id');
+                final buyerId = _safeGetString(dataMap, 'buyerId') ??
+                    _safeGetString(notification['sender'], '_id') ??
+                    _safeGetString(notification, 'sender');
+                final parentContext = this.context;
+                Navigator.of(context, rootNavigator: true).pop();
+                final route = MaterialPageRoute(
+                  builder: (_) => isPiece
+                      ? CreateSellPage2(
+                          alertNotificationId: sourceNotificationId,
+                          alertBuyerId: buyerId,
+                          alertRequestType: requestType.isNotEmpty
+                              ? requestType
+                              : 'piece_search',
+                        )
+                      : CreateSellPage(
+                          alertNotificationId: sourceNotificationId,
+                          alertBuyerId: buyerId,
+                          alertRequestType: requestType.isNotEmpty
+                              ? requestType
+                              : 'vehicle_search',
+                        ),
+                );
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  Navigator.of(parentContext).push(route);
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE57373),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.send, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Proposer une offre',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Message de contact
+          Center(
+            child: Text(
+              "Envoyez votre proposition d'offre à l'acheteur ",
+              style: TextStyle(
+                fontSize: 11,
+                color: const Color(0xFFB91C1C).withOpacity(0.7),
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  IconData _getIconForField(String field) {
+    switch (field) {
+      case 'Marque':
+        return Icons.business;
+      case 'Modèle':
+        return Icons.model_training;
+      case 'Pièce recherchée':
+        return Icons.build;
+      case 'Année':
+      case 'Année min':
+      case 'Année max':
+        return Icons.calendar_today;
+      case 'Budget max':
+        return Icons.monetization_on;
+      case 'Localisation':
+        return Icons.location_on;
+      case 'Urgence':
+        return Icons.priority_high;
+      case 'État':
+        return Icons.info_outline;
+      default:
+        return Icons.fiber_manual_record;
+    }
   }
 
   Widget _buildPromoContent(
@@ -1060,6 +1562,15 @@ class _NotificationsBodyState extends State<NotificationsBody> {
 
   Widget _buildStandardContent(
       Map<String, dynamic> notification, String bodyHtml) {
+    final dataMap = (notification['data'] is Map)
+        ? Map<String, dynamic>.from(notification['data'])
+        : <String, dynamic>{};
+    final action = (dataMap['action'] ?? '').toString();
+    final targetArticleId = (dataMap['targetArticleId'] ??
+            _safeGetString(notification, 'relatedId') ??
+            '')
+        .toString();
+    final targetType = (dataMap['targetType'] ?? '').toString();
     return Container(
       decoration: BoxDecoration(
         color: Colors.blue[50],
@@ -1085,6 +1596,21 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               '.': Style(color: Colors.blue[900], fontSize: FontSize(15)),
             },
           ),
+          if (action == 'view_proposal' && targetArticleId.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _openProposalArticle(
+                  context,
+                  articleId: targetArticleId,
+                  typeHint: targetType,
+                );
+              },
+              icon: const Icon(Icons.visibility),
+              label: const Text('Voir la proposition'),
+            ),
+          ],
         ],
       ),
     );

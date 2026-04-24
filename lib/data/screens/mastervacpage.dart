@@ -39,6 +39,9 @@ class MastervacPage extends StatefulWidget {
   final String? video;
   final bool fromPub;
   final Map<String, dynamic>? fournisseur; // Ajout des infos fournisseur
+  final String? alertNotificationId;
+  final String? alertBuyerId;
+  final String? alertRequestType;
 
   const MastervacPage({
     super.key,
@@ -57,6 +60,9 @@ class MastervacPage extends StatefulWidget {
     this.video,
     this.fromPub = false,
     this.fournisseur, // Ajout des infos fournisseur
+    this.alertNotificationId,
+    this.alertBuyerId,
+    this.alertRequestType,
   });
 
   @override
@@ -906,6 +912,12 @@ class _MastervacPageState extends State<MastervacPage> {
                         'photos': widget.images.whereType<String>().toList(),
                         'video': widget.video,
                         'fournisseur': widget.fournisseur, // Ajout des infos fournisseur
+                        if ((widget.alertBuyerId ?? '').isNotEmpty)
+                          'alertContext': {
+                            'sourceNotificationId': widget.alertNotificationId,
+                            'buyerId': widget.alertBuyerId,
+                            'requestType': widget.alertRequestType ?? 'piece_search',
+                          },
                       };
                       try {
                         final user = FirebaseAuth.instance.currentUser;

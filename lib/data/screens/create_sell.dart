@@ -13,7 +13,16 @@ import 'cars_info.dart'; // Importer le fichier combiné cars_info
 import 'movie.dart';
 
 class CreateSellPage extends StatefulWidget {
-  const CreateSellPage({super.key});
+  final String? alertNotificationId;
+  final String? alertBuyerId;
+  final String? alertRequestType;
+
+  const CreateSellPage({
+    super.key,
+    this.alertNotificationId,
+    this.alertBuyerId,
+    this.alertRequestType,
+  });
 
   @override
   // ignore: library_private_types_in_public_api
@@ -462,6 +471,9 @@ class _CreateSellPageState extends State<CreateSellPage> {
           video: videosList.isNotEmpty ? videosList.first : null,
           videos: videosList,
           entreprise: _companyController.text,
+          alertNotificationId: widget.alertNotificationId,
+          alertBuyerId: widget.alertBuyerId,
+          alertRequestType: widget.alertRequestType,
         ),
       ),
     );
@@ -903,16 +915,22 @@ class _CreateSellPageState extends State<CreateSellPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     // IMAGES EN PREMIER
                     _buildLabel('Images (max 12)', isRequired: false),
                     const SizedBox(height: 8),
@@ -1398,12 +1416,13 @@ class _CreateSellPageState extends State<CreateSellPage> {
                         ),
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            _buildVerificationButton(context),
-          ],
+              _buildVerificationButton(context),
+            ],
+          ),
         ),
       ),
     );

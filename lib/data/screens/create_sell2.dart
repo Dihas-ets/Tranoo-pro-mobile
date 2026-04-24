@@ -15,7 +15,16 @@ import '../../widgets/location_permission_dialog.dart';
 import 'movie.dart';
 
 class CreateSellPage2 extends StatefulWidget {
-  const CreateSellPage2({super.key});
+  final String? alertNotificationId;
+  final String? alertBuyerId;
+  final String? alertRequestType;
+
+  const CreateSellPage2({
+    super.key,
+    this.alertNotificationId,
+    this.alertBuyerId,
+    this.alertRequestType,
+  });
 
   @override
   CreateSellPage2State createState() => CreateSellPage2State();
@@ -538,6 +547,9 @@ class CreateSellPage2State extends State<CreateSellPage2> {
           images: images,
           video: _cloudinaryVideoUrl,
           fournisseur: fournisseur,
+          alertNotificationId: widget.alertNotificationId,
+          alertBuyerId: widget.alertBuyerId,
+          alertRequestType: widget.alertRequestType,
         ),
       ),
     );

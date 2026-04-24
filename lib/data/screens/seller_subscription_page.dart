@@ -66,9 +66,9 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
         int temp = _selectedMonths;
@@ -78,81 +78,132 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         return StatefulBuilder(
           builder: (ctx, setModal) {
             final media = MediaQuery.of(ctx);
-            final maxSheetHeight = media.size.height * 0.62;
+            final maxSheetHeight = media.size.height * 0.5;
             return AnimatedPadding(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
               padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-              child: SizedBox(
-              height: maxSheetHeight,
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Choisir la duree',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    flex: 10,
-                    child: ListWheelScrollView.useDelegate(
-                      controller: controller,
-                      itemExtent: 48,
-                      physics: const FixedExtentScrollPhysics(),
-                      onSelectedItemChanged: (idx) {
-                        setModal(() => temp = idx + 1);
-                      },
-                      childDelegate: ListWheelChildBuilderDelegate(
-                        childCount: 12,
-                        builder: (context, index) {
-                          final m = index + 1;
-                          final selected = m == temp;
-                          return Center(
-                            child: Text(
-                              '$m mois',
-                              style: TextStyle(
-                                fontSize: selected ? 22 : 18,
-                                fontWeight:
-                                    selected ? FontWeight.bold : FontWeight.w500,
-                                color: selected
-                                    ? const Color(0xFFB45309)
-                                    : Colors.black87,
-                              ),
-                            ),
-                          );
-                        },
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                height: maxSheetHeight,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                  ),
-                  SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(ctx, temp),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF8BF13),
-                            foregroundColor: Colors.black,
-                          ),
-                          child: const Text('Valider'),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Choisir la durée',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Text(
+                        'Plus la durée est longue, plus vous économisez',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      flex: 10,
+                      child: ListWheelScrollView.useDelegate(
+                        controller: controller,
+                        itemExtent: 48,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (idx) {
+                          setModal(() => temp = idx + 1);
+                        },
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          childCount: 12,
+                          builder: (context, index) {
+                            final m = index + 1;
+                            final selected = m == temp;
+                            final price = (m * (_status?.monthlyPriceFcfa ?? 5000));
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '$m ${m == 1 ? 'mois' : 'mois'}',
+                                      style: TextStyle(
+                                        fontSize: selected ? 22 : 18,
+                                        fontWeight:
+                                            selected ? FontWeight.bold : FontWeight.w500,
+                                        color: selected
+                                            ? Colors.amber.shade600
+                                            : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    if (selected)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          '$price FCFA',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.amber.shade600,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, temp),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber.shade500,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Valider',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
             );
           },
         );
@@ -199,7 +250,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Paiement echoue ou annule.'),
+            content: Text('Paiement échoué ou annulé.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -209,7 +260,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
       if (idToken == null) {
-        throw Exception('Utilisateur non connecte');
+        throw Exception('Utilisateur non connecté');
       }
 
       final dio = Dio(
@@ -241,8 +292,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Paiement reussi: abonnement active avec succes.'),
-          backgroundColor: Color(0xFF0461B6),
+          content: Text('Paiement réussi : abonnement activé avec succès.'),
+          backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
@@ -252,7 +303,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Echec du paiement ou de l\'activation.'),
+          content: Text('Échec du paiement ou de l\'activation.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -267,14 +318,22 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
 
   String _formatDate(DateTime? date) {
     if (date == null) return '--';
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final months = [
+      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   String _formatDateShort(dynamic raw) {
     if (raw == null) return '--';
     final dt = DateTime.tryParse(raw.toString());
     if (dt == null) return '--';
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    final months = [
+      'janv', 'févr', 'mars', 'avr', 'mai', 'juin',
+      'juil', 'août', 'sept', 'oct', 'nov', 'déc'
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
   bool _isFeexPaySuccess(dynamic result) {
@@ -293,254 +352,701 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
   @override
   Widget build(BuildContext context) {
     final status = _status;
+    final monthlyPrice = status?.monthlyPriceFcfa ?? 5000;
+    final totalPrice = _selectedMonths * monthlyPrice;
+    final hasDiscount = _selectedMonths >= 3;
+    final discountedPrice = hasDiscount ? totalPrice * 0.9 : totalPrice;
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Abonnement vendeur'),
-        backgroundColor: const Color(0xFFF8BF13),
-        foregroundColor: Colors.black,
+        title: const Text(
+          'Abonnement Vendeur',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: Colors.black87,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black87,
       ),
-      backgroundColor: const Color(0xFFF9FAFB),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+              ),
+            )
           : RefreshIndicator(
               onRefresh: _loadStatus,
+              color: Colors.amber,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  // Carte du plan actuel
                   Container(
-                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFF8BF13)),
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.amber.shade200, width: 1),
                     ),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Votre plan actuel',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          status?.currentPlanLabel ?? 'Inconnu',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Color(0xFF0461B6),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        if (status?.freeTrialActive == true)
-                          Text(
-                            'Jours restants (Decouverte): ${status?.freeTrialRemainingDays ?? 0}',
-                          ),
-                        Text(
-                          'Essai gratuit jusqu\'au: ${_formatDate(status?.freeTrialEndsAt)}',
-                        ),
-                        Text(
-                          'Plan payant jusqu\'au: ${_formatDate(status?.paidPlanEndsAt)}',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x1A000000),
-                          blurRadius: 8,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Plan Decouverte',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          '3 mois gratuits apres inscription. Publiez vos articles sans paiement.',
-                        ),
-                        const SizedBox(height: 14),
-                        const Divider(),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Plan Pro Mensuel',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${status?.monthlyPriceFcfa ?? 5000} FCFA / mois',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFB45309),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
                         Row(
                           children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: _openMonthPicker,
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: Color(0xFFF8BF13),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Duree: $_selectedMonths mois',
-                                  style: const TextStyle(
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.stars,
+                                color: Colors.amber.shade700,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Plan actuel',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
                         Text(
-                          'Total: ${(_selectedMonths * (status?.monthlyPriceFcfa ?? 5000))} FCFA',
+                          status?.currentPlanLabel ?? 'Inconnu',
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0461B6),
+                            color: Colors.black87,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text('Options incluses:'),
-                        const SizedBox(height: 4),
-                        const Text('- Publication illimitee des articles'),
-                        const Text('- Acces prioritaire aux mises en avant'),
-                        const Text('- Renouvellement mensuel'),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _subscribing ? null : _subscribe,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFF8BF13),
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                        const SizedBox(height: 12),
+                        if (status?.freeTrialActive == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
                             ),
-                            child: _subscribing
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.black,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Passer au Plan Pro',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.local_fire_department,
+                                  color: Colors.amber.shade700,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Essai gratuit : ${status?.freeTrialRemainingDays ?? 0} jours restants',
+                                  style: TextStyle(
+                                    color: Colors.amber.shade800,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                   ),
+                                ),
+                              ],
+                            ),
                           ),
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          icon: Icons.calendar_today,
+                          label: 'Fin de l\'essai gratuit',
+                          value: _formatDate(status?.freeTrialEndsAt),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildInfoRow(
+                          icon: Icons.verified,
+                          label: 'Fin du plan payant',
+                          value: _formatDate(status?.paidPlanEndsAt),
                         ),
                       ],
                     ),
                   ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
+
+                  const SizedBox(height: 20),
+
+                  // Carte Plan Pro
                   Container(
-                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Historique abonnement (10 derniers)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
+                        // En-tête
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(24),
+                              topRight: Radius.circular(24),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (_subscriptionHistory.isEmpty)
-                          const Text(
-                            'Aucun paiement d\'abonnement pour le moment.',
-                            style: TextStyle(color: Colors.grey),
-                          )
-                        else
-                          ..._subscriptionHistory.map((tx) {
-                            final amount = tx['amount']?.toString() ?? '--';
-                            final status = tx['status']?.toString() ?? '--';
-                            final createdAt = _formatDateShort(tx['createdAt']);
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF9FAFB),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: const Color(0xFFEDEDED),
-                                ),
-                              ),
-                              child: Row(
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Icon(
-                                    Icons.receipt_long,
-                                    color: Color(0xFFF8BF13),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      '$amount FCFA - $status',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
+                                  const Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Plan Pro',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
                                       ),
-                                    ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Boostez votre activité',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    createdAt,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade500,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Text(
+                                      'POPULAIRE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                            );
-                          }),
+                              const SizedBox(height: 16),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${monthlyPrice.toString()}',
+                                    style: const TextStyle(
+                                      fontSize: 38,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const Text(
+                                    ' FCFA',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    '/ mois',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Contenu
+                        Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Sélecteur de durée
+                              const Text(
+                                'Durée d\'abonnement',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              InkWell(
+                                onTap: _openMonthPicker,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_month,
+                                            color: Colors.amber.shade700,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            '$_selectedMonths ${_selectedMonths == 1 ? 'mois' : 'mois'}',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 16,
+                                        color: Colors.grey.shade400,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              // Total
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'Total',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${totalPrice.toString()} FCFA',
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: hasDiscount
+                                                ? Colors.grey.shade500
+                                                : Colors.black87,
+                                            decoration: hasDiscount
+                                                ? TextDecoration.lineThrough
+                                                : TextDecoration.none,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (hasDiscount) ...[
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Économie (10%)',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '- ${(totalPrice - discountedPrice).toStringAsFixed(0)} FCFA',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.green,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Divider(),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'À payer',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${discountedPrice.toStringAsFixed(0)} FCFA',
+                                            style: TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.amber.shade700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              // Avantages
+                              const Text(
+                                'Ce que vous obtenez',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildBenefitItem(
+                                icon: Icons.auto_awesome,
+                                text: 'Publications illimitées',
+                              ),
+                              const SizedBox(height: 10),
+                              _buildBenefitItem(
+                                icon: Icons.trending_up,
+                                text: 'Accès prioritaire aux mises en avant',
+                              ),
+                              const SizedBox(height: 10),
+                              _buildBenefitItem(
+                                icon: Icons.autorenew,
+                                text: 'Renouvellement mensuel automatique',
+                              ),
+                              const SizedBox(height: 10),
+                              _buildBenefitItem(
+                                icon: Icons.support_agent,
+                                text: 'Support prioritaire 24/7',
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              // Bouton d'action
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _subscribing ? null : _subscribe,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.amber.shade500,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: _subscribing
+                                      ? const SizedBox(
+                                          height: 22,
+                                          width: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.rocket_launch),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Activer le Plan Pro',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+
+                              if (_error != null) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.red.shade200,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _error!,
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // Historique
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.all(18),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.history,
+                                color: Colors.amber,
+                                size: 20,
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                'Historique des paiements',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_subscriptionHistory.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(18),
+                            child: Center(
+                              child: Text(
+                                'Aucun paiement d\'abonnement',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _subscriptionHistory.length,
+                            separatorBuilder: (_, __) => const Divider(
+                              height: 1,
+                              indent: 16,
+                              endIndent: 16,
+                            ),
+                            itemBuilder: (context, index) {
+                              final tx = _subscriptionHistory[index];
+                              final amount = tx['amount']?.toString() ?? '--';
+                              final statusTx = tx['status']?.toString() ?? '--';
+                              final createdAt =
+                                  _formatDateShort(tx['createdAt']);
+                              final isSuccess =
+                                  statusTx.toLowerCase().contains('success') ||
+                                  statusTx.toLowerCase().contains('paid');
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isSuccess
+                                            ? Colors.green.shade50
+                                            : Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        isSuccess
+                                            ? Icons.check_circle
+                                            : Icons.error_outline,
+                                        size: 18,
+                                        color: isSuccess
+                                            ? Colors.green.shade600
+                                            : Colors.red.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '$amount FCFA',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            statusTx,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: isSuccess
+                                                  ? Colors.green.shade600
+                                                  : Colors.red.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      createdAt,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.black54,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBenefitItem({
+    required IconData icon,
+    required String text,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.amber.shade50,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 16,
+            color: Colors.amber.shade700,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black54,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

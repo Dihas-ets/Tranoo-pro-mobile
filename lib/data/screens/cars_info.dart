@@ -41,6 +41,9 @@ class CarsInfo extends StatefulWidget {
   final int? selectedImageIndex;
   final String? entreprise;
   final bool fromPub;
+  final String? alertNotificationId;
+  final String? alertBuyerId;
+  final String? alertRequestType;
 
   const CarsInfo({
     super.key,
@@ -69,6 +72,9 @@ class CarsInfo extends StatefulWidget {
     this.selectedImageIndex,
     this.entreprise,
     this.fromPub = false,
+    this.alertNotificationId,
+    this.alertBuyerId,
+    this.alertRequestType,
   });
 
   @override
@@ -1590,6 +1596,12 @@ class _CarsinfoState extends State<CarsInfo> {
                         'photos': widget.images,
                         'video': _primaryVideo,
                         'entreprise': widget.entreprise,
+                        if ((widget.alertBuyerId ?? '').isNotEmpty)
+                          'alertContext': {
+                            'sourceNotificationId': widget.alertNotificationId,
+                            'buyerId': widget.alertBuyerId,
+                            'requestType': widget.alertRequestType ?? 'vehicle_search',
+                          },
                       };
                       log('[DEBUG] Données envoyées à l\'API :');
                       log(articleData.toString());
