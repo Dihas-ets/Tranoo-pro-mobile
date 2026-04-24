@@ -469,6 +469,24 @@ class NotificationProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> deleteNotification(String id, String token) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${getBaseUrl()}/notifications/$id'),
+        headers: {"Authorization": "Bearer $token"},
+      );
+      if (response.statusCode == 200) {
+        _notifications.removeWhere((n) => (n['_id'] ?? '').toString() == id);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Erreur suppression notification: $e');
+      return false;
+    }
+  }
+
   void _initFCMListener() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       final notif = {
@@ -507,6 +525,38 @@ class NotificationsBody extends StatefulWidget {
 }
 
 class _NotificationsBodyState extends State<NotificationsBody> {
+  final Set<String> _selectedNotificationIds = <String>{};
+
+  bool get _selectionMode => _selectedNotificationIds.isNotEmpty;
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedNotificationIds.contains(id)) {
+        _selectedNotificationIds.remove(id);
+      } else {
+        _selectedNotificationIds.add(id);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    if (!_selectionMode) return;
+    setState(() => _selectedNotificationIds.clear());
+  }
+
+  Future<void> _deleteSelected(NotificationProvider provider) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final token = await user?.getIdToken();
+    if (token == null) return;
+    final ids = _selectedNotificationIds.toList();
+    for (final id in ids) {
+      await provider.deleteNotification(id, token);
+    }
+    if (!mounted) return;
+    _clearSelection();
+    _syncUnreadCountWithHeader(provider);
+  }
+
   void _syncUnreadCountWithHeader(NotificationProvider provider) {
     final unreadCount =
         provider.notifications.where((n) => !(n['isRead'] ?? false)).length;
@@ -547,10 +597,56 @@ class _NotificationsBodyState extends State<NotificationsBody> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        leading: _selectionMode
+            ? IconButton(
+                tooltip: 'Annuler',
+                icon: const Icon(Icons.close),
+                onPressed: _clearSelection,
+              )
+            : null,
+        title: Text(
+          _selectionMode
+              ? '${_selectedNotificationIds.length} sélectionnée(s)'
+              : 'Notifications',
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.4,
+        actions: [
+          if (_selectionMode)
+            IconButton(
+              tooltip: 'Supprimer',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Supprimer'),
+                    content: Text(
+                      'Supprimer ${_selectedNotificationIds.length} notification(s) ?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Annuler'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE57373),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Supprimer'),
+                      ),
+                    ],
+                  ),
+                );
+                if (ok == true) {
+                  await _deleteSelected(provider);
+                }
+              },
+            ),
+        ],
       ),
       body: provider.loading
           ? const Center(child: CircularProgressIndicator())
@@ -582,6 +678,10 @@ class _NotificationsBodyState extends State<NotificationsBody> {
   Widget _buildNotificationsList(NotificationProvider provider, User? user) {
     try {
       return ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.only(top: 10, bottom: 10),
         itemCount: provider.notifications.length,
         itemBuilder: (ctx, index) {
@@ -604,9 +704,16 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               (notifData['action'] ?? '').toString() == 'view_proposal';
           final proposalThumb = (notifData['thumbnailUrl'] ?? '').toString();
           final proposalTitle = (notifData['articleTitle'] ?? '').toString();
+          final notifId = (_safeGetString(notif, '_id') ?? '').toString();
+          final isSelected =
+              notifId.isNotEmpty && _selectedNotificationIds.contains(notifId);
 
           return GestureDetector(
             onTap: () async {
+              if (_selectionMode) {
+                if (notifId.isNotEmpty) _toggleSelection(notifId);
+                return;
+              }
               if (isVerification) {
                 final token = await user?.getIdToken();
                 final notificationId = _safeGetString(notif, '_id');
@@ -633,6 +740,10 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                 }
               }
             },
+            onLongPress: () {
+              if (notifId.isEmpty) return;
+              _toggleSelection(notifId);
+            },
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               decoration: BoxDecoration(
@@ -641,9 +752,12 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                     : (isAlert ? const Color(0xFFFFF1F1) : Colors.blue[50]),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isAlert
-                      ? const Color(0xFFE57373).withOpacity(0.35)
-                      : Colors.transparent,
+                  color: isSelected
+                      ? const Color(0xFF111827)
+                      : (isAlert
+                          ? const Color(0xFFE57373).withOpacity(0.35)
+                          : Colors.transparent),
+                  width: isSelected ? 1.2 : 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -668,11 +782,12 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) =>
                               CircleAvatar(
-                            backgroundColor: isVerification
-                                ? Colors.amber
-                                : (isAlert
-                                    ? const Color(0xFFE57373)
-                                    : Colors.blue),
+                            backgroundColor:
+                                isVerification
+                                    ? Colors.amber
+                                    : (isAlert
+                                        ? const Color(0xFFE57373)
+                                        : Colors.blue),
                             child: Icon(
                               isVerification
                                   ? Icons.verified
@@ -687,9 +802,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                             ? Colors.amber
                             : (isAlert ? const Color(0xFFE57373) : Colors.blue),
                         child: Icon(
-                            isVerification
-                                ? Icons.verified
-                                : Icons.notifications,
+                            isVerification ? Icons.verified : Icons.notifications,
                             color: Colors.white),
                       ),
                 title: Row(
@@ -743,8 +856,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                     Text(
                       _safeGetString(notif, 'message') != null
                           ? (_safeGetString(notif, 'message')!.length > 52
-                              ? _safeGetString(notif, 'message')!
-                                      .substring(0, 52) +
+                              ? _safeGetString(notif, 'message')!.substring(0, 52) +
                                   '...'
                               : _safeGetString(notif, 'message')!)
                           : '-',
@@ -817,15 +929,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       if (response.statusCode != 200) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Impossible de charger la proposition.')),
+          const SnackBar(content: Text('Impossible de charger la proposition.')),
         );
         return;
       }
 
       final article = jsonDecode(response.body);
-      final articleType =
-          (article['type'] ?? typeHint ?? '').toString().toLowerCase();
+      final articleType = (article['type'] ?? typeHint ?? '').toString().toLowerCase();
 
       if (!mounted) return;
       if (articleType == 'piece') {
@@ -839,17 +949,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               year: (article['annee'] ?? '').toString(),
               description: (article['description'] ?? '').toString(),
               company: (article['entreprise'] ?? '').toString(),
-              location:
-                  (article['lieu'] ?? article['localisation'] ?? '').toString(),
+              location: (article['lieu'] ?? article['localisation'] ?? '').toString(),
               price: (article['prix'] ?? '').toString(),
               fuelType: article['typeMoteur']?.toString(),
               model: article['modele']?.toString(),
-              pieceType:
-                  (article['pieceType'] ?? article['condition'])?.toString(),
+              pieceType: (article['pieceType'] ?? article['condition'])?.toString(),
               images: (article['photos'] is List)
-                  ? (article['photos'] as List)
-                      .map((e) => e?.toString())
-                      .toList()
+                  ? (article['photos'] as List).map((e) => e?.toString()).toList()
                   : const [],
               video: article['video']?.toString(),
               fournisseur: (article['fournisseur'] is Map)
@@ -1132,21 +1238,19 @@ class _NotificationsBodyState extends State<NotificationsBody> {
   }
 
   // ========== NOUVEAU DESIGN DES ALERTES ==========
-  Widget _buildAlertContent(
-      Map<String, dynamic> notification, String bodyHtml) {
+  Widget _buildAlertContent(Map<String, dynamic> notification, String bodyHtml) {
     final dataMap = (notification['data'] is Map)
         ? Map<String, dynamic>.from(notification['data'])
         : <String, dynamic>{};
     final requestType = (dataMap['requestType'] ?? '').toString();
-    final fallbackMessage =
-        (_safeGetString(notification, 'message') ?? '').toLowerCase();
+    final fallbackMessage = (_safeGetString(notification, 'message') ?? '').toLowerCase();
     final isPiece = requestType == 'piece_search' ||
         fallbackMessage.contains('pièce') ||
         fallbackMessage.contains('piece');
-
+    
     // Construction des caractéristiques
     final List<MapEntry<String, String>> characteristics = [];
-
+    
     if ((dataMap['marque'] ?? '').toString().isNotEmpty) {
       characteristics.add(MapEntry('Marque', dataMap['marque'].toString()));
     }
@@ -1154,27 +1258,22 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       characteristics.add(MapEntry('Modèle', dataMap['modele'].toString()));
     }
     if ((dataMap['pieceName'] ?? '').toString().isNotEmpty && isPiece) {
-      characteristics
-          .add(MapEntry('Pièce recherchée', dataMap['pieceName'].toString()));
+      characteristics.add(MapEntry('Pièce recherchée', dataMap['pieceName'].toString()));
     }
     if ((dataMap['annee'] ?? '').toString().isNotEmpty && isPiece) {
       characteristics.add(MapEntry('Année', dataMap['annee'].toString()));
     }
     if ((dataMap['anneeMin'] ?? '').toString().isNotEmpty && !isPiece) {
-      characteristics
-          .add(MapEntry('Année min', dataMap['anneeMin'].toString()));
+      characteristics.add(MapEntry('Année min', dataMap['anneeMin'].toString()));
     }
     if ((dataMap['anneeMax'] ?? '').toString().isNotEmpty && !isPiece) {
-      characteristics
-          .add(MapEntry('Année max', dataMap['anneeMax'].toString()));
+      characteristics.add(MapEntry('Année max', dataMap['anneeMax'].toString()));
     }
     if ((dataMap['budgetMax'] ?? '').toString().isNotEmpty) {
-      characteristics
-          .add(MapEntry('Budget max', '${dataMap['budgetMax']} FCFA'));
+      characteristics.add(MapEntry('Budget max', '${dataMap['budgetMax']} FCFA'));
     }
     if ((dataMap['localisation'] ?? '').toString().isNotEmpty) {
-      characteristics
-          .add(MapEntry('Localisation', dataMap['localisation'].toString()));
+      characteristics.add(MapEntry('Localisation', dataMap['localisation'].toString()));
     }
     if ((dataMap['urgence'] ?? '').toString().isNotEmpty) {
       characteristics.add(MapEntry('Urgence', dataMap['urgence'].toString()));
@@ -1243,9 +1342,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               ),
             ],
           ),
-
+          
           const SizedBox(height: 16),
-
+          
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1264,9 +1363,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               ),
             ),
           ),
-
+          
           const SizedBox(height: 20),
-
+          
           Row(
             children: [
               Container(
@@ -1288,9 +1387,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               ),
             ],
           ),
-
+          
           const SizedBox(height: 12),
-
+          
           if (characteristics.isNotEmpty)
             Container(
               decoration: BoxDecoration(
@@ -1346,7 +1445,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                 }).toList(),
               ),
             ),
-
+          
           if (description.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -1379,16 +1478,15 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               ),
             ),
           ],
-
+          
           const SizedBox(height: 20),
-
+          
           // Bouton "Proposer une offre"
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                final sourceNotificationId =
-                    _safeGetString(notification, '_id');
+                final sourceNotificationId = _safeGetString(notification, '_id');
                 final buyerId = _safeGetString(dataMap, 'buyerId') ??
                     _safeGetString(notification['sender'], '_id') ??
                     _safeGetString(notification, 'sender');
@@ -1399,16 +1497,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                       ? CreateSellPage2(
                           alertNotificationId: sourceNotificationId,
                           alertBuyerId: buyerId,
-                          alertRequestType: requestType.isNotEmpty
-                              ? requestType
-                              : 'piece_search',
+                          alertRequestType: requestType.isNotEmpty ? requestType : 'piece_search',
                         )
                       : CreateSellPage(
                           alertNotificationId: sourceNotificationId,
                           alertBuyerId: buyerId,
-                          alertRequestType: requestType.isNotEmpty
-                              ? requestType
-                              : 'vehicle_search',
+                          alertRequestType:
+                              requestType.isNotEmpty ? requestType : 'vehicle_search',
                         ),
                 );
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1441,9 +1536,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               ),
             ),
           ),
-
+          
           const SizedBox(height: 8),
-
+          
           // Message de contact
           Center(
             child: Text(
@@ -1566,10 +1661,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
         ? Map<String, dynamic>.from(notification['data'])
         : <String, dynamic>{};
     final action = (dataMap['action'] ?? '').toString();
-    final targetArticleId = (dataMap['targetArticleId'] ??
-            _safeGetString(notification, 'relatedId') ??
-            '')
-        .toString();
+    final targetArticleId =
+        (dataMap['targetArticleId'] ?? _safeGetString(notification, 'relatedId') ?? '')
+            .toString();
     final targetType = (dataMap['targetType'] ?? '').toString();
     return Container(
       decoration: BoxDecoration(

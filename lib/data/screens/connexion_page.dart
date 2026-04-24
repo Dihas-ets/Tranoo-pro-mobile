@@ -456,156 +456,179 @@ class _ConnexionPageState extends State<ConnexionPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed:
-                      _isLoading
-                          ? null
-                          : () async {
-                            // Vérification des champs obligatoires
-                            if (_emailController.text.trim().isEmpty ||
-                                _passwordController.text.trim().isEmpty) {
-                              AuthMessagePopup.showWarning(
-                                context,
-                                title: 'Certains champs sont manquants.',
-                                subtitle: 'Veuillez compléter les informations requises.',
-                              );
-                              return;
-                            }
-                            setState(() {
-                              _isLoading = true;
-                            });
-                            _logger.info(
-                              'Tentative de connexion avec email: ${_emailController.text.trim()}',
+                  onPressed: _isLoading
+                      ? null
+                      : () async {
+                          // Vérification des champs obligatoires
+                          if (_emailController.text.trim().isEmpty ||
+                              _passwordController.text.trim().isEmpty) {
+                            AuthMessagePopup.showWarning(
+                              context,
+                              title: 'Certains champs sont manquants.',
+                              subtitle:
+                                  'Veuillez compléter les informations requises.',
                             );
-                            try {
-                              await userService.loginUser(
-                                email: _emailController.text.trim(),
-                                password: _passwordController.text.trim(),
+                            return;
+                          }
+                          setState(() {
+                            _isLoading = true;
+                          });
+                          _logger.info(
+                            'Tentative de connexion avec email: ${_emailController.text.trim()}',
+                          );
+                          try {
+                            await userService.loginUser(
+                              email: _emailController.text.trim(),
+                              password: _passwordController.text.trim(),
+                            );
+                            _logger.info(
+                              'Connexion Firebase réussie pour: ${_emailController.text.trim()}',
+                            );
+
+                            // Charger l'utilisateur et le rôle via AuthProvider puis naviguer
+                            final auth = context.read<myauth.AuthProvider>();
+                            await auth.reloadUser();
+
+                            // Attendre brièvement que l'état soit bien propagé
+                            final startWait = DateTime.now();
+                            while (auth.user == null &&
+                                DateTime.now().difference(startWait) <
+                                    const Duration(seconds: 5)) {
+                              await Future.delayed(
+                                const Duration(milliseconds: 100),
                               );
-                              _logger.info(
-                                'Connexion Firebase réussie pour: ${_emailController.text.trim()}',
+                            }
+
+                            if (auth.user == null) {
+                              throw Exception(
+                                "La session n'a pas pu être initialisée. Réessayez.",
                               );
-
-                              // Charger l'utilisateur et le rôle via AuthProvider puis naviguer
-                              final auth = context.read<myauth.AuthProvider>();
-                              await auth.reloadUser();
-
-                              // Attendre brièvement que l'état soit bien propagé
-                              final startWait = DateTime.now();
-                              while (auth.user == null &&
-                                  DateTime.now().difference(startWait) <
-                                      const Duration(seconds: 5)) {
-                                await Future.delayed(
-                                  const Duration(milliseconds: 100),
-                                );
-                              }
-
-                              if (auth.user == null) {
-                                throw Exception(
-                                  "La session n'a pas pu être initialisée. Réessayez.",
-                                );
-                              }
-
-                              // Mettre à jour le timestamp de dernière connexion
-                              final prefs =
-                                  await SharedPreferences.getInstance();
-                              await prefs.setInt(
-                                'lastLoginTime',
-                                DateTime.now().millisecondsSinceEpoch,
-                              );
-
-                              if (!mounted) return;
-                              
-                              // Vérifier si livreur/chauffeur sans photo de profil
-                              final userRole = auth.user?['role']?.toString();
-                              final userPhoto = auth.user?['photo']?.toString();
-                              final needsPhotoUpload = (userRole == 'livreur' || userRole == 'chauffeur') &&
-                                  (userPhoto == null || userPhoto.isEmpty);
-                              
-                              if (needsPhotoUpload) {
-                                // Rediriger vers le profil pour upload photo obligatoire
-                                AuthMessagePopup.showInfo(
-                                  context,
-                                  title: 'Action requise',
-                                  subtitle: 'Veuillez uploader votre photo de profil pour continuer.',
-                                );
-                                if (!mounted) return;
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AvantHome(),
-                                  ),
-                                  (route) => false,
-                                );
-                                // Naviguer vers l'onglet profil après un court délai
-                                Future.delayed(const Duration(milliseconds: 500), () {
-                                  if (mounted) {
-                                    // Le profil sera affiché avec l'animation d'alerte
-                                  }
-                                });
-                              } else {
-                                AuthMessagePopup.showSuccess(
-                                  context,
-                                  title: 'Connexion réussie. Bienvenue !',
-                                );
-                                if (!mounted) return;
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AvantHome(),
-                                  ),
-                                  (route) => false,
-                                );
-                              }
-                            } catch (e) {
-                              _logger.warning(
-                                'Erreur lors de la connexion Firebase: ${e.toString()}',
-                              );
-                              String title =
-                                  'Impossible de se connecter avec ces informations.';
-                              String? subtitle;
-                              if (e.toString().contains('user-not-found')) {
-                                title = "Aucun compte n'est associé à cet email.";
-                                subtitle = 'Créez un compte pour continuer.';
-                              } else if (e.toString().contains(
-                                'wrong-password',
-                              )) {
-                                title = 'Mot de passe incorrect.';
-                                subtitle = 'Vérifiez vos informations et réessayez.';
-                              } else if (e.toString().contains(
-                                'invalid-credential',
-                              )) {
-                                title = 'Email ou mot de passe incorrect.';
-                                subtitle = 'Vérifiez vos informations et réessayez.';
-                              } else if (e.toString().contains('user-disabled')) {
-                                title = 'Votre compte est temporairement bloqué.';
-                                subtitle = 'Contactez l’assistance.';
-                              } else if (e.toString().contains('too-many-requests')) {
-                                title = 'Trop de tentatives de connexion.';
-                                subtitle = 'Réessayez dans quelques minutes.';
-                              } else if (e.toString().contains('network') ||
-                                  e.toString().contains('SocketException') ||
-                                  e.toString().contains('Failed host lookup')) {
-                                title = 'Impossible de se connecter au serveur.';
-                                subtitle = 'Vérifiez votre connexion internet.';
-                              } else if (e.toString().contains('server') ||
-                                  e.toString().contains('500') ||
-                                  e.toString().contains('503')) {
-                                title = 'Notre service rencontre un problème temporaire.';
-                                subtitle = 'Veuillez réessayer plus tard.';
-                              }
+                            }
+                            final userRole =
+                                auth.user?['role']?.toString().toLowerCase();
+                            if (userRole == 'acheteur') {
+                              await FirebaseAuth.instance.signOut();
                               if (!mounted) return;
                               AuthMessagePopup.showError(
                                 context,
-                                title: title,
-                                subtitle: subtitle,
-                                buttonText: 'Réessayer',
+                                title:
+                                    'Compte acheteur non autorisé sur Tranoo Pro.',
+                                subtitle:
+                                    'Utilisez l\'application Tranoo (Acheteur).',
+                                buttonText: 'Compris',
                               );
-                            } finally {
-                              setState(() {
-                                _isLoading = false;
-                              });
+                              return;
                             }
-                          },
+
+                            // Mettre à jour le timestamp de dernière connexion
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setInt(
+                              'lastLoginTime',
+                              DateTime.now().millisecondsSinceEpoch,
+                            );
+
+                            if (!mounted) return;
+
+                            // Vérifier si livreur/chauffeur sans photo de profil
+                            final userRoleRaw = auth.user?['role']?.toString();
+                            final userPhoto = auth.user?['photo']?.toString();
+                            final needsPhotoUpload =
+                                (userRoleRaw == 'livreur' ||
+                                        userRoleRaw == 'chauffeur') &&
+                                    (userPhoto == null || userPhoto.isEmpty);
+
+                            if (needsPhotoUpload) {
+                              // Rediriger vers le profil pour upload photo obligatoire
+                              AuthMessagePopup.showInfo(
+                                context,
+                                title: 'Action requise',
+                                subtitle:
+                                    'Veuillez uploader votre photo de profil pour continuer.',
+                              );
+                              if (!mounted) return;
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const AvantHome(),
+                                ),
+                                (route) => false,
+                              );
+                              // Naviguer vers l'onglet profil après un court délai
+                              Future.delayed(const Duration(milliseconds: 500),
+                                  () {
+                                if (mounted) {
+                                  // Le profil sera affiché avec l'animation d'alerte
+                                }
+                              });
+                            } else {
+                              AuthMessagePopup.showSuccess(
+                                context,
+                                title: 'Connexion réussie. Bienvenue !',
+                              );
+                              if (!mounted) return;
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const AvantHome(),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          } catch (e) {
+                            _logger.warning(
+                              'Erreur lors de la connexion Firebase: ${e.toString()}',
+                            );
+                            String title =
+                                'Impossible de se connecter avec ces informations.';
+                            String? subtitle;
+                            if (e.toString().contains('user-not-found')) {
+                              title = "Aucun compte n'est associé à cet email.";
+                              subtitle = 'Créez un compte pour continuer.';
+                            } else if (e.toString().contains(
+                                  'wrong-password',
+                                )) {
+                              title = 'Mot de passe incorrect.';
+                              subtitle =
+                                  'Vérifiez vos informations et réessayez.';
+                            } else if (e.toString().contains(
+                                  'invalid-credential',
+                                )) {
+                              title = 'Email ou mot de passe incorrect.';
+                              subtitle =
+                                  'Vérifiez vos informations et réessayez.';
+                            } else if (e.toString().contains('user-disabled')) {
+                              title = 'Votre compte est temporairement bloqué.';
+                              subtitle = 'Contactez l’assistance.';
+                            } else if (e
+                                .toString()
+                                .contains('too-many-requests')) {
+                              title = 'Trop de tentatives de connexion.';
+                              subtitle = 'Réessayez dans quelques minutes.';
+                            } else if (e.toString().contains('network') ||
+                                e.toString().contains('SocketException') ||
+                                e.toString().contains('Failed host lookup')) {
+                              title = 'Impossible de se connecter au serveur.';
+                              subtitle = 'Vérifiez votre connexion internet.';
+                            } else if (e.toString().contains('server') ||
+                                e.toString().contains('500') ||
+                                e.toString().contains('503')) {
+                              title =
+                                  'Notre service rencontre un problème temporaire.';
+                              subtitle = 'Veuillez réessayer plus tard.';
+                            }
+                            if (!mounted) return;
+                            AuthMessagePopup.showError(
+                              context,
+                              title: title,
+                              subtitle: subtitle,
+                              buttonText: 'Réessayer',
+                            );
+                          } finally {
+                            setState(() {
+                              _isLoading = false;
+                            });
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF8BF13),
                     foregroundColor: Colors.black,
@@ -616,17 +639,16 @@ class _ConnexionPageState extends State<ConnexionPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child:
-                      _isLoading
-                          ? const CircularProgressIndicator(color: Colors.black)
-                          : Text(
-                            'Se connecter',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize:
-                                  screenWidth * (isPortrait ? 0.045 : 0.035),
-                            ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.black)
+                      : Text(
+                          'Se connecter',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize:
+                                screenWidth * (isPortrait ? 0.045 : 0.035),
                           ),
+                        ),
                 ),
               ),
 

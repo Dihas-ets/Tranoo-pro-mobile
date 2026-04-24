@@ -16,7 +16,7 @@ class SecondPageState extends State<SecondPage>
   int _currentImageIndex = 0;
   final List<String> _images = [
     'assets/images/voiture_deuxieme_page.png',
-    'assets/images/image_background.png',
+    'assets/images/voiture_deuxieme_page.png',
   ];
 
   @override
@@ -67,26 +67,23 @@ class SecondPageState extends State<SecondPage>
             child: Container(
               key: ValueKey(_currentImageIndex),
               decoration: BoxDecoration(
+                color: Colors.white,
                 image: DecorationImage(
                   image: AssetImage(_images[_currentImageIndex]),
-                  fit: _images[_currentImageIndex].contains('voiture_deuxieme_page') 
-                      ? BoxFit.contain 
-                      : BoxFit.cover,
-                  scale: _images[_currentImageIndex].contains('voiture_deuxieme_page') 
-                      ? 1.2 
-                      : 1.0,
+                  fit: BoxFit.contain,
+                  scale: 1.05,
                 ),
               ),
             ),
           ),
 
-          // 🌫️ Dégradé sombre pour rendre le texte lisible
+          // Légère couche blanche pour conserver l'effet "splash pro"
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
-                colors: [Colors.black.withAlpha(60), Colors.transparent],
+                colors: [Colors.white.withAlpha(80), Colors.white.withAlpha(20)],
               ),
             ),
           ),
@@ -105,9 +102,9 @@ class SecondPageState extends State<SecondPage>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Découvrez votre\nvéhicule idéal en\nquelques clics',
+                      'Tranoo Pro\nGérez vos ventes et\nservices pro',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Colors.black87,
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                       ),

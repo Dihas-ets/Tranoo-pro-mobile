@@ -39,6 +39,9 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
   late int _modeleTabIndex;
   late int _localisationTabIndex;
   late int _budgetTabIndex;
+  late int _statusPendingTabIndex;
+  late int _statusOnlineTabIndex;
+  late int _statusRejectedTabIndex;
 
   final UserService _userService = UserService();
   final SubscriptionAccessService _subscriptionService =
@@ -53,10 +56,13 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
     // Initialisation des indices des onglets selon le rôle
     final isVendeur = _userService.currentRole == UserRole.vendeur;
     if (isVendeur) {
-      // Vendeur: pas de filtres Localisation/Budget
+      // Vendeur: 5 onglets (2 filtres + 3 statuts)
       _marqueTabIndex = 0;
       _modeleTabIndex = 1;
-      _tabController = TabController(length: 2, vsync: this);
+      _statusPendingTabIndex = 2;
+      _statusOnlineTabIndex = 3;
+      _statusRejectedTabIndex = 4;
+      _tabController = TabController(length: 5, vsync: this);
     } else {
       // Autres rôles: tous les filtres
       _marqueTabIndex = 0;
@@ -342,6 +348,7 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
 
   // Appliquer les filtres
   List<dynamic> _applyFilters(List<dynamic> source) {
+    final isVendeur = _userService.currentRole == UserRole.vendeur;
     return source.where((p) {
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
         final marque =
@@ -373,6 +380,22 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
             double.tryParse(prixStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
         if (_budgetMin != null && price < _budgetMin!) return false;
         if (_budgetMax != null && price > _budgetMax!) return false;
+      }
+      if (isVendeur) {
+        final statut = (p['statut'] ?? '').toString().toLowerCase();
+        if (_tabController.index == _statusPendingTabIndex &&
+            statut != 'en_attente') {
+          return false;
+        }
+        if (_tabController.index == _statusOnlineTabIndex &&
+            statut != 'en_ligne') {
+          return false;
+        }
+        if (_tabController.index == _statusRejectedTabIndex &&
+            statut != 'rejeté' &&
+            statut != 'rejete') {
+          return false;
+        }
       }
       return true;
     }).toList();
@@ -856,7 +879,7 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                 decoration: BoxDecoration(
                   color: (_accessStatus?.canCreateArticle ?? false)
                       ? Colors.green.shade100
-                      : Colors.red.shade100,
+                      : Colors.blue.shade100,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Center(
@@ -865,7 +888,7 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                     style: TextStyle(
                       color: (_accessStatus?.canCreateArticle ?? false)
                           ? Colors.green.shade800
-                          : Colors.red.shade800,
+                          : Colors.blue.shade800,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -946,6 +969,12 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                           tabs: [
                             _buildTabButton("Marque", _marqueTabIndex),
                             _buildTabButton("Modèles", _modeleTabIndex),
+                            if (isVendeur)
+                              _buildTabButton("En attente", _statusPendingTabIndex, isWide: true),
+                            if (isVendeur)
+                              _buildTabButton("En ligne", _statusOnlineTabIndex, isWide: true),
+                            if (isVendeur)
+                              _buildTabButton("Rejeté", _statusRejectedTabIndex, isWide: true),
                             if (!isVendeur)
                               _buildTabButton(
                                 "Localisation",
@@ -1086,36 +1115,91 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                                   child: SizedBox(
                                                     height: 100,
                                                     width: double.infinity,
-                                                    child: (piece['photos']
-                                                                    as List?)
-                                                                ?.isNotEmpty ==
-                                                            true
-                                                        ? Image.network(
-                                                            piece['photos'][0],
-                                                            fit: BoxFit.cover,
-                                                          )
-                                                        : (piece['video'] !=
-                                                                    null &&
-                                                                (piece['video']
-                                                                        ?.toString()
-                                                                        .isNotEmpty ??
-                                                                    false))
-                                                            ? VideoPreviewPlaceholder(
-                                                                videoUrl: piece['video']?.toString(),
-                                                                iconSize: 36,
-                                                          )
-                                                        : Container(
-                                                            color: Colors
-                                                                .grey[200],
-                                                                child:
-                                                                    const Icon(
-                                                              Icons
-                                                                  .image_not_supported,
-                                                              size: 30,
-                                                              color: Colors
-                                                                  .black26,
-                                                            ),
+                                                    child: Stack(
+                                                      children: [
+                                                        Positioned.fill(
+                                                          child: (piece['photos']
+                                                                          as List?)
+                                                                      ?.isNotEmpty ==
+                                                                  true
+                                                              ? Image.network(
+                                                                  piece['photos'][0],
+                                                                  fit: BoxFit.cover,
+                                                                )
+                                                              : (piece['video'] !=
+                                                                          null &&
+                                                                      (piece['video']
+                                                                              ?.toString()
+                                                                              .isNotEmpty ??
+                                                                          false))
+                                                                  ? VideoPreviewPlaceholder(
+                                                                      videoUrl: piece['video']?.toString(),
+                                                                      iconSize: 36,
+                                                                    )
+                                                                  : Container(
+                                                                      color: Colors
+                                                                          .grey[200],
+                                                                      child:
+                                                                          const Icon(
+                                                                        Icons
+                                                                            .image_not_supported,
+                                                                        size: 30,
+                                                                        color: Colors
+                                                                            .black26,
+                                                                      ),
+                                                                    ),
+                                                        ),
+                                                        Positioned(
+                                                          top: 6,
+                                                          right: 6,
+                                                          child: Builder(
+                                                            builder: (context) {
+                                                              final status =
+                                                                  (piece['statut'] ?? '')
+                                                                      .toString()
+                                                                      .toLowerCase();
+                                                              Color bg;
+                                                              Color fg;
+                                                              String label;
+                                                              if (status == 'en_ligne') {
+                                                                bg = const Color(0xFFE8F5E9);
+                                                                fg = const Color(0xFF2E7D32);
+                                                                label = 'En ligne';
+                                                              } else if (status == 'en_attente') {
+                                                                bg = const Color(0xFFFFF8E1);
+                                                                fg = const Color(0xFFB45309);
+                                                                label = 'En attente';
+                                                              } else {
+                                                                bg = const Color(0xFFFFEBEE);
+                                                                fg = const Color(0xFFC62828);
+                                                                label = 'Rejeté';
+                                                              }
+                                                              return Container(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                  horizontal: 8,
+                                                                  vertical: 4,
+                                                                ),
+                                                                decoration: BoxDecoration(
+                                                                  color: bg,
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(10),
+                                                                ),
+                                                                child: Text(
+                                                                  label,
+                                                                  style: TextStyle(
+                                                                    color: fg,
+                                                                    fontWeight:
+                                                                        FontWeight.w700,
+                                                                    fontSize: 10,
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            },
                                                           ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                                 const SizedBox(height: 8),
@@ -1208,15 +1292,52 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                           Positioned(
                                             top: 6,
                                             right: 6,
-                                            child: IconButton(
-                                              icon: const Icon(Icons.close,
-                                                  color: Colors.red, size: 20),
-                                              onPressed: canManagePieces
-                                                  ? () => _deletePiece(
-                                                        pieceId,
-                                                        index,
-                                                      )
-                                                  : null,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  tooltip: 'Modifier',
+                                                  icon: const Icon(
+                                                    Icons.edit,
+                                                    color: Color(0xFF0461B6),
+                                                    size: 20,
+                                                  ),
+                                                  onPressed: canManagePieces
+                                                      ? () {
+                                                          final id = (piece['_id'] ??
+                                                                  piece['id'] ??
+                                                                  piece['articleId'] ??
+                                                                  piece['Id'] ??
+                                                                  piece['article'])
+                                                              ?.toString();
+                                                          Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                              builder: (context) =>
+                                                                  CreateSellPage2(
+                                                                editMode: true,
+                                                                editArticleId: id,
+                                                                initialData: Map<String, dynamic>.from(piece),
+                                                              ),
+                                                            ),
+                                                          ).then((_) => fetchPieces());
+                                                        }
+                                                      : null,
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.close,
+                                                    color: Colors.red,
+                                                    size: 20,
+                                                  ),
+                                                  onPressed: canManagePieces
+                                                      ? () => _deletePiece(
+                                                            pieceId,
+                                                            index,
+                                                          )
+                                                      : null,
+                                                ),
+                                              ],
                                             ),
                                           ),
                                       ],

@@ -8,6 +8,8 @@ import 'package:flutter/services.dart'; // Added for input formatters
 import 'package:image_picker/image_picker.dart';
 import '../../utils/cloudinary_upload.dart';
 import 'package:http/http.dart' as http; // Ajouté pour l'upload web
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 
 import 'cars_info.dart'; // Importer le fichier combiné cars_info
 import 'movie.dart';
@@ -16,12 +18,18 @@ class CreateSellPage extends StatefulWidget {
   final String? alertNotificationId;
   final String? alertBuyerId;
   final String? alertRequestType;
+  final bool editMode;
+  final String? editArticleId;
+  final Map<String, dynamic>? initialData;
 
   const CreateSellPage({
     super.key,
     this.alertNotificationId,
     this.alertBuyerId,
     this.alertRequestType,
+    this.editMode = false,
+    this.editArticleId,
+    this.initialData,
   });
 
   @override
@@ -36,6 +44,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
   final TextEditingController _yearController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _companyController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
   final TextEditingController _cylindreController = TextEditingController();
   final TextEditingController _distanceController = TextEditingController();
   final TextEditingController _siegesController = TextEditingController();
@@ -175,6 +184,63 @@ class _CreateSellPageState extends State<CreateSellPage> {
     'Anthracite': const Color(0xFF36454F),
     'Perle': const Color(0xFFEAE0C8),
   };
+
+  @override
+  void initState() {
+    super.initState();
+    final init = widget.initialData;
+    if (widget.editMode && init != null) {
+      _titleController.text = (init['titre'] ?? '').toString();
+      _yearController.text = (init['annee'] ?? '').toString();
+      _descriptionController.text = (init['description'] ?? '').toString();
+      _companyController.text = (init['entreprise'] ?? '').toString();
+      _locationController.text =
+          (init['lieu'] ?? init['localisation'] ?? '').toString();
+      _priceController.text = (init['prix'] ?? '').toString();
+      _distanceController.text = (init['distance'] ?? '').toString();
+      _siegesController.text = (init['sieges'] ?? '').toString();
+      _cylindreController.text = (init['cylindre'] ?? '').toString();
+      _selectedBoiteVitesse = init['boiteVitesse']?.toString();
+      _selectedCarburantDropdown = init['carburant']?.toString();
+      _selectedClimatiseurDropdown = init['climatiseur']?.toString();
+      _selectedCondition = init['condition']?.toString();
+      _selectedCouleur = init['couleur']?.toString();
+
+      final marque = init['marque']?.toString();
+      if (marque != null && marque.isNotEmpty) {
+        if (_marques.contains(marque)) {
+          _selectedMarques = marque;
+        } else {
+          _selectedMarques = 'Autre';
+          _customMarque = marque;
+        }
+      }
+
+      final modele = init['modele']?.toString();
+      if (modele != null && modele.isNotEmpty) {
+        _selectedModel = modele;
+      }
+
+      final portes = init['portes'];
+      final portesInt =
+          portes is int ? portes : int.tryParse((portes ?? '').toString());
+      if (portesInt != null) _selectedPorte = portesInt;
+
+      if (init['photos'] is List) {
+        final urls = (init['photos'] as List)
+            .map((e) => e?.toString())
+            .whereType<String>()
+            .where((e) => e.isNotEmpty)
+            .toList();
+        for (int i = 0; i < urls.length && i < _cloudinaryImageUrls.length; i++) {
+          _cloudinaryImageUrls[i] = urls[i];
+        }
+      }
+      if (init['video'] != null) {
+        _cloudinaryVideoUrls[0] = init['video']?.toString();
+      }
+    }
+  }
 
   Future<void> _pickImage(int startIndex) async {
     final ImagePicker picker = ImagePicker();
@@ -364,6 +430,10 @@ class _CreateSellPageState extends State<CreateSellPage> {
   }
 
   void _onValidate() {
+    if (widget.editMode) {
+      _saveEditedCar();
+      return;
+    }
     // Debug logs
     print('[CreateSell] _cloudinaryVideoUrls: $_cloudinaryVideoUrls');
     print('[CreateSell] _uploadedVideos: $_uploadedVideos');
@@ -467,6 +537,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
           cylindre: _cylindreController.text,
           couleur: _selectedCouleur,
           dedouanement: false, // Dédouanement retiré, valeur par défaut
+          lieu: _locationController.text.trim(),
           images: imagesList,
           video: videosList.isNotEmpty ? videosList.first : null,
           videos: videosList,
@@ -477,6 +548,113 @@ class _CreateSellPageState extends State<CreateSellPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _saveEditedCar() async {
+    final id = (widget.editArticleId ?? '').toString();
+    if (id.isEmpty) return;
+
+    // Reuse validation (same checks)
+    if (_isAnyUploading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez attendre la fin de l\'upload.')),
+      );
+      return;
+    }
+    if (_titleController.text.isEmpty ||
+        _yearController.text.isEmpty ||
+        _selectedCondition == null ||
+        _selectedMarques == null ||
+        (_selectedMarques == 'Autre' &&
+            ((_customMarque == null || _customMarque!.isEmpty) ||
+                (_customModel == null || _customModel!.isEmpty))) ||
+        (_selectedMarques != 'Autre' &&
+            (_selectedModel == null ||
+                (_selectedModel == 'Autre' &&
+                    (_customModel == null || _customModel!.isEmpty)))) ||
+        _cylindreController.text.isEmpty ||
+        _selectedPorte == null ||
+        _selectedBoiteVitesse == null ||
+        _selectedCarburantDropdown == null ||
+        _selectedClimatiseurDropdown == null ||
+        _selectedCouleur == null ||
+        _distanceController.text.isEmpty ||
+        _siegesController.text.isEmpty ||
+        _priceController.text.isEmpty ||
+        _companyController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires.')),
+      );
+      return;
+    }
+
+    final imagesList = _cloudinaryImageUrls.whereType<String>().toList();
+    final videosList = _cloudinaryVideoUrls.whereType<String>().toList();
+
+    String? marque = _selectedMarques == 'Autre' ? _customMarque : _selectedMarques;
+    String? modele;
+    if (_selectedMarques == 'Autre') {
+      modele = _customModel;
+    } else {
+      modele = _selectedModel == 'Autre' ? _customModel : _selectedModel;
+    }
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+      if (token == null) return;
+
+      final payload = {
+        'type': 'voiture',
+        'titre': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'marque': marque,
+        'modele': modele,
+        'annee': _yearController.text.trim(),
+        'prix': _priceController.text.trim(),
+        'condition': _selectedCondition,
+        'boiteVitesse': _selectedBoiteVitesse,
+        'carburant': _selectedCarburantDropdown,
+        'climatiseur': _selectedClimatiseurDropdown,
+        'distance': _distanceController.text.trim(),
+        'sieges': _siegesController.text.trim(),
+        'portes': _selectedPorte?.toString(),
+        'cylindre': _cylindreController.text.trim(),
+        'couleur': _selectedCouleur,
+        'photos': imagesList,
+        'video': videosList.isNotEmpty ? videosList.first : null,
+        'entreprise': _companyController.text.trim(),
+        // compat lieu/localisation
+        'lieu': _locationController.text.trim(),
+        'localisation': _locationController.text.trim(),
+      };
+
+      final resp = await http.put(
+        Uri.parse('${UserService().dio.options.baseUrl}/articles/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (!mounted) return;
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Modifications enregistrées.')),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur sauvegarde: ${resp.statusCode}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur sauvegarde: $e')),
+      );
+    }
   }
 
   Widget _buildLabel(String text, {bool isRequired = true}) {
@@ -543,9 +721,9 @@ class _CreateSellPageState extends State<CreateSellPage> {
                   Text('Upload en cours...'),
                 ],
               )
-            : const Text(
-                'Aperçu',
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+            : Text(
+                widget.editMode ? 'Sauvegarder' : 'Aperçu',
+                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
               ),
       ),
     );
@@ -1416,6 +1594,22 @@ class _CreateSellPageState extends State<CreateSellPage> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 24),
+
+                    _buildLabel('Localisation', isRequired: false),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _locationController,
+                      decoration: InputDecoration(
+                        hintText: 'Entrer la localisation',
+                        filled: true,
+                        fillColor: const Color(0xFFF2F2F2),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
                     ],
                   ),
                 ),
@@ -1434,6 +1628,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
     _yearController.dispose();
     _descriptionController.dispose();
     _companyController.dispose();
+    _locationController.dispose();
     _cylindreController.dispose();
     _distanceController.dispose();
     _siegesController.dispose();

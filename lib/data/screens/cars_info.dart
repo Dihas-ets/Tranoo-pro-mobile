@@ -1593,6 +1593,8 @@ class _CarsinfoState extends State<CarsInfo> {
                         'cylindre': widget.cylindre,
                         'couleur': widget.couleur,
                         'dedouanement': widget.dedouanement,
+                        'lieu': widget.lieu,
+                        'localisation': widget.lieu,
                         'photos': widget.images,
                         'video': _primaryVideo,
                         'entreprise': widget.entreprise,

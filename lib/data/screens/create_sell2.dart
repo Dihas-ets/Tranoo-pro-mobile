@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
@@ -8,7 +9,6 @@ import 'package:dio/dio.dart';
 import 'mastervacpage.dart';
 import '../../utils/cloudinary_upload.dart';
 import 'package:tranoo_pro/services/user_service.dart';
-import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'dart:developer';
 import 'map_picker_screen.dart';
 import '../../widgets/location_permission_dialog.dart';
@@ -18,12 +18,18 @@ class CreateSellPage2 extends StatefulWidget {
   final String? alertNotificationId;
   final String? alertBuyerId;
   final String? alertRequestType;
+  final bool editMode;
+  final String? editArticleId;
+  final Map<String, dynamic>? initialData;
 
   const CreateSellPage2({
     super.key,
     this.alertNotificationId,
     this.alertBuyerId,
     this.alertRequestType,
+    this.editMode = false,
+    this.editArticleId,
+    this.initialData,
   });
 
   @override
@@ -90,6 +96,42 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   @override
   void initState() {
     super.initState();
+    final init = widget.initialData;
+    if (widget.editMode && init != null) {
+      _titleController.text = (init['titre'] ?? '').toString();
+      _anneeController.text = (init['annee'] ?? '').toString();
+      _prixController.text = (init['prix'] ?? '').toString();
+      _descriptionController.text = (init['description'] ?? '').toString();
+      _companyController.text = (init['entreprise'] ?? '').toString();
+      _modelController.text = (init['modele'] ?? '').toString();
+      _selectedPieceType = (init['pieceType'] ?? init['condition'])?.toString();
+      _selectedFuelType = (init['typeMoteur'] ?? '').toString().isNotEmpty
+          ? (init['typeMoteur']).toString()
+          : null;
+      if (init['photos'] is List) {
+        final urls = (init['photos'] as List).map((e) => e?.toString()).whereType<String>().where((e) => e.isNotEmpty).toList();
+        _cloudinaryUrls = urls.map((e) => e).toList();
+        _uploadedImages = List<File?>.filled(_cloudinaryUrls.length, null);
+        _isUploadingImage = List<bool>.filled(_cloudinaryUrls.length, false);
+      }
+      _cloudinaryVideoUrl = init['video']?.toString();
+      _localisationController.text =
+          (init['lieu'] ?? init['localisation'] ?? '').toString();
+      final fournisseur = init['fournisseur'] is Map
+          ? Map<String, dynamic>.from(init['fournisseur'] as Map)
+          : <String, dynamic>{};
+      _fournisseurTelController.text =
+          (fournisseur['telephone'] ?? '').toString();
+      final lat = fournisseur['latitude'];
+      final lng = fournisseur['longitude'];
+      _fournisseurLatitude = lat is num ? lat.toDouble() : double.tryParse('$lat');
+      _fournisseurLongitude =
+          lng is num ? lng.toDouble() : double.tryParse('$lng');
+      _fournisseurAddress = (fournisseur['adresseTexte'] ?? '').toString();
+      if (_fournisseurAddress.isEmpty) {
+        _fournisseurAddress = _localisationController.text.trim();
+      }
+    }
   }
 
   Future<String> _getAddressFromCoordinates(double lat, double lng) async {
@@ -479,9 +521,12 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                   Text('Upload en cours...'),
                 ],
               )
-            : const Text(
-                'Aperçu',
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+            : Text(
+                widget.editMode ? 'Sauvegarder' : 'Aperçu',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                ),
               ),
       ),
     );
@@ -528,7 +573,27 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       'telephone': _fournisseurTelController.text.trim(),
       'latitude': _fournisseurLatitude,
       'longitude': _fournisseurLongitude,
+      'adresseTexte': _fournisseurAddress.isNotEmpty
+          ? _fournisseurAddress
+          : _localisationController.text.trim(),
     };
+
+    if (widget.editMode) {
+      _saveEditedPiece(
+        title: title,
+        annee: annee,
+        description: description,
+        company: company,
+        prix: prix,
+        fuelType: fuelType,
+        model: model,
+        pieceType: pieceType,
+        images: images,
+        video: _cloudinaryVideoUrl,
+        fournisseur: fournisseur,
+      );
+      return;
+    }
 
     Navigator.push(
       context,
@@ -553,6 +618,67 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         ),
       ),
     );
+  }
+
+  Future<void> _saveEditedPiece({
+    required String title,
+    required String annee,
+    required String description,
+    required String company,
+    required String prix,
+    required String? fuelType,
+    required String model,
+    required String? pieceType,
+    required List<String> images,
+    required String? video,
+    required Map<String, dynamic> fournisseur,
+  }) async {
+    final id = (widget.editArticleId ?? '').toString();
+    if (id.isEmpty) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+      if (token == null) return;
+      final payload = {
+        'type': 'piece',
+        'titre': title,
+        'annee': annee,
+        'description': description,
+        'entreprise': company,
+        'prix': prix,
+        'typeMoteur': fuelType,
+        'modele': model,
+        'pieceType': pieceType,
+        'photos': images,
+        'video': video,
+        'fournisseur': fournisseur,
+        'lieu': _localisationController.text.trim(),
+        'localisation': _localisationController.text.trim(),
+      };
+      final resp = await Dio().put(
+        '${UserService().dio.options.baseUrl}/articles/$id',
+        data: payload,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (!mounted) return;
+      if ((resp.statusCode ?? 500) >= 200 && (resp.statusCode ?? 500) < 300) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Modifications enregistrées.')),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur sauvegarde: ${resp.statusCode}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur sauvegarde: $e')),
+      );
+    }
   }
 
   @override

@@ -8,7 +8,7 @@ import 'package:tranoo_pro/data/screens/piece.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
-import 'package:tranoo_pro/data/screens/vendre.dart';
+import 'package:tranoo_pro/data/screens/voitures.dart';
 
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
@@ -111,7 +111,7 @@ class _AvantHomeState extends State<AvantHome> {
   final List<Widget> _pagesVendeur = [
     Marque(),
     const Une(isStandalone: true),
-    Vendre(),
+    const VoituresPage(),
     Piece(),
   ];
 
@@ -491,8 +491,8 @@ class _AvantHomeState extends State<AvantHome> {
                             label: 'Publicité',
                           ),
                           BottomNavigationBarItem(
-                            icon: Icon(Icons.sell, size: iconSize),
-                            label: 'Vendre',
+                            icon: Icon(Icons.directions_car, size: iconSize),
+                            label: 'Voitures',
                           ),
                           BottomNavigationBarItem(
                             icon: Icon(Icons.build, size: iconSize),

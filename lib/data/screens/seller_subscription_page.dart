@@ -41,12 +41,24 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
     });
     try {
       final status = await _subscriptionService.getSellerAccessStatus();
-      final history = await _subscriptionService.getSubscriptionHistory(limit: 10);
       if (!mounted) return;
       setState(() {
         _status = status;
-        _subscriptionHistory = history;
       });
+
+      // L'historique est non bloquant: en cas d'erreur, on garde quand même
+      // les infos d'abonnement (prix/mois/essai) affichées à l'écran.
+      try {
+        final history =
+            await _subscriptionService.getSubscriptionHistory(limit: 10);
+        if (!mounted) return;
+        setState(() {
+          _subscriptionHistory = history;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        debugPrint('[SUB_PAGE] historique indisponible: $e');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -61,162 +73,6 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
     }
   }
 
-  Future<void> _openMonthPicker() async {
-    final result = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) {
-        int temp = _selectedMonths;
-        final controller = FixedExtentScrollController(
-          initialItem: _selectedMonths - 1,
-        );
-        return StatefulBuilder(
-          builder: (ctx, setModal) {
-            final media = MediaQuery.of(ctx);
-            final maxSheetHeight = media.size.height * 0.5;
-            return AnimatedPadding(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                ),
-                height: maxSheetHeight,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    Container(
-                      width: 44,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Choisir la durée',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: Text(
-                        'Plus la durée est longue, plus vous économisez',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      flex: 10,
-                      child: ListWheelScrollView.useDelegate(
-                        controller: controller,
-                        itemExtent: 48,
-                        physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (idx) {
-                          setModal(() => temp = idx + 1);
-                        },
-                        childDelegate: ListWheelChildBuilderDelegate(
-                          childCount: 12,
-                          builder: (context, index) {
-                            final m = index + 1;
-                            final selected = m == temp;
-                            final price = (m * (_status?.monthlyPriceFcfa ?? 5000));
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '$m ${m == 1 ? 'mois' : 'mois'}',
-                                      style: TextStyle(
-                                        fontSize: selected ? 22 : 18,
-                                        fontWeight:
-                                            selected ? FontWeight.bold : FontWeight.w500,
-                                        color: selected
-                                            ? Colors.amber.shade600
-                                            : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                    if (selected)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          '$price FCFA',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.amber.shade600,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx, temp),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amber.shade500,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: const Text(
-                              'Valider',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (result != null && mounted) {
-      setState(() {
-        _selectedMonths = result;
-      });
-    }
-  }
-
   Future<void> _subscribe() async {
     setState(() {
       _subscribing = true;
@@ -227,8 +83,17 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         throw Exception('Configuration FeexPay manquante');
       }
 
-      final amount = (_selectedMonths * (_status?.monthlyPriceFcfa ?? 5000))
-          .toString();
+      final monthlyPrice = _status?.monthlyPriceFcfa ?? 0;
+      final total = _selectedMonths * monthlyPrice;
+      final remainingDays =
+          _status?.paidPlanEndsAt?.difference(DateTime.now()).inDays;
+      final hasDiscount = _status != null &&
+          _status!.paidPlanActive &&
+          _status!.currentSubscriptionMonths >= 6 &&
+          remainingDays != null &&
+          remainingDays >= 0 &&
+          remainingDays <= 10;
+      final amount = (hasDiscount ? (total * 0.9) : total).toStringAsFixed(0);
       final transKey = randomAlphaNumeric(15);
 
       final result = await Navigator.push(
@@ -352,9 +217,15 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
   @override
   Widget build(BuildContext context) {
     final status = _status;
-    final monthlyPrice = status?.monthlyPriceFcfa ?? 5000;
+    final monthlyPrice = status?.monthlyPriceFcfa ?? 0;
     final totalPrice = _selectedMonths * monthlyPrice;
-    final hasDiscount = _selectedMonths >= 3;
+    final remainingDays = status?.paidPlanEndsAt?.difference(DateTime.now()).inDays;
+    final hasDiscount = status != null &&
+        status.paidPlanActive &&
+        status.currentSubscriptionMonths >= 6 &&
+        remainingDays != null &&
+        remainingDays >= 0 &&
+        remainingDays <= 10;
     final discountedPrice = hasDiscount ? totalPrice * 0.9 : totalPrice;
 
     return Scaffold(
@@ -600,48 +471,99 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              InkWell(
-                                onTap: _openMonthPicker,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.shade300),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_month,
+                                      color: Colors.amber.shade700,
+                                      size: 20,
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.calendar_month,
-                                            color: Colors.amber.shade700,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            '$_selectedMonths ${_selectedMonths == 1 ? 'mois' : 'mois'}',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '$_selectedMonths mois',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                    Column(
+                                      children: [
+                                        InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedMonths =
+                                                  (_selectedMonths + 1).clamp(1, 12);
+                                            });
+                                          },
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(4),
+                                            child: Icon(
+                                              Icons.keyboard_arrow_up,
+                                              size: 22,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                      Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 16,
-                                        color: Colors.grey.shade400,
-                                      ),
-                                    ],
+                                        ),
+                                        InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedMonths =
+                                                  (_selectedMonths - 1).clamp(1, 12);
+                                            });
+                                          },
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(4),
+                                            child: Icon(
+                                              Icons.keyboard_arrow_down,
+                                              size: 22,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: hasDiscount
+                                      ? const Color(0xFFE8F5E9)
+                                      : const Color(0xFFE8F1FF),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: hasDiscount
+                                        ? const Color(0xFFB7E1C1)
+                                        : const Color(0xFFB7D0FF),
+                                  ),
+                                ),
+                                child: Text(
+                                  hasDiscount
+                                      ? 'Bravo! Vous êtes éligible à -10%: votre abonnement de 6 mois arrive à expiration et vous renouvelez à temps.'
+                                      : 'Réduction fidélité: disponible uniquement avec un abonnement de 6 mois, proche de l\'expiration, et renouvelé avant la date de fin.',
+                                  style: TextStyle(
+                                    color: hasDiscount
+                                        ? const Color(0xFF1B5E20)
+                                        : const Color(0xFF0B3D91),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.35,
                                   ),
                                 ),
                               ),
@@ -691,7 +613,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           const Text(
-                                            'Économie (10%)',
+                                            'Économie fidélité (10%)',
                                             style: TextStyle(
                                               fontSize: 13,
                                               color: Colors.green,
@@ -708,32 +630,32 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      const Divider(),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          const Text(
-                                            'À payer',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                          Text(
-                                            '${discountedPrice.toStringAsFixed(0)} FCFA',
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.amber.shade700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ],
+                                    const SizedBox(height: 8),
+                                    const Divider(),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'À payer',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${discountedPrice.toStringAsFixed(0)} FCFA',
+                                          style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),

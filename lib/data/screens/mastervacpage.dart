@@ -39,6 +39,7 @@ class MastervacPage extends StatefulWidget {
   final String? video;
   final bool fromPub;
   final Map<String, dynamic>? fournisseur; // Ajout des infos fournisseur
+  final bool editMode;
   final String? alertNotificationId;
   final String? alertBuyerId;
   final String? alertRequestType;
@@ -63,6 +64,7 @@ class MastervacPage extends StatefulWidget {
     this.alertNotificationId,
     this.alertBuyerId,
     this.alertRequestType,
+    this.editMode = false,
   });
 
   @override
@@ -90,6 +92,17 @@ class _MastervacPageState extends State<MastervacPage> {
   static const int _maxImageHeight = 1080;
   static const List<String> _allowedFormats = ['jpg', 'jpeg', 'png', 'webp'];
 
+  late final TextEditingController _editTitleController;
+  late final TextEditingController _editYearController;
+  late final TextEditingController _editDescriptionController;
+  late final TextEditingController _editCompanyController;
+  late final TextEditingController _editLocationController;
+  late final TextEditingController _editPriceController;
+  late final TextEditingController _editModelController;
+  String? _editFuelType;
+  String? _editPieceType;
+  bool _saving = false;
+
   @override
   void initState() {
     super.initState();
@@ -98,6 +111,17 @@ class _MastervacPageState extends State<MastervacPage> {
     );
     _pageController = PageController(initialPage: _currentImageIndex);
     _loadArticleStatut();
+
+    _editTitleController = TextEditingController(text: widget.title);
+    _editYearController = TextEditingController(text: widget.year);
+    _editDescriptionController =
+        TextEditingController(text: widget.description);
+    _editCompanyController = TextEditingController(text: widget.company);
+    _editLocationController = TextEditingController(text: widget.location ?? '');
+    _editPriceController = TextEditingController(text: widget.price);
+    _editModelController = TextEditingController(text: widget.model ?? '');
+    _editFuelType = widget.fuelType?.toString();
+    _editPieceType = widget.pieceType?.toString();
   }
 
   // Fonction pour valider la taille et le format d'une image
@@ -126,16 +150,15 @@ class _MastervacPageState extends State<MastervacPage> {
     try {
       final imageBytes = imageFile.readAsBytesSync();
       final decodedImage = await decodeImageFromList(imageBytes);
-      if (decodedImage != null) {
-        final width = decodedImage.width;
-        final height = decodedImage.height;
-        
-        if (width > _maxImageWidth || height > _maxImageHeight) {
-          return {
-            'isValid': false,
-            'error': 'Dimensions trop grandes. Maximum: ${_maxImageWidth}x${_maxImageHeight}px'
-          };
-        }
+      final width = decodedImage.width;
+      final height = decodedImage.height;
+
+      if (width > _maxImageWidth || height > _maxImageHeight) {
+        return {
+          'isValid': false,
+          'error':
+              'Dimensions trop grandes. Maximum: ${_maxImageWidth}x${_maxImageHeight}px'
+        };
       }
     } catch (e) {
       return {
@@ -307,13 +330,214 @@ class _MastervacPageState extends State<MastervacPage> {
 
   @override
   void dispose() {
+    _editTitleController.dispose();
+    _editYearController.dispose();
+    _editDescriptionController.dispose();
+    _editCompanyController.dispose();
+    _editLocationController.dispose();
+    _editPriceController.dispose();
+    _editModelController.dispose();
     _confettiController.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
+  Future<void> _saveEdits() async {
+    if (_saving) return;
+    final id = (widget.id ?? '').toString();
+    if (id.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+      if (token == null) return;
+
+      final payload = {
+        'type': 'piece',
+        'titre': _editTitleController.text.trim(),
+        'annee': _editYearController.text.trim(),
+        'description': _editDescriptionController.text.trim(),
+        'entreprise': _editCompanyController.text.trim(),
+        'lieu': _editLocationController.text.trim(),
+        'localisation': _editLocationController.text.trim(),
+        'prix': _editPriceController.text.trim(),
+        'typeMoteur': _editFuelType,
+        'modele': _editModelController.text.trim(),
+        'pieceType': _editPieceType,
+        'photos': widget.images.whereType<String>().toList(),
+        'video': widget.video,
+        'fournisseur': widget.fournisseur,
+      };
+
+      final resp = await http.put(
+        Uri.parse(getBaseUrl() + '/articles/' + id),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (!mounted) return;
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Modifications enregistrées.')),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur sauvegarde: ${resp.statusCode}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur sauvegarde: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _buildEditScaffold() {
+    const fuelItems = [
+      'Essence',
+      'Gazoil',
+      'Diesel',
+      'Electrique',
+      'Hybride',
+      'Aucun',
+    ];
+    const pieceItems = ['Nouveau', 'Occasion'];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
+      appBar: AppBar(
+        title: const Text('Modifier la pièce'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0.4,
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextField(
+              controller: _editTitleController,
+              decoration: const InputDecoration(
+                labelText: 'Titre',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _editYearController,
+              decoration: const InputDecoration(
+                labelText: 'Année',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _editModelController,
+              decoration: const InputDecoration(
+                labelText: 'Modèle',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _editFuelType,
+              items: fuelItems
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
+              onChanged: (v) => setState(() => _editFuelType = v),
+              decoration: const InputDecoration(
+                labelText: 'Type moteur',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _editPieceType,
+              items: pieceItems
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
+              onChanged: (v) => setState(() => _editPieceType = v),
+              decoration: const InputDecoration(
+                labelText: 'État',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _editPriceController,
+              decoration: const InputDecoration(
+                labelText: 'Prix',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _editCompanyController,
+              decoration: const InputDecoration(
+                labelText: 'Entreprise',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _editLocationController,
+              decoration: const InputDecoration(
+                labelText: 'Localisation',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _editDescriptionController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _saveEdits,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE57373),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Sauvegarder',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.editMode) {
+      return _buildEditScaffold();
+    }
     // On ne passe plus de booléen, on déduit le rôle ici
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),

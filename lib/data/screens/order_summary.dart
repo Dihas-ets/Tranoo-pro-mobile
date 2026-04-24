@@ -5,8 +5,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:random_string/random_string.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
+import 'dart:math';
+import 'dart:developer' as developer;
 import '../../services/cart_service.dart';
 import '../../services/user_service.dart';
+import 'map_picker_screen.dart';
 
 enum PaymentMethod { cash, online }
 
@@ -21,8 +24,14 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   PaymentMethod _method = PaymentMethod.cash;
-  double _deliveryFee = 720; // Calculé automatiquement
-  double _discount = 500; // Calculé automatiquement
+  double _deliveryFee = 0; // Calculé automatiquement
+  double _discount = 0;
+  double _pricePerKm = 0;
+  double? _deliveryLatitude;
+  double? _deliveryLongitude;
+  double? _supplierLatitude;
+  double? _supplierLongitude;
+  double? _deliveryDistanceKm;
   bool _isProcessing = false;
   final String _transKey = randomAlphaNumeric(15);
 
@@ -31,6 +40,101 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
     _addressController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371.0;
+    final dLat = (lat2 - lat1) * (pi / 180.0);
+    final dLon = (lon2 - lon1) * (pi / 180.0);
+    final la1 = lat1 * (pi / 180.0);
+    final la2 = lat2 * (pi / 180.0);
+    final h = (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(la1) * cos(la2) * (sin(dLon / 2) * sin(dLon / 2));
+    final c = 2 * atan2(sqrt(h), sqrt(1 - h));
+    return r * c;
+  }
+
+  Future<void> _loadDeliveryPricePerKm() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: UserService().dio.options.baseUrl,
+          headers: {
+            if (token != null) 'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final response = await dio.get('/deliveries/settings');
+      if (response.statusCode == 200) {
+        final root = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : <String, dynamic>{};
+        final data = root['settings'] is Map<String, dynamic>
+            ? root['settings'] as Map<String, dynamic>
+            : root;
+        final value = data['pricePerKm'];
+        final parsed = value is num ? value.toDouble() : double.tryParse('$value');
+        if (parsed != null && parsed >= 0) {
+          _pricePerKm = parsed;
+        }
+        developer.log('[ORDER_SUMMARY_PRO] settings pricePerKm=$_pricePerKm');
+      }
+    } catch (e) {
+      developer.log('[ORDER_SUMMARY_PRO] load pricePerKm error=$e');
+    }
+  }
+
+  Future<void> _loadSupplierCoordsIfNeeded(CartService cart) async {
+    if (_supplierLatitude != null && _supplierLongitude != null) return;
+    if (cart.items.isEmpty) return;
+    final articleId = cart.items.first.articleId;
+    if (articleId.isEmpty) return;
+    try {
+      final dio = Dio(BaseOptions(baseUrl: UserService().dio.options.baseUrl));
+      final response = await dio.get('/articles/$articleId');
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : <String, dynamic>{};
+      final article = data['article'] is Map<String, dynamic>
+          ? data['article'] as Map<String, dynamic>
+          : data;
+      final fournisseur = article['fournisseur'] is Map<String, dynamic>
+          ? article['fournisseur'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      final lat = fournisseur['latitude'];
+      final lng = fournisseur['longitude'];
+      final parsedLat = lat is num ? lat.toDouble() : double.tryParse('$lat');
+      final parsedLng = lng is num ? lng.toDouble() : double.tryParse('$lng');
+      if (parsedLat != null && parsedLng != null && mounted) {
+        setState(() {
+          _supplierLatitude = parsedLat;
+          _supplierLongitude = parsedLng;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _recalculateDeliveryFee(CartService cart) async {
+    if (_deliveryLatitude == null || _deliveryLongitude == null) return;
+    await _loadDeliveryPricePerKm();
+    await _loadSupplierCoordsIfNeeded(cart);
+    if (_supplierLatitude == null || _supplierLongitude == null || !mounted) return;
+
+    final km = _haversineKm(
+      _supplierLatitude!,
+      _supplierLongitude!,
+      _deliveryLatitude!,
+      _deliveryLongitude!,
+    );
+    final fee = (km * _pricePerKm).roundToDouble();
+    setState(() {
+      _deliveryDistanceKm = km;
+      _deliveryFee = fee < 0 ? 0 : fee;
+      _discount = 0;
+    });
   }
 
   @override
@@ -91,7 +195,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                       ),
                     ),
                     TextButton.icon(
-                      onPressed: () => _selectLocationFromList(),
+                      onPressed: () => _selectLocationFromMap(cart),
                       icon: const Icon(Icons.map, size: 16),
                       label: const Text('Choisir sur la carte'),
                     ),
@@ -130,6 +234,18 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                   'Frais de livraison',
                   '${_deliveryFee.toStringAsFixed(0)} F',
                 ),
+                if (_deliveryDistanceKm != null) ...[
+                  const SizedBox(height: 6),
+                  _rowKV(
+                    'Distance',
+                    '${_deliveryDistanceKm!.toStringAsFixed(2)} km',
+                  ),
+                  const SizedBox(height: 6),
+                  _rowKV(
+                    'Tarif/km',
+                    '${_pricePerKm.toStringAsFixed(0)} F',
+                  ),
+                ],
                 const SizedBox(height: 6),
                 _rowKV(
                   'Remise sur la livraison',
@@ -248,53 +364,27 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
     );
   }
 
-  Future<void> _selectLocationFromList() async {
-    final List<String> commonAddresses = [
-      'Cotonou, Bénin',
-      'Porto-Novo, Bénin',
-      'Lomé, Togo',
-      'Accra, Ghana',
-      'Lagos, Nigeria',
-      'Abidjan, Côte d\'Ivoire',
-      'Dakar, Sénégal',
-      'Bamako, Mali',
-      'Ouagadougou, Burkina Faso',
-      'Niamey, Niger',
-    ];
-
-    final selectedAddress = await showDialog<String>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Sélectionner une adresse'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: commonAddresses.length,
-                itemBuilder: (context, index) {
-                  final address = commonAddresses[index];
-                  return ListTile(
-                    leading: const Icon(Icons.location_on),
-                    title: Text(address),
-                    onTap: () => Navigator.pop(context, address),
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Annuler'),
-              ),
-            ],
-          ),
+  Future<void> _selectLocationFromMap(CartService cart) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapPickerScreen(
+          initialLatitude: _deliveryLatitude,
+          initialLongitude: _deliveryLongitude,
+        ),
+      ),
     );
-
-    if (selectedAddress != null && mounted) {
+    if (result != null && result is Map<String, dynamic> && mounted) {
+      final lat = (result['latitude'] as num?)?.toDouble();
+      final lng = (result['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null) return;
       setState(() {
-        _addressController.text = selectedAddress;
+        _deliveryLatitude = lat;
+        _deliveryLongitude = lng;
+        _addressController.text =
+            'Position: ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
       });
+      await _recalculateDeliveryFee(cart);
     }
   }
 
@@ -487,6 +577,18 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
       'deliveryAddress': _addressController.text.trim(),
       'deliveryNote': _noteController.text.trim(),
       'status': paymentMethod == 'cash' ? 'pending' : 'paid',
+      'deliveryInfo': {
+        'distanceKm': _deliveryDistanceKm,
+        'lieuDestination': {
+          'adresse': _addressController.text.trim(),
+          'latitude': _deliveryLatitude,
+          'longitude': _deliveryLongitude,
+        },
+        'fournisseur': {
+          'latitude': _supplierLatitude,
+          'longitude': _supplierLongitude,
+        },
+      },
     };
 
     await dio.post('/orders', data: orderData);

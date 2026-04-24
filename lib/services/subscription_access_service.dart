@@ -10,6 +10,7 @@ class SellerAccessStatus {
   final DateTime? paidPlanEndsAt;
   final int monthlyPriceFcfa;
   final int currentSubscriptionMonths;
+  final int freeTrialDays;
 
   const SellerAccessStatus({
     required this.freeTrialActive,
@@ -18,13 +19,14 @@ class SellerAccessStatus {
     required this.paidPlanEndsAt,
     required this.monthlyPriceFcfa,
     required this.currentSubscriptionMonths,
+    required this.freeTrialDays,
   });
 
   bool get canCreateArticle => freeTrialActive || paidPlanActive;
 
   String get currentPlanLabel {
     if (paidPlanActive) return 'Plan Pro Mensuel';
-    if (freeTrialActive) return 'Plan Decouverte (3 mois gratuits)';
+    if (freeTrialActive) return 'Plan Decouverte (45 jours gratuits)';
     return 'Aucun plan actif';
   }
 
@@ -50,18 +52,42 @@ class SellerAccessStatus {
 class SubscriptionAccessService {
   final UserService _userService = UserService();
 
-  int _extractMonthlyPrice(dynamic data, {int fallback = 5000}) {
+  int _extractMonthlyPrice(dynamic data, {int fallback = 0}) {
     if (data is Map<String, dynamic>) {
       final directPrix = data['prixMensuel'];
       if (directPrix is num) return directPrix.toInt();
+      final directPrixParsed = int.tryParse(directPrix?.toString() ?? '');
+      if (directPrixParsed != null) return directPrixParsed;
 
       final directMonthly = data['monthlyPrice'];
       if (directMonthly is num) return directMonthly.toInt();
+      final directMonthlyParsed = int.tryParse(directMonthly?.toString() ?? '');
+      if (directMonthlyParsed != null) return directMonthlyParsed;
 
       final nestedPricing = data['pricing'];
       if (nestedPricing is Map<String, dynamic>) {
         final nestedPrix = nestedPricing['prixMensuel'];
         if (nestedPrix is num) return nestedPrix.toInt();
+        final nestedPrixParsed = int.tryParse(nestedPrix?.toString() ?? '');
+        if (nestedPrixParsed != null) return nestedPrixParsed;
+      }
+    }
+    return fallback;
+  }
+
+  int _extractFreeTrialDays(dynamic data, {int fallback = 45}) {
+    if (data is Map<String, dynamic>) {
+      final direct = data['freeTrialDays'];
+      if (direct is num) return direct.toInt();
+      final directParsed = int.tryParse(direct?.toString() ?? '');
+      if (directParsed != null) return directParsed;
+
+      final nested = data['pricing'];
+      if (nested is Map<String, dynamic>) {
+        final nestedValue = nested['freeTrialDays'];
+        if (nestedValue is num) return nestedValue.toInt();
+        final nestedParsed = int.tryParse(nestedValue?.toString() ?? '');
+        if (nestedParsed != null) return nestedParsed;
       }
     }
     return fallback;
@@ -77,8 +103,9 @@ class SubscriptionAccessService {
         paidPlanActive: false,
         freeTrialEndsAt: null,
         paidPlanEndsAt: null,
-        monthlyPriceFcfa: 5000,
+        monthlyPriceFcfa: 0,
         currentSubscriptionMonths: 1,
+        freeTrialDays: 45,
       );
     }
 
@@ -98,7 +125,8 @@ class SubscriptionAccessService {
     bool freeTrialActive = false;
     bool paidPlanActive = false;
     DateTime? paidPlanEndsAt;
-    int monthlyPrice = 5000;
+    int monthlyPrice = 0;
+    int freeTrialDays = 45;
     int currentMonths = 1;
 
     final futures = <Future<void>>[
@@ -118,6 +146,9 @@ class SubscriptionAccessService {
             paidPlanEndsAt = DateTime.tryParse(data['expiresAt'].toString());
           }
           monthlyPrice = _extractMonthlyPrice(data, fallback: monthlyPrice);
+          developer.log(
+            '[SUB_ACCESS] extracted monthlyPrice from /subscription/me => $monthlyPrice',
+          );
         } catch (e) {
           developer.log('[SUB_ACCESS] /subscription/me error=$e');
         }
@@ -154,6 +185,10 @@ class SubscriptionAccessService {
               ? pricingResponse.data as Map<String, dynamic>
               : <String, dynamic>{};
           monthlyPrice = _extractMonthlyPrice(data, fallback: monthlyPrice);
+          freeTrialDays = _extractFreeTrialDays(data, fallback: freeTrialDays);
+          developer.log(
+            '[SUB_ACCESS] extracted from /admin/subscription-pricing => monthlyPrice=$monthlyPrice freeTrialDays=$freeTrialDays',
+          );
         } catch (e) {
           developer.log('[SUB_ACCESS] /admin/subscription-pricing error=$e');
         }
@@ -161,10 +196,13 @@ class SubscriptionAccessService {
     ];
 
     await Future.wait(futures);
+    developer.log(
+      '[SUB_ACCESS] FINAL RESOLVED => baseUrl=${_userService.dio.options.baseUrl} monthlyPrice=$monthlyPrice freeTrialDays=$freeTrialDays paidPlanActive=$paidPlanActive currentMonths=$currentMonths',
+    );
 
     final trialStartDate = inscriptionDateOverride ?? inscriptionDate;
     if (trialStartDate != null) {
-      freeTrialEndsAt = trialStartDate.add(const Duration(days: 90));
+      freeTrialEndsAt = trialStartDate.add(Duration(days: freeTrialDays));
       final now = DateTime.now();
       freeTrialActive = now.isBefore(
         freeTrialEndsAt.add(const Duration(days: 1)),
@@ -183,6 +221,7 @@ class SubscriptionAccessService {
       paidPlanEndsAt: paidPlanEndsAt,
       monthlyPriceFcfa: monthlyPrice,
       currentSubscriptionMonths: currentMonths,
+      freeTrialDays: freeTrialDays,
     );
   }
 

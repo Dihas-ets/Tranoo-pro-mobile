@@ -9,7 +9,6 @@ import 'cars_info.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'create_sell.dart';
-import 'movie.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 
 class VoituresPage extends StatefulWidget {
@@ -41,6 +40,9 @@ class _VoituresPageState extends State<VoituresPage>
   late int _modeleTabIndex;
   late int _localisationTabIndex;
   late int _budgetTabIndex;
+  late int _statusPendingTabIndex;
+  late int _statusOnlineTabIndex;
+  late int _statusRejectedTabIndex;
 
   final UserService _userService = UserService();
 
@@ -51,10 +53,13 @@ class _VoituresPageState extends State<VoituresPage>
     // Initialisation des indices des onglets selon le rôle
     final isVendeur = _userService.currentRole == UserRole.vendeur;
     if (isVendeur) {
-      // Vendeur: pas de filtres Localisation/Budget
+      // Vendeur: 5 onglets (2 filtres + 3 statuts)
       _marqueTabIndex = 0;
       _modeleTabIndex = 1;
-      _tabController = TabController(length: 2, vsync: this);
+      _statusPendingTabIndex = 2;
+      _statusOnlineTabIndex = 3;
+      _statusRejectedTabIndex = 4;
+      _tabController = TabController(length: 5, vsync: this);
     } else {
       // Autres rôles: tous les filtres
       _marqueTabIndex = 0;
@@ -202,6 +207,7 @@ class _VoituresPageState extends State<VoituresPage>
 
   // Appliquer les filtres
   List<dynamic> _applyFilters(List<dynamic> source) {
+    final isVendeur = _userService.currentRole == UserRole.vendeur;
     return source.where((v) {
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
         final marque = (v['marque'] ?? '').toString().toLowerCase();
@@ -232,6 +238,22 @@ class _VoituresPageState extends State<VoituresPage>
             double.tryParse(prixStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
         if (_budgetMin != null && price < _budgetMin!) return false;
         if (_budgetMax != null && price > _budgetMax!) return false;
+      }
+      if (isVendeur) {
+        final statut = (v['statut'] ?? '').toString().toLowerCase();
+        if (_tabController.index == _statusPendingTabIndex &&
+            statut != 'en_attente') {
+          return false;
+        }
+        if (_tabController.index == _statusOnlineTabIndex &&
+            statut != 'en_ligne') {
+          return false;
+        }
+        if (_tabController.index == _statusRejectedTabIndex &&
+            statut != 'rejeté' &&
+            statut != 'rejete') {
+          return false;
+        }
       }
       return true;
     }).toList();
@@ -723,7 +745,7 @@ class _VoituresPageState extends State<VoituresPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Voitures en ligne'),
+        title: Text(isVendeur ? 'Mes voitures' : 'Voitures en ligne'),
         backgroundColor: Colors.amber,
         actions: [
           if (isVendeur)
@@ -784,6 +806,12 @@ class _VoituresPageState extends State<VoituresPage>
                           tabs: [
                             _buildTabButton("Marque", _marqueTabIndex),
                             _buildTabButton("Modèles", _modeleTabIndex),
+                            if (isVendeur)
+                              _buildTabButton("En attente", _statusPendingTabIndex, isWide: true),
+                            if (isVendeur)
+                              _buildTabButton("En ligne", _statusOnlineTabIndex, isWide: true),
+                            if (isVendeur)
+                              _buildTabButton("Rejeté", _statusRejectedTabIndex, isWide: true),
                             if (!isVendeur)
                               _buildTabButton(
                                 "Localisation",
@@ -812,7 +840,7 @@ class _VoituresPageState extends State<VoituresPage>
                           ? Center(
                               child: Text(
                                 isVendeur
-                                    ? "Vous n'avez aucune voiture en ligne"
+                                    ? "Vous n'avez aucune voiture publiée"
                                     : "Aucune voiture disponible pour le moment.",
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
@@ -1036,6 +1064,51 @@ class _VoituresPageState extends State<VoituresPage>
                                                           ),
                                                         ),
                                                       ),
+                                                      Positioned(
+                                                        top: 8,
+                                                        right: 8,
+                                                        child: Builder(
+                                                          builder: (context) {
+                                                            final status =
+                                                                (voiture['statut'] ?? '')
+                                                                    .toString()
+                                                                    .toLowerCase();
+                                                            Color bg;
+                                                            Color fg;
+                                                            String label;
+                                                            if (status == 'en_ligne') {
+                                                              bg = const Color(0xFFE8F5E9);
+                                                              fg = const Color(0xFF2E7D32);
+                                                              label = 'En ligne';
+                                                            } else if (status == 'en_attente') {
+                                                              bg = const Color(0xFFFFF8E1);
+                                                              fg = const Color(0xFFB45309);
+                                                              label = 'En attente';
+                                                            } else {
+                                                              bg = const Color(0xFFFFEBEE);
+                                                              fg = const Color(0xFFC62828);
+                                                              label = 'Rejeté';
+                                                            }
+                                                            return Container(
+                                                              padding: const EdgeInsets.symmetric(
+                                                                  horizontal: 8, vertical: 4),
+                                                              decoration: BoxDecoration(
+                                                                color: bg,
+                                                                borderRadius:
+                                                                    BorderRadius.circular(10),
+                                                              ),
+                                                              child: Text(
+                                                                label,
+                                                                style: TextStyle(
+                                                                  color: fg,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  fontSize: 10,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
                                                     ],
                                                   ),
                                                 ),
@@ -1216,18 +1289,50 @@ class _VoituresPageState extends State<VoituresPage>
                                           Positioned(
                                             top: 8,
                                             right: 8,
-                                            child: IconButton(
-                                              icon: const Icon(
-                                                Icons.close,
-                                                color: Colors.red,
-                                                size: 24,
-                                              ),
-                                              onPressed: () {
-                                                _deleteVoiture(
-                                                  voiture['_id'] ?? '',
-                                                  index,
-                                                );
-                                              },
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  tooltip: 'Modifier',
+                                                  icon: const Icon(
+                                                    Icons.edit,
+                                                    color: Color(0xFF0461B6),
+                                                    size: 22,
+                                                  ),
+                                                  onPressed: () {
+                                                    final id = (voiture['_id'] ??
+                                                            voiture['id'] ??
+                                                            voiture['articleId'] ??
+                                                            voiture['Id'] ??
+                                                            voiture['article'])
+                                                        ?.toString();
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (context) =>
+                                                            CreateSellPage(
+                                                          editMode: true,
+                                                          editArticleId: id,
+                                                          initialData: Map<String, dynamic>.from(voiture),
+                                                        ),
+                                                      ),
+                                                    ).then((_) => fetchVoitures());
+                                                  },
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.close,
+                                                    color: Colors.red,
+                                                    size: 24,
+                                                  ),
+                                                  onPressed: () {
+                                                    _deleteVoiture(
+                                                      voiture['_id'] ?? '',
+                                                      index,
+                                                    );
+                                                  },
+                                                ),
+                                              ],
                                             ),
                                           ),
                                       ],
