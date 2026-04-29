@@ -11,12 +11,14 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:logging/logging.dart';
 import 'package:tranoo_pro/services/blocked_user_service.dart';
+import 'package:tranoo_pro/widgets/type_vendeur_migration_dialog.dart';
 
 class AuthProvider with ChangeNotifier {
   String? _token;
   Map<String, dynamic>? _user;
   bool _loading = true;
   final Logger _logger = Logger('AuthProvider');
+  bool _isTypeVendeurDialogOpen = false;
 
   static const String _tokenKey = 'token';
   static const String _userKey = 'user';
@@ -160,6 +162,13 @@ class AuthProvider with ChangeNotifier {
               if (role != null) {
                 debugPrint('[AuthProvider] setRole: $role');
                 UserService().setRole(role);
+                // Hydrater vendeurType depuis le backend (Mongo)
+                final vendeurType = _user!['vendeurType']?.toString();
+                UserService().setVendeurType(
+                  vendeurType != null && vendeurType.trim().isNotEmpty
+                      ? vendeurType.trim()
+                      : null,
+                );
               } else {
                 debugPrint('[AuthProvider] clearRole (role null)');
                 UserService().clearRole();
@@ -262,6 +271,12 @@ class AuthProvider with ChangeNotifier {
           final role = stringToUserRole(_user!['role']);
           if (role != null) {
             UserService().setRole(role);
+            final vendeurType = _user!['vendeurType']?.toString();
+            UserService().setVendeurType(
+              vendeurType != null && vendeurType.trim().isNotEmpty
+                  ? vendeurType.trim()
+                  : null,
+            );
           } else {
             UserService().clearRole();
           }
@@ -309,6 +324,38 @@ class AuthProvider with ChangeNotifier {
       BlockedUserService.showBlockedDialog(message);
     } catch (e) {
       debugPrint('Erreur lors de la gestion de l\'utilisateur bloqué: $e');
+    }
+  }
+
+  // Vérification du type de vendeur pour la migration
+  Future<void> checkTypeVendeurMigration(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && _user != null) {
+      final role = _user!['role'] as String?;
+      
+      // Vérifier si c'est un vendeur et si le type n'a pas été sélectionné
+      if (role == 'vendeur') {
+        final vendeurType = _user!['vendeurType']?.toString();
+        final needsChoice = vendeurType == null || vendeurType.trim().isEmpty;
+        if (!needsChoice || _isTypeVendeurDialogOpen) return;
+
+        _isTypeVendeurDialogOpen = true;
+        try {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => TypeVendeurMigrationDialog(
+              onTypeSelected: (String vendeurType) {
+                _user!['vendeurType'] = vendeurType;
+                UserService().setVendeurType(vendeurType);
+                notifyListeners();
+              },
+            ),
+          );
+        } finally {
+          _isTypeVendeurDialogOpen = false;
+        }
+      }
     }
   }
 }

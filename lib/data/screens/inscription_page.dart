@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/widgets/auth_message_popup.dart';
+import 'avant_home.dart';
 
 import 'connexion_page.dart'; // Assurez-vous que ce fichier existe
 
@@ -21,7 +24,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-  final TextEditingController _maisonController = TextEditingController();
   final TextEditingController _entrepriseProvenanceController =
       TextEditingController();
   final TextEditingController _referralController = TextEditingController();
@@ -38,6 +40,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
   String? selectedCountryCode;
   int selectedDigits = 8;
   String? selectedRole;
+  String? _typeVendeur; // Pour la sélection du type de vendeur
   int _currentStep = 0; // 0: infos, 1: rôle, 2: sécurité
   final List<Map<String, dynamic>> countries = [
     {'name': 'Bénin', 'code': '+229', 'flag': '🇧🇯', 'digits': 8},
@@ -293,14 +296,17 @@ class _InscriptionPageState extends State<InscriptionPage> {
     final screenWidth = mediaQuery.size.width;
     final screenHeight = mediaQuery.size.height;
     final isPortrait = mediaQuery.orientation == Orientation.portrait;
+    final bottomInset = mediaQuery.viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: screenWidth * (isPortrait ? 0.05 : 0.1),
-            vertical: screenHeight * (isPortrait ? 0.02 : 0.05),
+          padding: EdgeInsets.fromLTRB(
+            screenWidth * (isPortrait ? 0.05 : 0.1),
+            screenHeight * (isPortrait ? 0.02 : 0.05),
+            screenWidth * (isPortrait ? 0.05 : 0.1),
+            screenHeight * (isPortrait ? 0.02 : 0.05) + bottomInset,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -586,6 +592,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     screenHeight: screenHeight,
                     isPortrait: isPortrait,
                   ),
+                  SizedBox(height: screenHeight * 0.02),
+                  _buildTypeVendeurSelector(screenWidth, screenHeight, isPortrait),
                 ],
                 if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
                   SizedBox(height: screenHeight * 0.02),
@@ -692,15 +700,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                   ),
                 ],
                 SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
-                  controller: _maisonController,
-                  label: "Maison",
-                  icon: Icons.home,
-                  placeholder: "Rue 123, Cotonou",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
                 SizedBox(height: screenHeight * 0.02),
                 Row(
                   children: [
@@ -722,8 +721,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          if (selectedRole == null ||
-                              _maisonController.text.trim().isEmpty) {
+                          if (selectedRole == null) {
                             AuthMessagePopup.showWarning(
                               context,
                               title: 'Certains champs sont manquants.',
@@ -939,8 +937,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     _passwordController.text.trim().isEmpty ||
                                     _confirmPasswordController.text.trim().isEmpty ||
                                     selectedRole == null ||
-                                    selectedCountry == null ||
-                                    _maisonController.text.trim().isEmpty) {
+                                    selectedCountry == null) {
                                   AuthMessagePopup.showWarning(
                                     context,
                                     title: 'Certains champs sont manquants.',
@@ -1058,7 +1055,18 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     nom: _nomController.text.trim(),
                                     prenoms: _prenomController.text.trim(),
                                     telephone: fullPhone,
-                                    role: selectedRole!.toLowerCase(),
+                                    // Le backend accepte role='vendeur' uniquement.
+                                    // Le type vendeur est porté par vendeurType.
+                                    role: selectedRole == 'Vendeur'
+                                        ? 'vendeur'
+                                        : selectedRole!.toLowerCase(),
+                                    vendeurType: selectedRole == 'Vendeur'
+                                        ? (_typeVendeur == 'vendeurVehicules'
+                                            ? 'vehicules'
+                                            : _typeVendeur == 'vendeurPieces'
+                                                ? 'pieces'
+                                                : 'mixte')
+                                        : null,
                                     entreprise: selectedRole == 'Transitaire'
                                         ? _entrepriseController.text.trim()
                                         : null,
@@ -1137,20 +1145,34 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   }
 
                                   if (!mounted) return;
+                                  // L'utilisateur est déjà connecté via Firebase après registerUser.
+                                  // On recharge son profil backend puis on l'envoie directement à l'accueil.
+                                  final auth = context.read<myauth.AuthProvider>();
+                                  await auth.reloadUser();
+
+                                  final startWait = DateTime.now();
+                                  while (auth.user == null &&
+                                      DateTime.now().difference(startWait) <
+                                          const Duration(seconds: 5)) {
+                                    await Future.delayed(
+                                      const Duration(milliseconds: 100),
+                                    );
+                                  }
+
+                                  if (!mounted) return;
                                   await AuthMessagePopup.showSuccess(
                                     context,
                                     title: 'Compte créé avec succès.',
-                                    subtitle: 'Connectez-vous pour continuer.',
-                                    buttonText: 'Se connecter',
-                                    onPressed: () {
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const ConnexionPage(),
-                                        ),
-                                      );
-                                    },
+                                    subtitle: 'Bienvenue sur Tranoo Pro !',
+                                  );
+
+                                  if (!mounted) return;
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const AvantHome(),
+                                    ),
+                                    (route) => false,
                                   );
                                 } catch (e) {
                                   var title = 'Une erreur est survenue.';
@@ -1218,7 +1240,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                 ),
               ],
 
-              SizedBox(height: screenHeight * 0.03),
+              SizedBox(height: isPortrait ? 12 : 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1249,7 +1271,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                   ),
                 ],
               ),
-              SizedBox(height: screenHeight * 0.03),
+              SizedBox(height: isPortrait ? 12 : 10),
             ],
           ),
         ),
@@ -1315,6 +1337,167 @@ class _InscriptionPageState extends State<InscriptionPage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  // Widget pour la sélection du type de vendeur
+  Widget _buildTypeVendeurSelector(double screenWidth, double screenHeight, bool isPortrait) {
+    // Initialiser par défaut à "vendeur" (mixte) pour la compatibilité
+    if (_typeVendeur == null) {
+      _typeVendeur = 'vendeur';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(screenWidth * 0.04),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8BF13).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFF8BF13).withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.category,
+                color: const Color(0xFFF8BF13),
+                size: screenWidth * 0.05,
+              ),
+              SizedBox(width: screenWidth * 0.02),
+              Text(
+                "Type de vendeur",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: screenHeight * 0.01),
+          Text(
+            "Sélectionnez ce que vous vendez principalement",
+            style: TextStyle(
+              fontSize: screenWidth * (isPortrait ? 0.03 : 0.025),
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(height: screenHeight * 0.02),
+          
+          // Options radio
+          _buildRadioOption(
+            'vendeur',
+            'Vendeur mixte (recommandé)',
+            'Je vends des véhicules ET des pièces',
+            Icons.category,
+            screenWidth,
+            screenHeight,
+            isPortrait,
+            true,
+          ),
+          
+          _buildRadioOption(
+            'vendeurVehicules',
+            'Vendeur de véhicules',
+            'Je vends uniquement des véhicules',
+            Icons.directions_car,
+            screenWidth,
+            screenHeight,
+            isPortrait,
+            false,
+          ),
+          
+          _buildRadioOption(
+            'vendeurPieces',
+            'Vendeur de pièces',
+            'Je vends uniquement des pièces détachées',
+            Icons.build,
+            screenWidth,
+            screenHeight,
+            isPortrait,
+            false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRadioOption(
+    String value,
+    String title,
+    String description,
+    IconData icon,
+    double screenWidth,
+    double screenHeight,
+    bool isPortrait,
+    bool isRecommended,
+  ) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: screenHeight * 0.01),
+      child: RadioListTile<String>(
+        value: value,
+        groupValue: _typeVendeur,
+        onChanged: (newValue) {
+          setState(() {
+            _typeVendeur = newValue;
+          });
+        },
+        title: Row(
+          children: [
+            Icon(
+              icon,
+              color: _typeVendeur == value ? const Color(0xFFF8BF13) : Colors.grey[600],
+              size: screenWidth * 0.04,
+            ),
+            SizedBox(width: screenWidth * 0.02),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: screenWidth * (isPortrait ? 0.035 : 0.025),
+                  color: _typeVendeur == value ? const Color(0xFFF8BF13) : Colors.black,
+                ),
+              ),
+            ),
+            if (isRecommended)
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth * 0.02,
+                  vertical: screenHeight * 0.005,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "Recommandé",
+                  style: TextStyle(
+                    color: Colors.green[700],
+                    fontSize: screenWidth * 0.025,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: EdgeInsets.only(left: screenWidth * 0.06),
+          child: Text(
+            description,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: screenWidth * (isPortrait ? 0.03 : 0.02),
+            ),
+          ),
+        ),
+        activeColor: const Color(0xFFF8BF13),
+        contentPadding: EdgeInsets.zero,
       ),
     );
   }

@@ -527,8 +527,12 @@ class _AppInitializerState extends State<AppInitializer>
     // Détecter le code de parrainage depuis l'URL
     await _handleReferralCode();
 
-    // Naviguer vers l'écran principal
+    // Vérifier le type de vendeur pour la migration
     if (mounted) {
+      final authProvider = Provider.of<myauth.AuthProvider>(context, listen: false);
+      await authProvider.checkTypeVendeurMigration(context);
+      
+      // Naviguer vers l'écran principal
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const AvantHome()),
       );

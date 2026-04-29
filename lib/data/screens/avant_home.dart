@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tranoo_pro/data/screens/wallet_screen.dart';
 import 'package:tranoo_pro/data/screens/wallet_vendeur_screen.dart';
@@ -22,6 +23,8 @@ import 'package:tranoo_pro/data/screens/chauffeur_home.dart';
 import 'package:tranoo_pro/data/screens/profilutilisateurpage.dart';
 import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
 import 'package:tranoo_pro/data/screens/profil3.dart';
+import 'package:tranoo_pro/data/screens/settings_type_vendeur_page.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 
 class AvantHome extends StatefulWidget {
   const AvantHome({super.key});
@@ -30,26 +33,52 @@ class AvantHome extends StatefulWidget {
   State<AvantHome> createState() => _AvantHomeState();
 }
 
-class _AvantHomeState extends State<AvantHome> {
+class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _didRedirectToLogin = false;
   bool _didCheckOnboarding = false;
+  bool _didCheckTypeVendeurMigration = false;
+  Timer? _lightRefreshTimer;
+  DateTime? _lastLightRefreshAt;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final counterProvider = Provider.of<CounterProvider>(
-          context,
-          listen: false,
-        );
-        counterProvider.loadCounters();
-      } catch (e) {
-        print('DEBUG: Erreur accès CounterProvider: $e');
-      }
-    });
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runLightRefresh(force: true));
+    _lightRefreshTimer = Timer.periodic(
+      const Duration(seconds: 90),
+      (_) => _runLightRefresh(),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _lightRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _runLightRefresh(force: true);
+    }
+  }
+
+  Future<void> _runLightRefresh({bool force = false}) async {
+    if (!mounted) return;
+    final now = DateTime.now();
+    if (!force &&
+        _lastLightRefreshAt != null &&
+        now.difference(_lastLightRefreshAt!) < const Duration(seconds: 45)) {
+      return;
+    }
+    _lastLightRefreshAt = now;
+    try {
+      await Provider.of<CounterProvider>(context, listen: false).loadCounters();
+    } catch (_) {}
   }
 
   Future<void> _checkOnboardingAndInactivity() async {
@@ -108,12 +137,20 @@ class _AvantHomeState extends State<AvantHome> {
     Transit(),
   ];
 
-  final List<Widget> _pagesVendeur = [
-    Marque(),
-    const Une(isStandalone: true),
-    const VoituresPage(),
-    Piece(),
-  ];
+  List<Widget> _buildVendeurPages() {
+    final userService = UserService();
+    final pages = <Widget>[
+      Marque(),
+      const Une(isStandalone: true),
+    ];
+    if (userService.peutVendreVehicules) {
+      pages.add(const VoituresPage());
+    }
+    if (userService.peutVendrePieces) {
+      pages.add(Piece());
+    }
+    return pages;
+  }
 
   double responsiveSize(
     double screenWidth,
@@ -177,9 +214,10 @@ class _AvantHomeState extends State<AvantHome> {
           ? _pagesTransitaire[_selectedIndex]
           : _pagesTransitaire[0];
     } else if (role == 'vendeur') {
-      return _selectedIndex < _pagesVendeur.length
-          ? _pagesVendeur[_selectedIndex]
-          : _pagesVendeur[0];
+      final vendeurPages = _buildVendeurPages();
+      return _selectedIndex < vendeurPages.length
+          ? vendeurPages[_selectedIndex]
+          : vendeurPages[0];
     } else {
       return const Center(child: CircularProgressIndicator());
     }
@@ -235,11 +273,28 @@ class _AvantHomeState extends State<AvantHome> {
           _updateLastLoginTime();
         }
 
-        // Ajusté pour 4 onglets (Accueil, Publicité, Vendre, Pièces)
-        if (role == 'vendeur' && _selectedIndex > 3) {
+        if (!loading &&
+            user != null &&
+            role == 'vendeur' &&
+            !_didCheckTypeVendeurMigration) {
+          _didCheckTypeVendeurMigration = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await Provider.of<myauth.AuthProvider>(
+              context,
+              listen: false,
+            ).checkTypeVendeurMigration(context);
+          });
+        }
+
+        final vendeurItemsCount = role == 'vendeur'
+            ? _buildVendeurMenuItems(role, iconSize).length
+            : 0;
+        if (role == 'vendeur' &&
+            vendeurItemsCount > 0 &&
+            _selectedIndex > vendeurItemsCount - 1) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             setState(() {
-              _selectedIndex = 3;
+              _selectedIndex = vendeurItemsCount - 1;
             });
           });
         }
@@ -442,6 +497,23 @@ class _AvantHomeState extends State<AvantHome> {
                                     size: iconSize,
                                   ),
                                 ),
+                                if (role == 'vendeur')
+                                  _buildDrawerButton(
+                                    context,
+                                    text: 'Type de vendeur',
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const SettingsTypeVendeurPage(),
+                                      ),
+                                    ),
+                                    icon: Icon(
+                                      Icons.category,
+                                      color: Colors.black,
+                                      size: iconSize,
+                                    ),
+                                  ),
                                 _buildDrawerButton(
                                   context,
                                   text: 'Déconnexion',
@@ -480,25 +552,8 @@ class _AvantHomeState extends State<AvantHome> {
                   unselectedItemColor: Colors.black,
                   currentIndex: _selectedIndex,
                   onTap: (i) => _onItemTapped(i, role),
-                  items: role == 'vendeur'
-                      ? [
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.home, size: iconSize),
-                            label: 'Accueil',
-                          ),
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.campaign, size: iconSize),
-                            label: 'Publicité',
-                          ),
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.directions_car, size: iconSize),
-                            label: 'Voitures',
-                          ),
-                          BottomNavigationBarItem(
-                            icon: Icon(Icons.build, size: iconSize),
-                            label: 'Pièces',
-                          ),
-                        ]
+                  items: (role == 'vendeur' || role?.startsWith('vendeur') == true)
+                      ? _buildVendeurMenuItems(role, iconSize)
                       : role == 'transitaire'
                           ? [
                               BottomNavigationBarItem(
@@ -577,5 +632,80 @@ class _AvantHomeState extends State<AvantHome> {
         ),
       ),
     );
+  }
+
+  // Méthode pour construire le menu des vendeurs selon le type
+  List<BottomNavigationBarItem> _buildVendeurMenuItems(String? role, double iconSize) {
+    final userService = UserService();
+    
+    // Menu selon vendeurType (compat: null => mixte)
+    if (userService.peutVendreVehicules && userService.peutVendrePieces) {
+      return [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home, size: iconSize),
+          label: 'Accueil',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.campaign, size: iconSize),
+          label: 'Publicité',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.directions_car, size: iconSize),
+          label: 'Voitures',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.build, size: iconSize),
+          label: 'Pièces',
+        ),
+      ];
+    }
+    
+    // Vendeur de véhicules uniquement
+    if (userService.peutVendreVehicules && !userService.peutVendrePieces) {
+      return [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home, size: iconSize),
+          label: 'Accueil',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.campaign, size: iconSize),
+          label: 'Publicité',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.directions_car, size: iconSize),
+          label: 'Voitures',
+        ),
+      ];
+    }
+    
+    // Vendeur de pièces uniquement
+    if (userService.peutVendrePieces && !userService.peutVendreVehicules) {
+      return [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home, size: iconSize),
+          label: 'Accueil',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.campaign, size: iconSize),
+          label: 'Publicité',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.build, size: iconSize),
+          label: 'Pièces',
+        ),
+      ];
+    }
+    
+    // Menu par défaut (fallback)
+    return [
+      BottomNavigationBarItem(
+        icon: Icon(Icons.home, size: iconSize),
+        label: 'Accueil',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.campaign, size: iconSize),
+        label: 'Publicité',
+      ),
+    ];
   }
 }

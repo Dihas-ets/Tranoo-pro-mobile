@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../config/backend_config.dart';
+import '../services/user_service.dart';
+import '../utils/role_redirect.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -34,10 +36,11 @@ class NotificationService {
       final token = await _getAuthToken();
       if (token == null) throw Exception('Token d\'authentification manquant');
 
+      String url = '$_baseUrl/notifications?page=$page&limit=$limit&unreadOnly=$unreadOnly';
+      // Le ciblage des alertes est géré côté backend (envoi aux vendeurs concernés).
+
       final response = await http.get(
-        Uri.parse(
-          '$_baseUrl/notifications?page=$page&limit=$limit&unreadOnly=$unreadOnly',
-        ),
+        Uri.parse(url),
         headers: {'Authorization': 'Bearer $token'},
       );
 

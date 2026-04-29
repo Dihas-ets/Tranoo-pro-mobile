@@ -1272,6 +1272,11 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     if ((dataMap['budgetMax'] ?? '').toString().isNotEmpty) {
       characteristics.add(MapEntry('Budget max', '${dataMap['budgetMax']} FCFA'));
     }
+    if ((dataMap['quantity'] ?? '').toString().isNotEmpty) {
+      characteristics.add(
+        MapEntry('Quantité recherchée', dataMap['quantity'].toString()),
+      );
+    }
     if ((dataMap['localisation'] ?? '').toString().isNotEmpty) {
       characteristics.add(MapEntry('Localisation', dataMap['localisation'].toString()));
     }

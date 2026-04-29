@@ -38,6 +38,7 @@ class UserService extends ChangeNotifier {
   }
 
   UserRole? _currentRole;
+  String? _vendeurType; // 'mixte' | 'vehicules' | 'pieces' | null (compat)
 
   // =============================
   // IMPORTANT : URL DU BACKEND
@@ -50,14 +51,30 @@ class UserService extends ChangeNotifier {
   Dio get dio => _dio;
 
   UserRole? get currentRole => _currentRole;
+  String? get vendeurType => _vendeurType;
   bool get isTransitaire => _currentRole == UserRole.transitaire;
   bool get isVendeur => _currentRole == UserRole.vendeur;
+  // Compat: ces flags reposent maintenant sur vendeurType (pas sur des rôles backend)
+  bool get isVendeurVehicules => isVendeur && _vendeurType == 'vehicules';
+  bool get isVendeurPieces => isVendeur && _vendeurType == 'pieces';
   bool get isChauffeur => _currentRole == UserRole.chauffeur;
   bool get isAgentCommercial => _currentRole == UserRole.agentCommercial;
   bool get isLivreur => _currentRole == UserRole.livreur;
+  
+  // Getters utilitaires pour la logique de vente
+  bool get peutVendreVehicules =>
+      isVendeur && (_vendeurType == null || _vendeurType == 'mixte' || _vendeurType == 'vehicules');
+      
+  bool get peutVendrePieces =>
+      isVendeur && (_vendeurType == null || _vendeurType == 'mixte' || _vendeurType == 'pieces');
 
   void setRole(UserRole role) {
     _currentRole = role;
+    notifyListeners();
+  }
+
+  void setVendeurType(String? vendeurType) {
+    _vendeurType = vendeurType;
     notifyListeners();
   }
 
@@ -65,6 +82,7 @@ class UserService extends ChangeNotifier {
 
   void clearRole() {
     _currentRole = null;
+    _vendeurType = null;
     notifyListeners();
   }
 
@@ -76,6 +94,7 @@ class UserService extends ChangeNotifier {
     required String prenoms,
     required String telephone,
     required String role,
+    String? vendeurType,
     String? fcmToken,
     String? entreprise,
     String? registreCommerce,
@@ -108,6 +127,7 @@ class UserService extends ChangeNotifier {
         'role': role.toLowerCase(),
         'fcmToken': fcmToken,
       };
+      if (vendeurType != null) data['vendeurType'] = vendeurType;
 
       // Ajouter les champs spécifiques selon le rôle
       if (entreprise != null) data['entreprise'] = entreprise;

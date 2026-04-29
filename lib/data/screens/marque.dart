@@ -15,7 +15,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
-import 'package:tranoo_pro/data/screens/movie.dart';
 
 class Article {
   final String id;
@@ -2509,8 +2508,12 @@ Widget buildPubsALaUneCarousel() {
               _buildBudgetSection(),
             // Section sponsorisée: toujours affichée
             buildPubsSponsoriseesSection(),
-            buildVoituresRecommandeesSection(),
-            buildPiecesSection(),
+            if (_userService.currentRole != UserRole.vendeur ||
+                _userService.peutVendreVehicules)
+              buildVoituresRecommandeesSection(),
+            if (_userService.currentRole != UserRole.vendeur ||
+                _userService.peutVendrePieces)
+              buildPiecesSection(),
             // Add the new sections here
           ],
         ),
