@@ -880,7 +880,7 @@ class _MarqueState extends State<Marque> with SingleTickerProviderStateMixin {
           mainAxisSpacing: 10,
           childAspectRatio: cardAspectRatio,
         ),
-        itemCount: filtered.length > 8 ? 8 : filtered.length,
+        itemCount: filtered.length > 4 ? 4 : filtered.length,
         itemBuilder: (context, index) {
           final voiture = filtered[index];
           return GestureDetector(
@@ -1432,8 +1432,8 @@ Padding(
                       mainAxisSpacing: 10,
                       childAspectRatio: sectionCardAspectRatio,
                     ),
-                    itemCount: _applyFilters(voituresEnLigne).length > 8
-                        ? 8
+                    itemCount: _applyFilters(voituresEnLigne).length > 4
+                        ? 4
                         : _applyFilters(voituresEnLigne).length,
                     itemBuilder: (context, index) {
                       final list = _applyFilters(voituresEnLigne);
@@ -2795,15 +2795,13 @@ Widget buildPubsALaUneCarousel() {
         "value": currentVehicleIds.length,
         "icon": Icons.directions_car_filled,
         "color": const Color(0xFFF8BF13),
-        "background": const Color(0xFFFFF3CD),
         "description": "Annonce(s) visibles"
       },
       {
         "label": "Vues enregistrées",
         "value": totalClicks,
         "icon": Icons.remove_red_eye,
-        "color": const Color(0xFF536DFE),
-        "background": const Color(0xFFE8EAFE),
+        "color": const Color(0xFFF8BF13),
         "description": "Consultations sur vos annonces"
       },
     ];
@@ -2835,27 +2833,20 @@ Widget buildPubsALaUneCarousel() {
             child: Row(
               children: statsCards.map((card) {
                 return Container(
-                  width: 190,
-                  margin: const EdgeInsets.only(right: 12),
-                  padding: const EdgeInsets.all(16),
+                  width: 148,
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        (card["color"] as Color).withOpacity(0.15),
-                        Colors.white,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: (card["color"] as Color).withOpacity(0.3),
+                      color: const Color(0xFFF8BF13).withOpacity(0.45),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: (card["color"] as Color).withOpacity(0.08),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                        color: Colors.black12.withOpacity(0.04),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -2865,31 +2856,31 @@ Widget buildPubsALaUneCarousel() {
                       Icon(
                         card["icon"] as IconData,
                         color: card["color"] as Color,
-                        size: 28,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        card["label"] as String,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: (card["color"] as Color).withOpacity(0.9),
-                        ),
+                        size: 20,
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "${card["value"]}",
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
+                        card["label"] as String,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                           color: Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
+                        "${card["value"]}",
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
                         card["description"] as String,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 10,
                           color: Colors.black54,
                         ),
                       ),

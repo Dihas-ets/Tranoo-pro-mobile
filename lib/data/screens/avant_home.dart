@@ -642,8 +642,8 @@ class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
     if (userService.peutVendreVehicules && userService.peutVendrePieces) {
       return [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home, size: iconSize),
-          label: 'Accueil',
+          icon: Icon(Icons.storefront_outlined, size: iconSize),
+          label: 'Boutique',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.campaign, size: iconSize),
@@ -664,8 +664,8 @@ class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
     if (userService.peutVendreVehicules && !userService.peutVendrePieces) {
       return [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home, size: iconSize),
-          label: 'Accueil',
+          icon: Icon(Icons.storefront_outlined, size: iconSize),
+          label: 'Boutique',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.campaign, size: iconSize),
@@ -682,8 +682,8 @@ class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
     if (userService.peutVendrePieces && !userService.peutVendreVehicules) {
       return [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home, size: iconSize),
-          label: 'Accueil',
+          icon: Icon(Icons.storefront_outlined, size: iconSize),
+          label: 'Boutique',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.campaign, size: iconSize),
@@ -699,8 +699,8 @@ class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
     // Menu par défaut (fallback)
     return [
       BottomNavigationBarItem(
-        icon: Icon(Icons.home, size: iconSize),
-        label: 'Accueil',
+        icon: Icon(Icons.storefront_outlined, size: iconSize),
+        label: 'Boutique',
       ),
       BottomNavigationBarItem(
         icon: Icon(Icons.campaign, size: iconSize),

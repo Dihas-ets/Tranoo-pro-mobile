@@ -134,6 +134,32 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     }
   }
 
+  Future<void> _trackDemoEvent(String eventType, {String? page}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final token = await user.getIdToken();
+      log('[DEMO_EVENT] send $eventType page=$page');
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: UserService().dio.options.baseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final resp = await dio.post('/demo-events/track', data: {
+        'eventType': eventType,
+        'page': page,
+        'client': 'mobile',
+      });
+      log('[DEMO_EVENT] resp status=${resp.statusCode} data=${resp.data}');
+    } catch (_) {
+      // best-effort
+    }
+  }
+
   Future<String> _getAddressFromCoordinates(double lat, double lng) async {
     try {
       final response = await Dio().get(
@@ -533,6 +559,9 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   }
 
   void _onValidate() {
+    if (!widget.editMode) {
+      _trackDemoEvent('seller_create_started', page: 'create_sell2.dart');
+    }
     final title = _titleController.text.trim();
     final annee = _anneeController.text.trim();
     final prix = _prixController.text.trim();
@@ -566,6 +595,10 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         const SnackBar(content: Text('Veuillez ajouter au moins une image ou une vidéo.')),
       );
       return;
+    }
+
+    if (!widget.editMode) {
+      _trackDemoEvent('seller_create_completed', page: 'create_sell2.dart');
     }
 
     final images = _cloudinaryUrls.whereType<String>().where((url) => url.isNotEmpty).toList();

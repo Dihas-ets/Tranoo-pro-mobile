@@ -14,6 +14,7 @@ import 'dart:developer';
 import 'verification_payment.dart'; // Import pour la page de vérification de paiement
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dio/dio.dart';
 
 class CarsInfo extends StatefulWidget {
   final String? id;
@@ -1671,6 +1672,7 @@ class _CarsinfoState extends State<CarsInfo> {
             child: ElevatedButton(
               onPressed: () {
                 log('[DEBUG] Bouton Faire une pub cliqué');
+                _trackDemoEvent('campaign_initiated', page: 'cars_info.dart');
                 // Ouvrir la page de demande de pub avec les infos de l'article
                 Navigator.push(
                   context,
@@ -1724,5 +1726,31 @@ class _CarsinfoState extends State<CarsInfo> {
         ],
       );
     }
+  }
+}
+
+Future<void> _trackDemoEvent(String eventType, {String? page}) async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final token = await user.getIdToken();
+    log('[DEMO_EVENT] send $eventType page=$page');
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: UserService().dio.options.baseUrl,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+    final resp = await dio.post('/demo-events/track', data: {
+      'eventType': eventType,
+      'page': page,
+      'client': 'mobile',
+    });
+    log('[DEMO_EVENT] resp status=${resp.statusCode} data=${resp.data}');
+  } catch (_) {
+    // best-effort tracking
   }
 }

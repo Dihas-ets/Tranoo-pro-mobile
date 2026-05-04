@@ -18,6 +18,7 @@ import 'package:tranoo_pro/services/user_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'map_picker_screen.dart';
 import '../../widgets/location_permission_dialog.dart';
+import 'package:dio/dio.dart';
 
 class Une extends StatefulWidget {
   final String? articleId; // ID de l'article existant (optionnel)
@@ -150,6 +151,7 @@ class _UneState extends State<Une> {
   @override
   void initState() {
     super.initState();
+    _trackDemoEvent('listing_opened_une', page: 'une.dart');
     _loadPrixConfig(); // Charger les prix depuis le backend
     if (widget.isStandalone) {
       _selectedVoiture = 'À la une';
@@ -1020,6 +1022,7 @@ class _UneState extends State<Une> {
   Future<void> _onPayer() async {
     debugPrint('🚀 [DEBUG] Début _onPayer - articleId: ${widget.articleId}');
     log('🚀 [DEBUG] Début _onPayer - articleId: ${widget.articleId}');
+    await _trackDemoEvent('campaign_initiated', page: 'une.dart');
 
     final currentType =
         _selectedVoiture ?? (widget.isStandalone ? 'À la une' : null);
@@ -1275,6 +1278,32 @@ class _UneState extends State<Une> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _trackDemoEvent(String eventType, {String? page}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final token = await user.getIdToken();
+      log('[DEMO_EVENT] send $eventType page=$page');
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: UserService().dio.options.baseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final resp = await dio.post('/demo-events/track', data: {
+        'eventType': eventType,
+        'page': page,
+        'client': 'mobile',
+      });
+      log('[DEMO_EVENT] resp status=${resp.statusCode} data=${resp.data}');
+    } catch (_) {
+      // best-effort
     }
   }
 

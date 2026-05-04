@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:tranoo_pro/config/backend_config.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
 List<dynamic> _piecesForPickup(Map<String, dynamic> delivery, int? pickupIndex) {
   final pickups = delivery['pickups'];
@@ -287,6 +285,7 @@ class DeliveryQrScannerScreen extends StatefulWidget {
 
 class _DeliveryQrScannerScreenState extends State<DeliveryQrScannerScreen> {
   bool _handled = false;
+  final TextEditingController _qrController = TextEditingController();
 
   bool _isValidPayload(String raw) {
     final orderToken = 'TRN_ORDER:${widget.expectedOrderId}';
@@ -307,35 +306,46 @@ class _DeliveryQrScannerScreenState extends State<DeliveryQrScannerScreen> {
   }
 
   @override
+  void dispose() {
+    _qrController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scanner QR de livraison')),
-      body: Stack(
-        children: [
-          MobileScanner(
-            onDetect: (capture) {
-              final value = capture.barcodes.isNotEmpty
-                  ? (capture.barcodes.first.rawValue ?? '')
-                  : '';
-              if (value.isNotEmpty) {
-                _handleValue(value);
-              }
-            },
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: double.infinity,
-              color: Colors.black54,
-              padding: const EdgeInsets.all(12),
-              child: const Text(
-                'Scannez le QR de la commande pour finaliser la livraison',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
+      appBar: AppBar(title: const Text('Valider livraison')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Saisissez le contenu du QR pour finaliser la livraison.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _qrController,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Contenu QR',
+                border: OutlineInputBorder(),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () => _handleValue(_qrController.text.trim()),
+              child: const Text('Valider'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Format attendu: TRN_ORDER:${widget.expectedOrderId} et DELIVERY:${widget.expectedDeliveryId}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ],
+        ),
       ),
     );
   }

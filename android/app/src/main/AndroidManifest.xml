@@ -23,7 +23,8 @@
     <application
         android:label="Tranoo Pro"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:extractNativeLibs="false">
 
         <activity
             android:name=".MainActivity"

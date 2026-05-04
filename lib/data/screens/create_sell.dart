@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data'; // Added for Uint8List
 import 'dart:convert'; // Added for jsonDecode
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb; // Added for kIsWeb
@@ -10,6 +11,7 @@ import '../../utils/cloudinary_upload.dart';
 import 'package:http/http.dart' as http; // Ajouté pour l'upload web
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:dio/dio.dart';
 
 import 'cars_info.dart'; // Importer le fichier combiné cars_info
 import 'movie.dart';
@@ -242,6 +244,32 @@ class _CreateSellPageState extends State<CreateSellPage> {
     }
   }
 
+  Future<void> _trackDemoEvent(String eventType, {String? page}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final token = await user.getIdToken();
+      log('[DEMO_EVENT] send $eventType page=$page');
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: UserService().dio.options.baseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final resp = await dio.post('/demo-events/track', data: {
+        'eventType': eventType,
+        'page': page,
+        'client': 'mobile',
+      });
+      log('[DEMO_EVENT] resp status=${resp.statusCode} data=${resp.data}');
+    } catch (_) {
+      // best-effort
+    }
+  }
+
   Future<void> _pickImage(int startIndex) async {
     final ImagePicker picker = ImagePicker();
     // Multi-sélection sur mobile et web
@@ -430,6 +458,9 @@ class _CreateSellPageState extends State<CreateSellPage> {
   }
 
   void _onValidate() {
+    if (!widget.editMode) {
+      _trackDemoEvent('seller_create_started', page: 'create_sell.dart');
+    }
     if (widget.editMode) {
       _saveEditedCar();
       return;
