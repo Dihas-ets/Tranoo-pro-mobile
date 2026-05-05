@@ -5,7 +5,7 @@ const bool kUseProdBackend = false; // <- Local (même réseau Wi-Fi)
 
 // ---- Paramètres locaux (téléphone physique connecté au même réseau Wi-Fi) ----
 // const String kLocalHost = 'R.69';
-const String kLocalHost = '192.168.1.92';
+const String kLocalHost = '192.168.1.82';
 const String kLocalPort = '5000';
 const String kLocalBaseNoApi = 'http://$kLocalHost:$kLocalPort';
 const String kLocalBaseUrl = '$kLocalBaseNoApi/api';
