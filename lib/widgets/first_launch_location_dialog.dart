@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FirstLaunchLocationDialog extends StatelessWidget {
   final VoidCallback onDismissed;
@@ -168,7 +169,14 @@ class FirstLaunchLocationDialog extends StatelessWidget {
                           child: Center(
                             child: ElevatedButton(
                               onPressed: () async {
-                                // Dismiss the custom dialog and immediately trigger the system prompt.
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                await prefs.setBool(
+                                  'tranoo_pro_has_seen_welcome',
+                                  true,
+                                );
+                                await prefs.setBool('is_first_launch', false);
+                                if (!context.mounted) return;
                                 Navigator.of(context).pop();
                                 await _requestPermissions();
                                 onDismissed();

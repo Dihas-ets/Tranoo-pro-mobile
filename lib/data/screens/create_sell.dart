@@ -12,9 +12,13 @@ import 'package:http/http.dart' as http; // Ajouté pour l'upload web
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:dio/dio.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'cars_info.dart'; // Importer le fichier combiné cars_info
+import 'map_picker_screen.dart';
+import '../../widgets/location_permission_dialog.dart';
 import 'movie.dart';
+import 'package:tranoo_pro/utils/amount_display.dart';
 
 class CreateSellPage extends StatefulWidget {
   final String? alertNotificationId;
@@ -63,6 +67,14 @@ class _CreateSellPageState extends State<CreateSellPage> {
   //bool _hasUploadedFile = false;
   final bool _hasUploadedFile = false;
   String? _cloudinaryUrl;
+
+  /// Localisation véhicule (carte / GPS), alignée sur create_sell2.
+  double? _vehicleLatitude;
+  double? _vehicleLongitude;
+  String _vehicleAddress = '';
+  String _vehicleCity = '';
+  bool _useVehicleCurrentLocation = false;
+  bool _loadingVehicleAddress = false;
 
   // Ajout pour plusieurs images et vidéo
   List<File?> _uploadedImages =
@@ -241,6 +253,144 @@ class _CreateSellPageState extends State<CreateSellPage> {
       if (init['video'] != null) {
         _cloudinaryVideoUrls[0] = init['video']?.toString();
       }
+      _hydrateVehicleLocationFromInit(init);
+    }
+  }
+
+  String get _effectiveLieu =>
+      _vehicleAddress.isNotEmpty ? _vehicleAddress : _locationController.text.trim();
+
+  Map<String, dynamic>? get _vehicleFournisseurPayload {
+    if (_vehicleLatitude == null || _vehicleLongitude == null) return null;
+    return {
+      'latitude': _vehicleLatitude,
+      'longitude': _vehicleLongitude,
+      'adresseTexte': _effectiveLieu,
+    };
+  }
+
+  void _hydrateVehicleLocationFromInit(Map<String, dynamic> init) {
+    _vehicleLatitude = null;
+    _vehicleLongitude = null;
+    _vehicleAddress = '';
+    _vehicleCity = '';
+    _useVehicleCurrentLocation = false;
+
+    final f = init['fournisseur'];
+    if (f is Map) {
+      final m = Map<String, dynamic>.from(f);
+      final lat = m['latitude'];
+      final lng = m['longitude'];
+      _vehicleLatitude = lat is num ? lat.toDouble() : double.tryParse('$lat');
+      _vehicleLongitude = lng is num ? lng.toDouble() : double.tryParse('$lng');
+      final addr = (m['adresseTexte'] ?? '').toString().trim();
+      if (addr.isNotEmpty) _vehicleAddress = addr;
+    }
+    if (_vehicleLatitude == null || _vehicleLongitude == null) {
+      final lat0 = init['latitude'];
+      final lng0 = init['longitude'];
+      if (lat0 != null && lng0 != null) {
+        _vehicleLatitude = double.tryParse(lat0.toString());
+        _vehicleLongitude = double.tryParse(lng0.toString());
+      }
+    }
+    final lieuStr =
+        (init['lieu'] ?? init['localisation'] ?? '').toString().trim();
+    if (_vehicleAddress.isEmpty && lieuStr.isNotEmpty) {
+      _vehicleAddress = lieuStr;
+    }
+    if (_vehicleAddress.isNotEmpty) {
+      _locationController.text = _vehicleAddress;
+    }
+  }
+
+  Future<String> _getAddressFromCoordinates(double lat, double lng) async {
+    try {
+      final response = await Dio().get(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'format': 'json',
+          'lat': lat,
+          'lon': lng,
+          'zoom': 18,
+          'addressdetails': 1,
+        },
+        options: Options(
+          headers: {'User-Agent': 'TranooPro/1.0'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        final address = data['display_name'] as String? ?? '';
+        final city = data['address']?['city'] ??
+            data['address']?['town'] ??
+            data['address']?['village'] ??
+            '';
+        if (!mounted) return address;
+        setState(() {
+          _vehicleCity = city?.toString() ?? '';
+        });
+        return address;
+      }
+    } catch (e) {
+      log('[GEO] Reverse geocoding error: $e');
+    }
+    return '';
+  }
+
+  Future<void> _setVehicleLocation({
+    required double lat,
+    required double lng,
+    required bool fromCurrent,
+  }) async {
+    if (!mounted) return;
+    setState(() {
+      _vehicleLatitude = lat;
+      _vehicleLongitude = lng;
+      _useVehicleCurrentLocation = fromCurrent;
+      _loadingVehicleAddress = true;
+    });
+    final address = await _getAddressFromCoordinates(lat, lng);
+    if (!mounted) return;
+    setState(() {
+      _vehicleAddress = address.isNotEmpty ? address : _vehicleAddress;
+      if (_vehicleAddress.isNotEmpty) {
+        _locationController.text = _vehicleAddress;
+      }
+      _loadingVehicleAddress = false;
+    });
+  }
+
+  Future<void> _useCurrentVehicleLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => LocationPermissionDialog(
+            userRole: 'vendeur',
+            onPermissionGranted: () async {},
+            onPermissionDenied: () {},
+          ),
+        );
+        permission = await Geolocator.checkPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      await _setVehicleLocation(
+        lat: pos.latitude,
+        lng: pos.longitude,
+        fromCurrent: true,
+      );
+    } catch (e) {
+      log('[GEO] Erreur position actuelle véhicule: $e');
     }
   }
 
@@ -568,7 +718,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
           cylindre: _cylindreController.text,
           couleur: _selectedCouleur,
           dedouanement: false, // Dédouanement retiré, valeur par défaut
-          lieu: _locationController.text.trim(),
+          lieu: _effectiveLieu,
+          fournisseur: _vehicleFournisseurPayload,
           images: imagesList,
           video: videosList.isNotEmpty ? videosList.first : null,
           videos: videosList,
@@ -656,8 +807,10 @@ class _CreateSellPageState extends State<CreateSellPage> {
         'video': videosList.isNotEmpty ? videosList.first : null,
         'entreprise': _companyController.text.trim(),
         // compat lieu/localisation
-        'lieu': _locationController.text.trim(),
-        'localisation': _locationController.text.trim(),
+        'lieu': _effectiveLieu,
+        'localisation': _effectiveLieu,
+        if (_vehicleFournisseurPayload != null)
+          'fournisseur': _vehicleFournisseurPayload,
       };
 
       final resp = await http.put(
@@ -765,22 +918,33 @@ class _CreateSellPageState extends State<CreateSellPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Bouton d'upload unique
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _pickMultipleImages(),
-            icon: const Icon(Icons.add_photo_alternate, size: 20),
-            label: const Text('Ajouter des images'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF8BF13),
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _pickMultipleImages(),
+                icon: const Icon(Icons.add_photo_alternate, size: 20),
+                label: const Text('Ajouter des images'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF8BF13),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-          ),
+            IconButton(
+              tooltip: 'Prendre une photo',
+              onPressed: _takePhotoFromCamera,
+              icon: const Icon(Icons.photo_camera),
+              color: const Color(0xFFF8BF13),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         
@@ -974,6 +1138,38 @@ class _CreateSellPageState extends State<CreateSellPage> {
   }
 
   // Fonctions pour l'upload d'images
+  Future<void> _takePhotoFromCamera() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+      if (photo == null) return;
+      final emptyIndex = _cloudinaryImageUrls.indexWhere(
+        (url) => url == null || url!.isEmpty,
+      );
+      if (emptyIndex == -1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Maximum d\'images atteint (12 images)'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+      await _processImageUpload(photo, emptyIndex);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur caméra: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _pickMultipleImages() async {
     final ImagePicker picker = ImagePicker();
     try {
@@ -1121,25 +1317,154 @@ class _CreateSellPageState extends State<CreateSellPage> {
     }
   }
 
+  Widget _buildVehicleLocationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Localisation du véhicule', isRequired: false),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _useCurrentVehicleLocation,
+                icon: const Icon(Icons.my_location),
+                label: const Text('Position actuelle'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.push<Map<String, double>>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MapPickerScreen(
+                        initialLatitude: _vehicleLatitude,
+                        initialLongitude: _vehicleLongitude,
+                      ),
+                    ),
+                  );
+                  if (result != null) {
+                    final lat = result['latitude'];
+                    final lng = result['longitude'];
+                    if (lat != null && lng != null) {
+                      await _setVehicleLocation(
+                        lat: lat,
+                        lng: lng,
+                        fromCurrent: false,
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Choisir sur carte'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_vehicleLatitude != null && _vehicleLongitude != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFCC00).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFFFFCC00).withOpacity(0.65),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _useVehicleCurrentLocation
+                          ? Icons.my_location
+                          : Icons.map,
+                      size: 16,
+                      color: const Color(0xFFB45309),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _useVehicleCurrentLocation
+                          ? 'Position actuelle'
+                          : 'Position sélectionnée',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                    if (_vehicleCity.isNotEmpty) ...[
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFCC00),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          truncateWithEllipsis(_vehicleCity, maxLen: 28),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_loadingVehicleAddress)
+                  const Text(
+                    'Récupération de l\'adresse...',
+                    style: TextStyle(color: Colors.black54),
+                  )
+                else
+                  Text(
+                    _vehicleAddress.isNotEmpty
+                        ? truncateWithEllipsis(_vehicleAddress)
+                        : 'Adresse non disponible',
+                    style: const TextStyle(color: Colors.black87),
+                  ),
+              ],
+            ),
+          )
+        else if (_vehicleAddress.isNotEmpty)
+          Text(
+            truncateWithEllipsis(_vehicleAddress),
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
+          )
+        else
+          const Text(
+            'Localisation du véhicule non définie',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     // IMAGES EN PREMIER
                     _buildLabel('Images (max 12)', isRequired: false),
                     const SizedBox(height: 8),
@@ -1152,13 +1477,13 @@ class _CreateSellPageState extends State<CreateSellPage> {
                     _buildVideoSection(),
                     const SizedBox(height: 24),
                     
-                    // Titre
-                    _buildLabel('Titre'),
+                    // Nom du véhicule
+                    _buildLabel('Nom du véhicule'),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _titleController,
                       decoration: InputDecoration(
-                        hintText: 'Entrer le titre',
+                        hintText: 'Entrer le nom du véhicule',
                         filled: true,
                         fillColor: const Color(0xFFF2F2F2),
                         border: OutlineInputBorder(
@@ -1341,13 +1666,15 @@ class _CreateSellPageState extends State<CreateSellPage> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _cylindreController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(4),
+                            ...decimalOptionalInputFormatters,
+                            LengthLimitingTextInputFormatter(12),
                           ],
                           decoration: InputDecoration(
-                            hintText: 'Entrer le cylindre (ex: 1600)',
+                            hintText: 'Ex: 1600 ou 1,6',
                             filled: true,
                             fillColor: const Color(0xFFF2F2F2),
                             border: OutlineInputBorder(
@@ -1509,24 +1836,26 @@ class _CreateSellPageState extends State<CreateSellPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Distance et Siège
+                    // Kilométrage et Places
                     Row(
                       children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildLabel('Distance'),
+                              _buildLabel('Kilométrage'),
                               const SizedBox(height: 8),
                               TextField(
                                 controller: _distanceController,
-                                keyboardType: TextInputType.number,
+                                keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
                                 inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(7),
+                                  ...decimalOptionalInputFormatters,
+                                  LengthLimitingTextInputFormatter(12),
                                 ],
                                 decoration: InputDecoration(
-                                  hintText: 'Entrer la distance (km)',
+                                  hintText: 'Kilométrage (km), ex: 12500 ou 12,5',
                                   filled: true,
                                   fillColor: const Color(0xFFF2F2F2),
                                   border: OutlineInputBorder(
@@ -1543,7 +1872,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildLabel('Siège'),
+                              _buildLabel('Place'),
                               const SizedBox(height: 8),
                               TextField(
                                 controller: _siegesController,
@@ -1553,7 +1882,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                   LengthLimitingTextInputFormatter(2),
                                 ],
                                 decoration: InputDecoration(
-                                  hintText: 'Entrer le nombre de sièges',
+                                  hintText: 'Nombre de places',
                                   filled: true,
                                   fillColor: const Color(0xFFF2F2F2),
                                   border: OutlineInputBorder(
@@ -1577,9 +1906,15 @@ class _CreateSellPageState extends State<CreateSellPage> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _priceController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            ...decimalOptionalInputFormatters,
+                            LengthLimitingTextInputFormatter(14),
+                          ],
                           decoration: InputDecoration(
-                            hintText: 'Saisir le Prix',
+                            hintText: 'Prix en FCFA (ex: 1500000 ou 1.500.000,5)',
                             filled: true,
                             fillColor: const Color(0xFFF2F2F2),
                             border: OutlineInputBorder(
@@ -1627,27 +1962,13 @@ class _CreateSellPageState extends State<CreateSellPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    _buildLabel('Localisation', isRequired: false),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _locationController,
-                      decoration: InputDecoration(
-                        hintText: 'Entrer la localisation',
-                        filled: true,
-                        fillColor: const Color(0xFFF2F2F2),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
+                    _buildVehicleLocationSection(),
                     ],
-                  ),
                 ),
               ),
-              _buildVerificationButton(context),
-            ],
-          ),
+            ),
+            _buildVerificationButton(context),
+          ],
         ),
       ),
     );

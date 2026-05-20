@@ -10,6 +10,8 @@ import 'package:random_string/random_string.dart';
 import 'package:tranoo_pro/data/screens/succes6.dart';
 import 'package:tranoo_pro/data/screens/payment_success.dart';
 import 'package:tranoo_pro/data/screens/payment_error.dart';
+import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
+import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
 
 final fpToken = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
 final idUser = dotenv.env['ID_USER_FEEXPAY'] ?? '';
@@ -133,7 +135,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       body:
           pubData == null
               ? const Center(child: CircularProgressIndicator())
-              : Padding(
+              : SafeArea(
+                child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,6 +317,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ],
                 ),
               ),
+              ),
     );
   }
 
@@ -370,8 +374,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
         throw Exception('Configuration FeexPay manquante');
       }
 
-      final amount = pubData!['prix']?.toString() ?? '0';
+      final amountNum = num.tryParse((pubData!['prix'] ?? 0).toString()) ?? 0;
+      if (amountNum <= 0) {
+        throw Exception('Montant invalide pour ce paiement');
+      }
+      final amount = amountNum.toStringAsFixed(0);
 
+      FeexPayCallbackState.clearPendingAtNewCheckout();
       // Navigation vers FeexPay avec le package officiel
       final result = await Navigator.push(
         context,
@@ -388,11 +397,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ),
       );
 
-      // Le résultat sera géré par les routes de redirection
-      if (result != null) {
-        // Mettre à jour le statut en arrière-plan
-        await _updatePubStatus();
+      // Succès souvent livré par deep link → [FeexPayChoiceCallbackPage] + [FeexPayCallbackState],
+      // alors que le retour de [ChoicePage] peut être null après « retour » (back).
+      final cb = FeexPayCallbackState.takeLatest();
+      final callbackHint =
+          result is Map && result['successHint'] == true;
+      String? transactionRef = extractFeexPayTransactionId(result) ??
+          _extractTransactionRef(result) ??
+          cb.transactionId;
+      bool success = feexPayReturnIndicatesSuccess(result) ||
+          cb.success == true ||
+          callbackHint;
+      if (transactionRef != null && transactionRef.isNotEmpty) {
+        final verified = await _verifyPaymentWithBackend(transactionRef);
+        success = success || verified;
+      }
+      log(
+        '[PUB_PAYMENT_APP] ChoicePage return result=$result txRef=$transactionRef success=$success transKey=$transKey pubId=${widget.pubId}',
+      );
+      print(
+        '[PUB_PAYMENT_APP] ChoicePage return result=$result txRef=$transactionRef success=$success transKey=$transKey pubId=${widget.pubId}',
+      );
 
+      // Même comportement que le flux commande/livraison:
+      // on ne dépend pas d'un retour strict de ChoicePage.
+      if (success) {
+        await _recordPublicitePayment(
+          amountNum,
+          idTransaction: transactionRef,
+        );
+        await _updatePubStatus();
         // Naviguer vers la page de succès
         if (mounted) {
           Navigator.pushAndRemoveUntil(
@@ -406,7 +440,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const PaymentErrorPage()),
+            MaterialPageRoute(
+              builder: (context) => PaymentErrorPage(
+                cancelled: result == null,
+              ),
+            ),
             (route) => false,
           );
         }
@@ -417,7 +455,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const PaymentErrorPage()),
+          MaterialPageRoute(
+            builder: (context) => const PaymentErrorPage(cancelled: false),
+          ),
           (route) => false,
         );
       }
@@ -425,6 +465,127 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  bool _statusToSuccess(String status) {
+    final s = status.toLowerCase().trim();
+    if (s.isEmpty) return false;
+    if (s.contains('fail') ||
+        s.contains('error') ||
+        s.contains('cancel') ||
+        s.contains('annul') ||
+        s.contains('declin') ||
+        s.contains('expired')) {
+      return false;
+    }
+    if (s.contains('success') ||
+        s.contains('successful') ||
+        s.contains('paid') ||
+        s.contains('ok') ||
+        s.contains('completed') ||
+        s.contains('approved')) {
+      return true;
+    }
+    return false;
+  }
+
+  String? _extractTransactionRef(dynamic result) {
+    if (result is Map) {
+      final keys = [
+        'ref',
+        'reference',
+        'id_transaction',
+        'transactionId',
+        'transaction_id',
+        'short_code',
+        'shortCode',
+        'callbackArgs',
+        'payment_reference',
+        'custom_id',
+        'order_id',
+        'id',
+      ];
+      for (final k in keys) {
+        final v = result[k]?.toString().trim();
+        if (v != null && v.isNotEmpty) return v;
+      }
+    }
+    if (result is String) {
+      final parsed = result.trim();
+      if (parsed.startsWith('{') && parsed.endsWith('}')) {
+        try {
+          final map = jsonDecode(parsed);
+          if (map is Map<String, dynamic>) return _extractTransactionRef(map);
+        } catch (_) {}
+      }
+      final uuidReg = RegExp(
+        r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}',
+      );
+      final m = uuidReg.firstMatch(parsed);
+      if (m != null) return m.group(0);
+      final trn = RegExp(r'\bTRN-[A-Z0-9-]+\b', caseSensitive: false)
+          .firstMatch(parsed);
+      if (trn != null) return trn.group(0);
+    }
+    return null;
+  }
+
+  Future<bool> _verifyPaymentWithBackend(String transactionRef) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${getBaseUrl()}/payments/feexpay/public/status/$transactionRef',
+        ),
+      );
+      if (response.statusCode != 200) return false;
+      final body = jsonDecode(response.body);
+      final status = (body['status'] ?? '').toString();
+      final verified = _statusToSuccess(status);
+      log(
+        '[PUB_PAYMENT_APP] verify backend txRef=$transactionRef status=$status verified=$verified',
+      );
+      return verified;
+    } catch (e) {
+      log('[PUB_PAYMENT_APP] verify backend failed txRef=$transactionRef err=$e');
+      return false;
+    }
+  }
+
+  Future<void> _recordPublicitePayment(
+    num amount, {
+    String? idTransaction,
+  }) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      final payload = <String, dynamic>{
+        'transKey': transKey,
+        'amount': amount,
+        'description': 'Paiement publicité ${widget.pubId}',
+        'type': 'publicite',
+        'status': 'success',
+        'publiciteId': widget.pubId,
+      };
+      final tid = idTransaction?.trim();
+      if (tid != null && tid.isNotEmpty) {
+        payload['id_transaction'] = tid;
+        payload['ref'] = tid;
+        payload['reference'] = tid;
+      }
+      await http.post(
+        Uri.parse('${getBaseUrl()}/payments/feexpay/flutter/record'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (idToken != null) 'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode(payload),
+      );
+      log(
+        '[PUB_PAYMENT_APP] recordFeexPayFlutter called pubId=${widget.pubId} amount=$amount transKey=$transKey id_transaction=$tid',
+      );
+    } catch (e) {
+      log('Erreur enregistrement paiement pub: $e');
     }
   }
 
@@ -445,6 +606,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (response.statusCode != 200) {
         log(
           'Erreur mise à jour statut: ${response.statusCode} - ${response.body}',
+        );
+      } else {
+        log(
+          '[PUB_PAYMENT_APP] updateStatut payee ok pubId=${widget.pubId}',
         );
       }
     } catch (e) {

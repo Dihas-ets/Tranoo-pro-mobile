@@ -6,6 +6,9 @@ import 'package:random_string/random_string.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/services/subscription_access_service.dart';
+import 'package:tranoo_pro/data/screens/avant_home.dart';
+import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
+import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
 
 class SellerSubscriptionPage extends StatefulWidget {
   const SellerSubscriptionPage({super.key});
@@ -96,6 +99,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       final amount = (hasDiscount ? (total * 0.9) : total).toStringAsFixed(0);
       final transKey = randomAlphaNumeric(15);
 
+      FeexPayCallbackState.clearPendingAtNewCheckout();
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
@@ -109,18 +113,6 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
           ),
         ),
       );
-
-      final isSuccess = _isFeexPaySuccess(result);
-      if (!isSuccess) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Paiement échoué ou annulé.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
-      }
 
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
@@ -138,6 +130,32 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         ),
       );
 
+      final cb = FeexPayCallbackState.takeLatest();
+      final callbackHint = result is Map && result['successHint'] == true;
+      String? feexId = extractFeexPayTransactionId(result) ?? cb.transactionId;
+      bool isSuccess = feexPayReturnIndicatesSuccess(result) ||
+          cb.success == true ||
+          callbackHint;
+      if (feexId != null && feexId.isNotEmpty) {
+        try {
+          final st = await dio.get('/payments/feexpay/public/status/$feexId');
+          if (st.statusCode == 200 && st.data is Map) {
+            final s = (st.data['status'] ?? '').toString().toLowerCase();
+            final verified = s.contains('success') ||
+                s.contains('successful') ||
+                s.contains('paid') ||
+                s.contains('ok') ||
+                s.contains('completed') ||
+                s.contains('approved');
+            isSuccess = isSuccess || verified;
+          }
+        } catch (_) {}
+      }
+
+      if (!isSuccess) {
+        return;
+      }
+
       await dio.post(
         '/payments/feexpay/flutter/record',
         data: {
@@ -147,6 +165,9 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
           'type': 'subscription',
           'status': 'success',
           'duree': '$_selectedMonths mois',
+          if (feexId != null && feexId.isNotEmpty) 'id_transaction': feexId,
+          if (feexId != null && feexId.isNotEmpty) 'ref': feexId,
+          if (feexId != null && feexId.isNotEmpty) 'reference': feexId,
         },
       );
 
@@ -160,6 +181,12 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
           content: Text('Paiement réussi : abonnement activé avec succès.'),
           backgroundColor: Colors.green,
         ),
+      );
+      await Future.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AvantHome()),
+        (route) => false,
       );
     } catch (e) {
       if (!mounted) return;
@@ -199,19 +226,6 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       'juil', 'août', 'sept', 'oct', 'nov', 'déc'
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
-  bool _isFeexPaySuccess(dynamic result) {
-    if (result == null) return false;
-    if (result is bool) return result;
-    final payload = result.toString().toLowerCase();
-    if (payload.contains('success') ||
-        payload.contains('successful') ||
-        payload.contains('paid') ||
-        payload.contains('ok')) {
-      return true;
-    }
-    return false;
   }
 
   @override

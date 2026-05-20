@@ -5,6 +5,7 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 // import 'payement.dart'; // Plus utilisé
 import 'package:tranoo_pro/services/user_service.dart'; // Importez UserService pour gérer les rôles
 import 'package:tranoo_pro/services/cart_service.dart';
+import 'package:tranoo_pro/utils/amount_display.dart';
 import 'cart_page.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 // import 'package:tranoo_pro/data/screens/paymentscreen.dart';
@@ -18,6 +19,7 @@ import 'dart:developer';
 import 'une.dart' as pub_page; // Import pour la page de demande de pub avec préfixe
 // import 'verification_payment.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart'; // Pour la sélection d'images
 import 'package:flutter/services.dart'; // Pour decodeImageFromList
@@ -80,6 +82,7 @@ class _MastervacPageState extends State<MastervacPage> {
   // Champs de livraison/lieu supprimés - gérés dans OrderSummaryPage
   late ConfettiController _confettiController;
   bool _isOnline = false;
+  String? _sellerPhone;
   
   // Variables pour la gestion des images
   List<File> _selectedImages = [];
@@ -106,11 +109,13 @@ class _MastervacPageState extends State<MastervacPage> {
   @override
   void initState() {
     super.initState();
+    trackArticleView(widget.id);
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 2),
     );
     _pageController = PageController(initialPage: _currentImageIndex);
-    _loadArticleStatut();
+    _sellerPhone = _phoneFromFournisseurWidget();
+    _loadArticleDetails();
 
     _editTitleController = TextEditingController(text: widget.title);
     _editYearController = TextEditingController(text: widget.year);
@@ -304,7 +309,81 @@ class _MastervacPageState extends State<MastervacPage> {
     }
   }
 
-  Future<void> _loadArticleStatut() async {
+  String? _phoneFromFournisseurWidget() {
+    final f = widget.fournisseur;
+    if (f == null) return null;
+    final phone = f['telephone']?.toString().trim() ?? '';
+    return phone.isEmpty ? null : phone;
+  }
+
+  String? _extractSellerPhone(Map<String, dynamic> data) {
+    final fournisseur = data['fournisseur'];
+    if (fournisseur is Map) {
+      final phone = fournisseur['telephone']?.toString().trim() ?? '';
+      if (phone.isNotEmpty) return phone;
+    }
+    final vendeur = data['vendeur'];
+    if (vendeur is Map) {
+      final phone = vendeur['telephone']?.toString().trim() ?? '';
+      if (phone.isNotEmpty) return phone;
+    }
+    return null;
+  }
+
+  String _digitsOnly(String raw) => raw.replaceAll(RegExp(r'\D'), '');
+
+  void _showSellerContactUnavailable() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Numéro du vendeur indisponible')),
+    );
+  }
+
+  Future<void> _openSellerWhatsApp() async {
+    final phone = _sellerPhone?.trim() ?? '';
+    if (phone.isEmpty) {
+      _showSellerContactUnavailable();
+      return;
+    }
+    final digits = _digitsOnly(phone);
+    if (digits.isEmpty) {
+      _showSellerContactUnavailable();
+      return;
+    }
+    final uri = Uri.parse('https://wa.me/$digits');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
+    );
+  }
+
+  Future<void> _callSeller() async {
+    final phone = _sellerPhone?.trim() ?? '';
+    if (phone.isEmpty) {
+      _showSellerContactUnavailable();
+      return;
+    }
+    final digits = _digitsOnly(phone);
+    if (digits.isEmpty) {
+      _showSellerContactUnavailable();
+      return;
+    }
+    final uri = Uri.parse('tel:+$digits');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Impossible de passer un appel')),
+    );
+  }
+
+  Future<void> _loadArticleDetails() async {
     try {
       final id = widget.id;
       if (id == null || id.isEmpty) return;
@@ -318,11 +397,13 @@ class _MastervacPageState extends State<MastervacPage> {
         },
       );
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
         final statut = (data['statut'] ?? '').toString().toLowerCase();
+        final phone = _extractSellerPhone(data) ?? _sellerPhone;
         if (!mounted) return;
         setState(() {
           _isOnline = (statut == 'en_ligne');
+          _sellerPhone = phone;
         });
       }
     } catch (_) {}
@@ -691,18 +772,7 @@ class _MastervacPageState extends State<MastervacPage> {
             children: [
               // WhatsApp
               GestureDetector(
-                onTap: () async {
-                  final url = 'https://wa.me/22941839801';
-                  final uri = Uri.parse(url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  } else {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
-                    );
-                  }
-                },
+                onTap: _openSellerWhatsApp,
                 child: CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.white,
@@ -721,18 +791,7 @@ class _MastervacPageState extends State<MastervacPage> {
               const SizedBox(height: 8),
               // Appel téléphonique
               GestureDetector(
-                onTap: () async {
-                  final url = 'tel:+2290141839801';
-                  final uri = Uri.parse(url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri);
-                  } else {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Impossible de passer un appel')),
-                    );
-                  }
-                },
+                onTap: _callSeller,
                 child: CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.white,
@@ -864,7 +923,9 @@ class _MastervacPageState extends State<MastervacPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          widget.price.isNotEmpty ? '${widget.price} FCFA' : 'Non renseigné',
+          widget.price.isNotEmpty
+              ? '${formatFcfaDots(widget.price)} FCFA'
+              : 'Non renseigné',
           style: TextStyle(
             fontSize: 20,
             color: Colors.grey[800],
@@ -920,7 +981,9 @@ class _MastervacPageState extends State<MastervacPage> {
         ),
         _buildSpecCard(
           'Localisation',
-          (widget.location?.isNotEmpty == true) ? widget.location! : 'Non renseigné',
+          (widget.location?.isNotEmpty == true)
+              ? truncateWithEllipsis(widget.location!.trim())
+              : 'Non renseigné',
           Icons.location_on,
         ),
       ],
@@ -984,7 +1047,7 @@ class _MastervacPageState extends State<MastervacPage> {
                 articleId: (widget.id ?? '').toString(),
                 title: widget.title,
                 imageUrl: firstImage.isEmpty ? null : firstImage,
-                priceLabel: widget.price,
+                priceLabel: formatFcfaDots(widget.price),
                 pieceType: widget.pieceType,
                 model: widget.model,
                 fuelType: widget.fuelType,
@@ -1054,7 +1117,7 @@ class _MastervacPageState extends State<MastervacPage> {
                 articleId: (widget.id ?? '').toString(),
                 title: widget.title,
                 imageUrl: firstImage.isEmpty ? null : firstImage,
-                priceLabel: widget.price,
+                priceLabel: formatFcfaDots(widget.price),
                 pieceType: widget.pieceType,
                 model: widget.model,
                 fuelType: widget.fuelType,

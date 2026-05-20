@@ -9,7 +9,27 @@ import 'mastervacpage.dart';
 import 'create_sell2.dart';
 import 'seller_subscription_page.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
+import 'package:tranoo_pro/utils/article_list_sort.dart';
+import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/utils/page_refresh_registry.dart';
+
+// Fonction utilitaire pour formater les prix avec des séparateurs de milliers
+String formatPrice(dynamic price) {
+  if (price == null) return '0';
+  try {
+    final priceNum = double.tryParse(price.toString()) ?? 0;
+    final priceStr = priceNum.toStringAsFixed(0);
+    final reversed = priceStr.split('').reversed.join('');
+    final withDots = reversed.replaceAllMapped(
+      RegExp(r'(\d{3})(?=\d)'),
+      (Match m) => '${m[0]}.',
+    );
+    return withDots.split('').reversed.join('');
+  } catch (e) {
+    return price.toString();
+  }
+}
 
 class Piece extends StatefulWidget {
   const Piece({super.key});
@@ -18,7 +38,10 @@ class Piece extends StatefulWidget {
   State<Piece> createState() => _PieceState();
 }
 
-class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
+class _PieceState extends State<Piece>
+    with SingleTickerProviderStateMixin, RegisterPageRefresh {
+  @override
+  Future<void> onPagePullRefresh() async => fetchPieces();
   List<dynamic> pieces = [];
   bool isLoading = true;
   String? error;
@@ -142,27 +165,38 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
       String url = getBaseUrl() + '/articles?type=piece';
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 8));
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (idToken != null && idToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $idToken';
+      }
+      final response = await http
+          .get(
+            Uri.parse(url),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final List<dynamic> data = sortArticleMapsNewestFirst(
+          jsonDecode(response.body) as List<dynamic>,
+        );
         setState(() {
           pieces = data;
           _isVisible = List.generate(data.length, (index) => true);
           isLoading = false;
         });
       } else {
+        debugPrint('[PIECES] HTTP ${response.statusCode}: ${response.body}');
         setState(() {
-          error = 'Erreur lors du chargement des pièces';
+          error = response.statusCode == 401
+              ? 'Session expirée. Reconnectez-vous.'
+              : 'Erreur lors du chargement des pièces';
           isLoading = false;
         });
       }
     } catch (e) {
+      debugPrint('[PIECES] fetchPieces exception: $e');
       setState(() {
         error = 'Erreur réseau';
         isLoading = false;
@@ -230,6 +264,27 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
     }
   }
 
+  Widget _sellerCardAction({
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onPressed,
+  }) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: Icon(icon, color: color, size: 18),
+        ),
+      ),
+    );
+  }
+
   String _formatDate(DateTime? date) {
     if (date == null) return '--';
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
@@ -291,6 +346,13 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                 'Tarif Plan Pro: ${status.monthlyPriceFcfa} FCFA / mois',
                 style: const TextStyle(color: Color(0xFFB45309)),
               ),
+              if (status.freeTrialActive && !status.paidPlanActive) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Vous pouvez souscrire maintenant: le Plan Pro commencera apres la fin du Plan Decouverte.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -298,15 +360,14 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
               onPressed: () => Navigator.pop(ctx, 'cancel'),
               child: const Text('Fermer'),
             ),
-            if (!canContinue)
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, 'subscribe'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF8BF13),
-                  foregroundColor: Colors.black,
-                ),
-                child: const Text('Voir abonnement'),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(ctx, 'subscribe'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.black,
+                side: const BorderSide(color: Color(0xFFF8BF13)),
               ),
+              child: Text(canContinue ? 'Souscrire' : 'Voir abonnement'),
+            ),
             if (canContinue)
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, 'continue'),
@@ -457,14 +518,14 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SizedBox(
-        height: 100 + 16,
+        height: 70 + 16,
         child: GridView.builder(
           scrollDirection: Axis.horizontal,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 1,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-            mainAxisExtent: 100,
+            mainAxisExtent: 70,
           ),
           itemCount: marques.length,
           itemBuilder: (context, index) {
@@ -512,19 +573,6 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                         },
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item["name"] ?? '',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _selectedBrand == item["name"]
-                            ? Colors.white
-                            : Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                   ],
                 ),
               ),
@@ -554,14 +602,14 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SizedBox(
-        height: 90 + 16,
+        height: 60 + 16,
         child: GridView.builder(
           scrollDirection: Axis.horizontal,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 1,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-            mainAxisExtent: 120,
+            mainAxisExtent: 80,
           ),
           itemCount: modeles.length,
           itemBuilder: (context, index) {
@@ -858,7 +906,8 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final userService = UserService();
     final isVendeur = userService.currentRole == UserRole.vendeur;
-    final isChauffeur = userService.currentRole == UserRole.chauffeur || userService.currentRole == UserRole.livreur;
+    final isChauffeur = userService.currentRole == UserRole.chauffeur ||
+        userService.currentRole == UserRole.livreur;
 
     final filteredPieces = _applyFilters(pieces).where((p) {
       final title = (p['titre'] ?? '').toString().toLowerCase();
@@ -875,7 +924,8 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Container(
                 margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: (_accessStatus?.canCreateArticle ?? false)
                       ? Colors.green.shade100
@@ -970,11 +1020,15 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                             _buildTabButton("Marque", _marqueTabIndex),
                             _buildTabButton("Modèles", _modeleTabIndex),
                             if (isVendeur)
-                              _buildTabButton("En attente", _statusPendingTabIndex, isWide: true),
+                              _buildTabButton(
+                                  "En attente", _statusPendingTabIndex,
+                                  isWide: true),
                             if (isVendeur)
-                              _buildTabButton("En ligne", _statusOnlineTabIndex, isWide: true),
+                              _buildTabButton("En ligne", _statusOnlineTabIndex,
+                                  isWide: true),
                             if (isVendeur)
-                              _buildTabButton("Rejeté", _statusRejectedTabIndex, isWide: true),
+                              _buildTabButton("Rejeté", _statusRejectedTabIndex,
+                                  isWide: true),
                             if (!isVendeur)
                               _buildTabButton(
                                 "Localisation",
@@ -1037,238 +1091,354 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                     child: Stack(
                                       children: [
                                         ColorFiltered(
-                                          colorFilter: isVendeur && !canManagePieces
-                                              ? const ColorFilter.matrix(<double>[
-                                                  0.2126, 0.7152, 0.0722, 0, 0,
-                                                  0.2126, 0.7152, 0.0722, 0, 0,
-                                                  0.2126, 0.7152, 0.0722, 0, 0,
-                                                  0, 0, 0, 1, 0,
-                                                ])
-                                              : const ColorFilter.mode(
-                                                  Colors.transparent,
-                                                  BlendMode.dst,
-                                                ),
-                                          child: GestureDetector(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    MastervacPage(
-                                                  id: (piece['_id'] ??
-                                                          piece['id'] ??
-                                                          piece['articleId'] ??
-                                                          piece['Id'] ??
-                                                          piece['article'])
-                                                      ?.toString(),
-                                                  isAcheteur: isChauffeur,
-                                                  title: piece['titre'] ?? '',
-                                                  year: piece['annee'] ?? '',
-                                                  description:
-                                                      piece['description'] ??
-                                                          '',
-                                                  company:
-                                                      piece['entreprise'] ?? '',
-                                                  location:
-                                                      piece['localisation'] ??
-                                                          '',
-                                                  price: piece['prix']
-                                                          ?.toString() ??
-                                                      '',
-                                                  images:
-                                                      (piece['photos'] as List?)
-                                                              ?.map((e) =>
-                                                                  e.toString())
-                                                              .toList() ??
-                                                          [],
-                                                  fuelType: piece['typeMoteur'],
-                                                  model: piece['modele']
-                                                      ?.toString(),
-                                                  pieceType: piece['pieceType'],
-                                                  video: piece['video'],
-                                                ),
-                                              ),
-                                            ).then((_) => fetchPieces());
-                                          },
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black12
-                                                      .withOpacity(0.08),
-                                                  blurRadius: 12,
-                                                  offset: const Offset(0, 6),
-                                                ),
-                                              ],
-                                            ),
-                                            padding: const EdgeInsets.all(10),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(16),
-                                                  child: SizedBox(
-                                                    height: 100,
-                                                    width: double.infinity,
-                                                    child: Stack(
-                                                      children: [
-                                                        Positioned.fill(
-                                                          child: (piece['photos']
-                                                                          as List?)
-                                                                      ?.isNotEmpty ==
-                                                                  true
-                                                              ? Image.network(
-                                                                  piece['photos'][0],
-                                                                  fit: BoxFit.cover,
-                                                                )
-                                                              : (piece['video'] !=
-                                                                          null &&
-                                                                      (piece['video']
-                                                                              ?.toString()
-                                                                              .isNotEmpty ??
-                                                                          false))
-                                                                  ? VideoPreviewPlaceholder(
-                                                                      videoUrl: piece['video']?.toString(),
-                                                                      iconSize: 36,
-                                                                    )
-                                                                  : Container(
-                                                                      color: Colors
-                                                                          .grey[200],
-                                                                      child:
-                                                                          const Icon(
-                                                                        Icons
-                                                                            .image_not_supported,
-                                                                        size: 30,
-                                                                        color: Colors
-                                                                            .black26,
-                                                                      ),
-                                                                    ),
-                                                        ),
-                                                        Positioned(
-                                                          top: 6,
-                                                          right: 6,
-                                                          child: Builder(
-                                                            builder: (context) {
-                                                              final status =
-                                                                  (piece['statut'] ?? '')
-                                                                      .toString()
-                                                                      .toLowerCase();
-                                                              Color bg;
-                                                              Color fg;
-                                                              String label;
-                                                              if (status == 'en_ligne') {
-                                                                bg = const Color(0xFFE8F5E9);
-                                                                fg = const Color(0xFF2E7D32);
-                                                                label = 'En ligne';
-                                                              } else if (status == 'en_attente') {
-                                                                bg = const Color(0xFFFFF8E1);
-                                                                fg = const Color(0xFFB45309);
-                                                                label = 'En attente';
-                                                              } else {
-                                                                bg = const Color(0xFFFFEBEE);
-                                                                fg = const Color(0xFFC62828);
-                                                                label = 'Rejeté';
-                                                              }
-                                                              return Container(
-                                                                padding:
-                                                                    const EdgeInsets.symmetric(
-                                                                  horizontal: 8,
-                                                                  vertical: 4,
-                                                                ),
-                                                                decoration: BoxDecoration(
-                                                                  color: bg,
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(10),
-                                                                ),
-                                                                child: Text(
-                                                                  label,
-                                                                  style: TextStyle(
-                                                                    color: fg,
-                                                                    fontWeight:
-                                                                        FontWeight.w700,
-                                                                    fontSize: 10,
-                                                                  ),
-                                                                ),
-                                                              );
-                                                            },
-                                                          ),
-                                                        ),
-                                                      ],
+                                          colorFilter:
+                                              isVendeur && !canManagePieces
+                                                  ? const ColorFilter
+                                                      .matrix(<double>[
+                                                      0.2126,
+                                                      0.7152,
+                                                      0.0722,
+                                                      0,
+                                                      0,
+                                                      0.2126,
+                                                      0.7152,
+                                                      0.0722,
+                                                      0,
+                                                      0,
+                                                      0.2126,
+                                                      0.7152,
+                                                      0.0722,
+                                                      0,
+                                                      0,
+                                                      0,
+                                                      0,
+                                                      0,
+                                                      1,
+                                                      0,
+                                                    ])
+                                                  : const ColorFilter.mode(
+                                                      Colors.transparent,
+                                                      BlendMode.dst,
                                                     ),
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              final articleMap =
+                                                  Map<String, dynamic>.from(
+                                                      piece);
+                                              trackArticleView(
+                                                  articleIdFromMap(articleMap));
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      MastervacPage(
+                                                    id: (piece['_id'] ??
+                                                            piece['id'] ??
+                                                            piece[
+                                                                'articleId'] ??
+                                                            piece['Id'] ??
+                                                            piece['article'])
+                                                        ?.toString(),
+                                                    isAcheteur: isChauffeur,
+                                                    title: piece['titre'] ?? '',
+                                                    year: piece['annee'] ?? '',
+                                                    description:
+                                                        piece['description'] ??
+                                                            '',
+                                                    company:
+                                                        piece['entreprise'] ??
+                                                            '',
+                                                    location:
+                                                        piece['localisation'] ??
+                                                            '',
+                                                    price: piece['prix']
+                                                            ?.toString() ??
+                                                        '',
+                                                    images: (piece['photos']
+                                                                as List?)
+                                                            ?.map((e) =>
+                                                                e.toString())
+                                                            .toList() ??
+                                                        [],
+                                                    fuelType:
+                                                        piece['typeMoteur'],
+                                                    model: piece['modele']
+                                                        ?.toString(),
+                                                    pieceType:
+                                                        piece['pieceType'],
+                                                    video: piece['video'],
                                                   ),
                                                 ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  piece['titre'] ??
-                                                      'Sans titre',
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 13,
+                                              ).then((_) => fetchPieces());
+                                            },
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black12
+                                                        .withOpacity(0.08),
+                                                    blurRadius: 12,
+                                                    offset: const Offset(0, 6),
                                                   ),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  piece['entreprise'] ??
-                                                      'Entreprise inconnue',
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: Colors.black54,
-                                                    fontSize: 11,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 10),
-                                                Container(
-                                                  width: double.infinity,
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 5),
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        const Color(0xFFFFF5E5),
+                                                ],
+                                              ),
+                                              padding: const EdgeInsets.all(10),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
-                                                            14),
+                                                            16),
+                                                    child: SizedBox(
+                                                      height: 100,
+                                                      width: double.infinity,
+                                                      child: Stack(
+                                                        children: [
+                                                          Positioned.fill(
+                                                            child: (piece['photos']
+                                                                            as List?)
+                                                                        ?.isNotEmpty ==
+                                                                    true
+                                                                ? Image.network(
+                                                                    piece['photos']
+                                                                        [0],
+                                                                    fit: BoxFit
+                                                                        .cover,
+                                                                  )
+                                                                : (piece['video'] !=
+                                                                            null &&
+                                                                        (piece['video']?.toString().isNotEmpty ??
+                                                                            false))
+                                                                    ? VideoPreviewPlaceholder(
+                                                                        videoUrl:
+                                                                            piece['video']?.toString(),
+                                                                        iconSize:
+                                                                            36,
+                                                                      )
+                                                                    : Container(
+                                                                        color: Colors
+                                                                            .grey[200],
+                                                                        child:
+                                                                            const Icon(
+                                                                          Icons
+                                                                              .image_not_supported,
+                                                                          size:
+                                                                              30,
+                                                                          color:
+                                                                              Colors.black26,
+                                                                        ),
+                                                                      ),
+                                                          ),
+                                                          Positioned(
+                                                            top: 6,
+                                                            right: 6,
+                                                            child: Builder(
+                                                              builder:
+                                                                  (context) {
+                                                                final status =
+                                                                    (piece['statut'] ??
+                                                                            '')
+                                                                        .toString()
+                                                                        .toLowerCase();
+                                                                Color bg;
+                                                                Color fg;
+                                                                String label;
+                                                                if (status ==
+                                                                    'en_ligne') {
+                                                                  bg = const Color(
+                                                                      0xFFE8F5E9);
+                                                                  fg = const Color(
+                                                                      0xFF2E7D32);
+                                                                  label =
+                                                                      'En ligne';
+                                                                } else if (status ==
+                                                                    'en_attente') {
+                                                                  bg = const Color(
+                                                                      0xFFFFF8E1);
+                                                                  fg = const Color(
+                                                                      0xFFB45309);
+                                                                  label =
+                                                                      'En attente';
+                                                                } else {
+                                                                  bg = const Color(
+                                                                      0xFFFFEBEE);
+                                                                  fg = const Color(
+                                                                      0xFFC62828);
+                                                                  label =
+                                                                      'Rejeté';
+                                                                }
+                                                                return Container(
+                                                                  padding:
+                                                                      const EdgeInsets
+                                                                          .symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                    vertical: 4,
+                                                                  ),
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: bg,
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            10),
+                                                                  ),
+                                                                  child: Text(
+                                                                    label,
+                                                                    style:
+                                                                        TextStyle(
+                                                                      color: fg,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w700,
+                                                                      fontSize:
+                                                                          10,
+                                                                    ),
+                                                                  ),
+                                                                );
+                                                              },
+                                                            ),
+                                                          ),
+                                                          Positioned(
+                                                            bottom: 6,
+                                                            left: 6,
+                                                            child:
+                                                                buildArticleViewBadge(
+                                                              articleViewsFromMap(
+                                                                Map<String,
+                                                                        dynamic>.from(
+                                                                    piece),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          if (isVendeur)
+                                                            Positioned(
+                                                              right: 6,
+                                                              bottom: 6,
+                                                              child: Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  _sellerCardAction(
+                                                                    icon: Icons
+                                                                        .edit,
+                                                                    color: const Color(
+                                                                        0xFF0461B6),
+                                                                    onPressed:
+                                                                        canManagePieces
+                                                                            ? () {
+                                                                                final id = (piece['_id'] ?? piece['id'] ?? piece['articleId'] ?? piece['Id'] ?? piece['article'])?.toString();
+                                                                                Navigator.push(
+                                                                                  context,
+                                                                                  MaterialPageRoute(
+                                                                                    builder: (context) => CreateSellPage2(
+                                                                                      editMode: true,
+                                                                                      editArticleId: id,
+                                                                                      initialData: Map<String, dynamic>.from(piece),
+                                                                                    ),
+                                                                                  ),
+                                                                                ).then((_) => fetchPieces());
+                                                                              }
+                                                                            : null,
+                                                                  ),
+                                                                  const SizedBox(
+                                                                      width: 6),
+                                                                  _sellerCardAction(
+                                                                    icon: Icons
+                                                                        .close,
+                                                                    color: Colors
+                                                                        .red,
+                                                                    onPressed: canManagePieces
+                                                                        ? () => _deletePiece(
+                                                                              pieceId,
+                                                                              index,
+                                                                            )
+                                                                        : null,
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ),
                                                   ),
-                                                  child: Text(
-                                                    piece['prix'] != null
-                                                        ? "${piece['prix']} FCFA"
-                                                        : 'Prix non communiqué',
-                                                    textAlign: TextAlign.center,
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    piece['titre'] ??
+                                                        'Sans titre',
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: const TextStyle(
-                                                      color: Color(0xFFB45309),
                                                       fontWeight:
                                                           FontWeight.w600,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    piece['entreprise'] ??
+                                                        'Entreprise inconnue',
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      color: Colors.black54,
                                                       fontSize: 11,
                                                     ),
                                                   ),
-                                                ),
-                                              ],
+                                                  const SizedBox(height: 10),
+                                                  Container(
+                                                    width: double.infinity,
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 5),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(
+                                                          0xFFFFF5E5),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              14),
+                                                    ),
+                                                    child: Text(
+                                                      piece['prix'] != null
+                                                          ? "${formatPrice(piece['prix'])} FCFA"
+                                                          : 'Prix non communiqué',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      style: const TextStyle(
+                                                        color:
+                                                            Color(0xFFB45309),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
-                                        ),
                                         ),
                                         if (isVendeur && !canManagePieces)
                                           Positioned.fill(
                                             child: Container(
                                               decoration: BoxDecoration(
-                                                color: Colors.white.withOpacity(0.45),
+                                                color: Colors.white
+                                                    .withOpacity(0.45),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
                                               ),
                                               alignment: Alignment.center,
                                               child: Container(
-                                                padding: const EdgeInsets.symmetric(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
                                                   horizontal: 10,
                                                   vertical: 6,
                                                 ),
@@ -1286,58 +1456,6 @@ class _PieceState extends State<Piece> with SingleTickerProviderStateMixin {
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                          ),
-                                        if (isVendeur)
-                                          Positioned(
-                                            top: 6,
-                                            right: 6,
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  tooltip: 'Modifier',
-                                                  icon: const Icon(
-                                                    Icons.edit,
-                                                    color: Color(0xFF0461B6),
-                                                    size: 20,
-                                                  ),
-                                                  onPressed: canManagePieces
-                                                      ? () {
-                                                          final id = (piece['_id'] ??
-                                                                  piece['id'] ??
-                                                                  piece['articleId'] ??
-                                                                  piece['Id'] ??
-                                                                  piece['article'])
-                                                              ?.toString();
-                                                          Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                              builder: (context) =>
-                                                                  CreateSellPage2(
-                                                                editMode: true,
-                                                                editArticleId: id,
-                                                                initialData: Map<String, dynamic>.from(piece),
-                                                              ),
-                                                            ),
-                                                          ).then((_) => fetchPieces());
-                                                        }
-                                                      : null,
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.close,
-                                                    color: Colors.red,
-                                                    size: 20,
-                                                  ),
-                                                  onPressed: canManagePieces
-                                                      ? () => _deletePiece(
-                                                            pieceId,
-                                                            index,
-                                                          )
-                                                      : null,
-                                                ),
-                                              ],
                                             ),
                                           ),
                                       ],

@@ -10,6 +10,9 @@ import 'dart:developer' as developer;
 import '../../services/cart_service.dart';
 import '../../services/user_service.dart';
 import 'map_picker_screen.dart';
+import 'avant_home.dart';
+import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
+import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
 
 enum PaymentMethod { cash, online }
 
@@ -319,7 +322,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                                 return;
                               }
                               // Auto-redirection directe vers FeexPay
-                              await _processOnlinePayment(total);
+                              await _processOnlinePayment(total, cart);
                             },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
@@ -478,8 +481,12 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
         // Afficher le modal de succès
         await _showSuccessModal();
 
-        // Retourner à l'accueil
-        Navigator.pop(context);
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const AvantHome()),
+            (route) => false,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -495,7 +502,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
     }
   }
 
-  Future<void> _processOnlinePayment(double total) async {
+  Future<void> _processOnlinePayment(double total, CartService cart) async {
     setState(() => _isProcessing = true);
 
     try {
@@ -506,8 +513,8 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
         throw Exception('Configuration FeexPay manquante');
       }
 
-      // Redirection directe vers FeexPay
-      await Navigator.push(
+      FeexPayCallbackState.clearPendingAtNewCheckout();
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder:
@@ -522,7 +529,52 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
         ),
       );
 
-      if (mounted) Navigator.pop(context, true);
+      if (!mounted) return;
+
+      final cb = FeexPayCallbackState.takeLatest();
+      final callbackHint = result is Map && result['successHint'] == true;
+      final txId = extractFeexPayTransactionId(result) ??
+          cb.transactionId;
+      var paid = feexPayReturnIndicatesSuccess(result) ||
+          cb.success == true ||
+          callbackHint;
+      if (txId != null && txId.isNotEmpty) {
+        try {
+          final probe = Dio();
+          final st = await probe.get(
+            '${UserService().dio.options.baseUrl}/payments/feexpay/public/status/$txId',
+          );
+          if (st.statusCode == 200 && st.data is Map) {
+            final s = (st.data['status'] ?? '').toString().toLowerCase();
+            paid = paid ||
+                s.contains('success') ||
+                s.contains('successful') ||
+                s.contains('paid') ||
+                s.contains('ok') ||
+                s.contains('completed') ||
+                s.contains('approved');
+          }
+        } catch (e) {
+          developer.log('[ORDER_ONLINE] public/status: $e', name: 'OrderSummary');
+        }
+      }
+
+      if (!paid) {
+        return;
+      }
+
+      await _recordCartFeexPayOnline(total, txId);
+
+      await _saveOrderToDatabase(total, cart, 'online');
+      await cart.clear();
+      await _showSuccessModal();
+
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const AvantHome()),
+          (route) => false,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -534,6 +586,43 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _recordCartFeexPayOnline(double total, String? txId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final token = await user.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: UserService().dio.options.baseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final body = <String, dynamic>{
+        'transKey': _transKey,
+        'amount': total.round(),
+        'description': 'Commande panier Tranoo Pro (paiement en ligne)',
+        'type': 'achat',
+        'status': 'success',
+      };
+      final tid = txId?.trim();
+      if (tid != null && tid.isNotEmpty) {
+        body['id_transaction'] = tid;
+        body['ref'] = tid;
+        body['reference'] = tid;
+      }
+      final res = await dio.post('/payments/feexpay/flutter/record', data: body);
+      developer.log(
+        '[ORDER_ONLINE] recordFeexPayFlutter status=${res.statusCode} data=${res.data}',
+        name: 'OrderSummary',
+      );
+    } catch (e) {
+      developer.log('[ORDER_ONLINE] recordFeexPayFlutter error: $e', name: 'OrderSummary');
     }
   }
 
@@ -697,7 +786,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                       ),
                     ),
                     child: const Text(
-                      'Parfait !',
+                      'Retour à l\'accueil',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

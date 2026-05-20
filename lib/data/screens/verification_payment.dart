@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'marque.dart';
@@ -7,6 +9,9 @@ import '../../services/user_service.dart';
 import 'package:feexpay_flutter/feexpay_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:random_string/random_string.dart';
+import 'package:http/http.dart' as http;
+import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
+import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
 
 final fpToken = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
 final idUser = dotenv.env['ID_USER_FEEXPAY'] ?? '';
@@ -26,10 +31,41 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
   bool isLoading = false;
   String? errorMessage;
   late final String transKey;
+  int _verificationPrice = 20000;
+
+  String _formatFcfa(int value) {
+    final priceStr = value.toString();
+    final reversed = priceStr.split('').reversed.join('');
+    final withDots = reversed.replaceAllMapped(
+      RegExp(r'(\d{3})(?=\d)'),
+      (Match m) => '${m[0]}.',
+    );
+    return withDots.split('').reversed.join('');
+  }
+
+  Future<void> _loadVerificationPrice() async {
+    try {
+      final url =
+          '${UserService().dio.options.baseUrl}/admin/verification-pricing';
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final raw = data['prixVerification'] ??
+            (data['pricing'] is Map
+                ? data['pricing']['prixVerification']
+                : null);
+        final parsed = int.tryParse('$raw');
+        if (parsed != null && parsed >= 0 && mounted) {
+          setState(() => _verificationPrice = parsed);
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadVerificationPrice();
     // Trans key encodant l'articleId si fourni pour usage côté web (paiements-details)
     // Format attendu côté web: VERIFICATION_<ObjectId>_...
     if ((widget.articleId ?? '').isNotEmpty) {
@@ -150,9 +186,9 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                      '10 000 FCFA',  
-                            style: TextStyle(
+                          Text(
+                            '${_formatFcfa(_verificationPrice)} FCFA',
+                            style: const TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF00A86B),
@@ -202,9 +238,9 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
                         color: Colors.white,
                         strokeWidth: 2,
                       )
-                    : const Text(
-                          'Procéder au paiement - 10 000 FCFA',
-                        style: TextStyle(
+                    : Text(
+                          'Procéder au paiement - ${_formatFcfa(_verificationPrice)} FCFA',
+                        style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
@@ -296,6 +332,7 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
         throw Exception('Configuration FeexPay manquante');
       }
 
+      FeexPayCallbackState.clearPendingAtNewCheckout();
       // Navigation vers FeexPay avec le package officiel
       final result = await Navigator.push(
         context,
@@ -303,7 +340,7 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
           builder: (context) => ChoicePage(
             token: fpToken,
             id: idUser,
-            amount: '10000', // Montant test 10 000 FCFA
+            amount: _verificationPrice.toString(),
             redirecturl:
                 (successUrl.isNotEmpty ? successUrl : '/verification-success'),
             errorredirecturl:
@@ -313,25 +350,92 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
         ),
       );
 
-      // Le résultat sera géré par les routes de redirection
-      if (result != null) {
-        // Traiter la demande serveur puis afficher HTML succès et rediriger vers Marque
-        await _processVerificationRequest();
+      if (!mounted) return;
+      final cb = FeexPayCallbackState.takeLatest();
+      final callbackHint = result is Map && result['successHint'] == true;
+      var paid = feexPayReturnIndicatesSuccess(result) ||
+          cb.success == true ||
+          callbackHint;
+      var txId = extractFeexPayTransactionId(result) ?? cb.transactionId;
+      if (!paid && txId != null && txId.isNotEmpty) {
+        try {
+          final url = Uri.parse(
+            '${getBaseUrl()}/payments/feexpay/public/status/$txId',
+          );
+          final r = await http.get(url);
+          if (r.statusCode == 200) {
+            final body = jsonDecode(r.body) as Map<String, dynamic>;
+            final st = (body['status'] ?? '').toString().toLowerCase();
+            paid = st.contains('success') ||
+                st.contains('successful') ||
+                st.contains('paid') ||
+                st.contains('ok') ||
+                st.contains('completed') ||
+                st.contains('approved');
+          }
+        } catch (e) {
+          debugPrint('[verification_payment] public/status fallback: $e');
+        }
+      }
+      if (paid) {
+        await _recordVerificationFeexPayFlutter(txId);
+        try {
+          await _processVerificationRequest();
+        } catch (e) {
+          if (mounted) {
+            setState(() => errorMessage = 'Erreur enregistrement: $e');
+          }
+          return;
+        }
         if (!mounted) return;
+        // Affiche notre écran de succès après la fermeture du flux FeexPay (le SDK peut montrer son propre message avant).
         await _showHtmlResultAndRedirect(success: true);
       }
+      // Échec / annulation FeexPay : pas de page d'erreur HTML (évite double UX avec le SDK).
     } catch (e) {
       setState(() {
         errorMessage = 'Erreur: $e';
       });
-      // Affichage page d'échec puis redirection
-      if (mounted) {
-        await _showHtmlResultAndRedirect(success: false);
-      }
     } finally {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _recordVerificationFeexPayFlutter(String? txId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final token = await user.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: UserService().dio.options.baseUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final body = <String, dynamic>{
+        'transKey': transKey,
+        'amount': _verificationPrice,
+        'description': 'Frais vérification documents',
+        'type': 'verification',
+        'status': 'success',
+      };
+      final tid = txId?.trim();
+      if (tid != null && tid.isNotEmpty) {
+        body['id_transaction'] = tid;
+        body['ref'] = tid;
+        body['reference'] = tid;
+      }
+      final res = await dio.post('/payments/feexpay/flutter/record', data: body);
+      debugPrint(
+        '[VerificationPayment] recordFeexPayFlutter status=${res.statusCode} data=${res.data}',
+      );
+    } catch (e) {
+      debugPrint('[VerificationPayment] recordFeexPayFlutter error: $e');
     }
   }
 
@@ -353,7 +457,7 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
     try {
       final response = await dio.post('/verification/request', data: {
         'type': 'document_verification',
-        'amount': 10000, // Montant test 10 000 FCFA
+        'amount': _verificationPrice,
         if ((widget.articleId ?? '').isNotEmpty) 'articleId': widget.articleId,
         'transKey': transKey, // utile pour traçabilité
       });
@@ -405,39 +509,78 @@ class _ResultHtmlPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: const SizedBox.shrink(),
-        title: Text(
-          success ? 'Paiement réussi' : 'Paiement échoué',
-          style: const TextStyle(
-              color: Colors.black, fontSize: 16, fontWeight: FontWeight.w500),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: const SizedBox.shrink(),
+          title: Text(
+            success ? 'Paiement réussi' : 'Paiement échoué',
+            style: const TextStyle(
+                color: Colors.black, fontSize: 16, fontWeight: FontWeight.w500),
+          ),
         ),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: htmlContent != null
-              ? SingleChildScrollView(child: Html(data: htmlContent))
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(success ? Icons.check_circle : Icons.cancel,
-                        size: 72,
-                        color: success ? const Color(0xFF00A86B) : Colors.red),
-                    const SizedBox(height: 12),
-                    Text(
-                      success ? 'Paiement réussi' : 'Paiement échoué',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('Redirection en cours...',
-                        style: TextStyle(color: Colors.grey)),
-                  ],
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: htmlContent != null
+                        ? SingleChildScrollView(child: Html(data: htmlContent))
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                  success ? Icons.check_circle : Icons.cancel,
+                                  size: 72,
+                                  color: success
+                                      ? const Color(0xFF00A86B)
+                                      : Colors.red),
+                              const SizedBox(height: 12),
+                              Text(
+                                success ? 'Paiement réussi' : 'Paiement échoué',
+                                style: const TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Vous pouvez retourner à l\'accueil.',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          success ? const Color(0xFF00A86B) : Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text(
+                      'Retour à l\'accueil',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

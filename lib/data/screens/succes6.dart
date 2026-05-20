@@ -17,7 +17,7 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
     super.initState();
     // LOG pour tracer l'affichage de la page de succès
     log('[SuccesScreen6] Affichage de la page de succès');
-    
+
     // Permettre la navigation après 2 secondes
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
@@ -82,19 +82,19 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                             style: TextStyle(fontSize: 14, height: 1.5),
                             children: [
                               TextSpan(
-                                text: 'Votre publication de piece a bien ete envoyee. ',
+                                text:
+                                    'Votre publication de piece est bien en ligne. ',
                                 style: TextStyle(color: Colors.black87),
                               ),
                               TextSpan(
-                                text: 'Elle sera d abord validee par un administrateur, ',
+                                text: 'Elle est visible immédiatement ',
                                 style: TextStyle(
                                   color: Color(0xFF1F2937),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                               TextSpan(
-                                text:
-                                    'puis automatiquement mise en ligne apres approbation.',
+                                text: 'dans l’application.',
                                 style: TextStyle(color: Color(0xFF00D67D)),
                               ),
                             ],
@@ -104,15 +104,17 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _canNavigate ? () {
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AvantHome(),
-                                ),
-                                (route) => false,
-                              );
-                            } : null,
+                            onPressed: _canNavigate
+                                ? () {
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AvantHome(),
+                                      ),
+                                      (route) => false,
+                                    );
+                                  }
+                                : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF00D67D),
                               foregroundColor: Colors.white,
@@ -122,35 +124,35 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                               ),
                               elevation: 2,
                             ),
-                            child: _canNavigate 
-                              ? const Text(
-                                  'Accéder à l\'accueil',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 16,
+                            child: _canNavigate
+                                ? const Text(
+                                    'Accéder à l\'accueil',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 16,
+                                    ),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Préparation...',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Préparation...',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ],
-                                ),
                           ),
                         ),
                       ],

@@ -8,7 +8,10 @@ import 'RetraitScreen.dart';
 import 'settings_page.dart';
 
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key});
+  /// `true` = portefeuille vendeur (même UI que livreur, métriques adaptées).
+  final bool vendorMode;
+
+  const WalletScreen({super.key, this.vendorMode = false});
 
   @override
   WalletScreenState createState() => WalletScreenState();
@@ -23,6 +26,7 @@ class WalletScreenState extends State<WalletScreen> {
   List<double> _weeklyData = [0, 0, 0, 0, 0, 0, 0];
   double _totalOrders = 0;
   double _totalKm = 0;
+  double _vendorRevenueFcfa = 0;
   // Profil utilisateur (dynamique)
   String? _userPhoto;
   String _userName = '';
@@ -43,8 +47,11 @@ class WalletScreenState extends State<WalletScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: _loadWallet,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header avec photo de profil
@@ -324,18 +331,26 @@ class WalletScreenState extends State<WalletScreen> {
                       children: [
                         Expanded(
                           child: _buildMetricCard(
-                            title: 'Commandes honorées',
-                            value: '${_totalOrders.toInt()}',
-                            unit: _currency,
+                            title: widget.vendorMode
+                                ? 'Ventes réussies'
+                                : 'Commandes honorées',
+                            value: widget.vendorMode
+                                ? '${_totalOrders.toInt()}'
+                                : '${_totalOrders.toInt()}',
+                            unit: widget.vendorMode ? 'vente(s)' : _currency,
                             color: const Color(0xFF4CAF50),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildMetricCard(
-                            title: 'Kilométrage',
-                            value: '${_totalKm.toInt()}',
-                            unit: 'km',
+                            title: widget.vendorMode
+                                ? 'Revenu ventes'
+                                : 'Kilométrage',
+                            value: widget.vendorMode
+                                ? '${_vendorRevenueFcfa.toInt()}'
+                                : '${_totalKm.toInt()}',
+                            unit: widget.vendorMode ? _currency : 'km',
                             color: const Color(0xFF2196F3),
                           ),
                         ),
@@ -360,6 +375,7 @@ class WalletScreenState extends State<WalletScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -540,12 +556,37 @@ class WalletScreenState extends State<WalletScreen> {
       );
     }
 
+    final visible = _transactions
+        .where((tx) {
+          final id = tx['id']?.toString() ?? '';
+          final label = (tx['label'] ?? '').toString();
+          final amount = _num(tx['amount']);
+          if (id == 'none' || id == 'sample-1') return false;
+          if (label == 'Aucune transaction' && amount == 0) return false;
+          return true;
+        })
+        .take(5)
+        .toList();
+
+    if (visible.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        child: const Column(
+          children: [
+            Icon(Icons.receipt_long, color: Colors.grey, size: 48),
+            SizedBox(height: 16),
+            Text(
+              'Aucune transaction récente',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
-      children: _transactions.take(5).map((tx) {
-        final dateStr = tx['date'] != null
-            ? DateFormat('dd MMMM yyyy', 'fr_FR')
-                .format(DateTime.parse(tx['date']))
-            : '';
+      children: visible.map((tx) {
+        final dateStr = _formatTxDate(tx['date']);
         final isCredit = tx['type'] == 'in';
 
         return Container(
@@ -615,6 +656,35 @@ class WalletScreenState extends State<WalletScreen> {
     );
   }
 
+  String _formatTxDate(dynamic raw) {
+    if (raw == null) return '';
+    try {
+      if (raw is DateTime) {
+        return DateFormat('dd MMMM yyyy', 'fr_FR').format(raw);
+      }
+      return DateFormat('dd MMMM yyyy', 'fr_FR')
+          .format(DateTime.parse(raw.toString()));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  List<Map<String, dynamic>> _parseTransactions(dynamic raw) {
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((tx) {
+          final id = tx['id']?.toString() ?? '';
+          final label = (tx['label'] ?? '').toString();
+          final amount = _num(tx['amount']);
+          if (id == 'none' || id == 'sample-1') return false;
+          if (label == 'Aucune transaction' && amount == 0) return false;
+          return true;
+        })
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -656,11 +726,7 @@ class WalletScreenState extends State<WalletScreen> {
       }
       if (txRes.statusCode == 200) {
         final data = jsonDecode(txRes.body);
-        final List list = data['transactions'] ?? [];
-        _transactions = list
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
+        _transactions = _parseTransactions(data['transactions']);
       }
       if (profileRes.statusCode == 200) {
         final data = jsonDecode(profileRes.body);
@@ -670,25 +736,52 @@ class WalletScreenState extends State<WalletScreen> {
           if (_userName.isEmpty)
             _userName = (u['nom'] ?? u['email'] ?? '')?.toString() ?? '';
           _userRole = _formatRole(u['role']?.toString() ?? '');
-          final v = u['vehicule'];
-          if (v is Map<String, dynamic>) {
-            final type = v['type']?.toString() ?? 'Véhicule';
-            final plate = v['immatriculation']?.toString() ?? '';
-            _userVehicle = plate.isNotEmpty ? '$type • $plate' : type;
+          if (widget.vendorMode) {
+            final entreprise = u['entreprise']?.toString().trim() ?? '';
+            _userVehicle = entreprise.isNotEmpty ? entreprise : 'Vendeur Tranoo';
           } else {
-            _userVehicle = 'Véhicule';
+            final v = u['vehicule'];
+            if (v is Map<String, dynamic>) {
+              final type = v['type']?.toString() ?? 'Véhicule';
+              final plate = v['immatriculation']?.toString() ?? '';
+              _userVehicle = plate.isNotEmpty ? '$type • $plate' : type;
+            } else {
+              _userVehicle = 'Véhicule';
+            }
           }
           _userPhoto = u['photo']?.toString();
         }
       }
       if (statsRes.statusCode == 200) {
         final data = jsonDecode(statsRes.body);
-        _totalOrders = _num(data['totalOrders']);
-        _totalKm = _num(data['totalKm']);
-        final list = data['weeklyData'];
-        if (list is List && list.length >= 7) {
-          _weeklyData =
-              list.map((e) => (e is num ? e.toDouble() : 0.0)).toList();
+        if (widget.vendorMode) {
+          _totalOrders = _num(data['totalOrders']);
+          _vendorRevenueFcfa = _num(
+            data['totalRevenueFcfa'] ?? data['totalKm'],
+          );
+          final list = data['weeklyData'];
+          if (list is List && list.length >= 7) {
+            _weeklyData =
+                list.map((e) => (e is num ? e.toDouble() : 0.0)).toList();
+          }
+        } else {
+          _totalOrders = _num(data['totalOrders']);
+          _totalKm = _num(data['totalKm']);
+          final list = data['weeklyData'];
+          if (list is List && list.length >= 7) {
+            _weeklyData =
+                list.map((e) => (e is num ? e.toDouble() : 0.0)).toList();
+          }
+        }
+      } else if (widget.vendorMode) {
+        final sellerRes = await http.get(
+          Uri.parse('$baseUrl/api/protected/stats/seller-marque'),
+          headers: headers,
+        );
+        if (sellerRes.statusCode == 200) {
+          final data = jsonDecode(sellerRes.body);
+          _totalOrders = _num(data['venteSuccessCount']);
+          _vendorRevenueFcfa = _num(data['totalRevenueFcfa']);
         }
       }
     } catch (e) {

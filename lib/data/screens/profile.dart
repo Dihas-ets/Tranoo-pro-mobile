@@ -178,7 +178,12 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
       ),
     );
     await dio.patch('/users/me', data: {field: value});
-    // Après modification, on resynchronise toutes les données
+    final me = await dio.get('/protected/me');
+    final refreshedUser = me.data['user'];
+    await local_auth.AuthProvider.saveUserToPrefs(idToken, refreshedUser);
+    if (mounted) {
+      context.read<local_auth.AuthProvider>().reloadUser();
+    }
     await fetchUser();
     setState(() {
       isSaving = false;

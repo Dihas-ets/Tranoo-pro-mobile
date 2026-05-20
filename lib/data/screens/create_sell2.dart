@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -8,11 +9,13 @@ import 'package:dio/dio.dart';
 
 import 'mastervacpage.dart';
 import '../../utils/cloudinary_upload.dart';
+import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
 import 'package:tranoo_pro/services/user_service.dart';
 import 'dart:developer';
 import 'map_picker_screen.dart';
 import '../../widgets/location_permission_dialog.dart';
 import 'movie.dart';
+import 'package:tranoo_pro/utils/amount_display.dart';
 
 class CreateSellPage2 extends StatefulWidget {
   final String? alertNotificationId;
@@ -42,12 +45,9 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   final TextEditingController _anneeController = TextEditingController();
   final TextEditingController _localisationController = TextEditingController();
   final TextEditingController _prixController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _companyController = TextEditingController();
-  
   // Infos fournisseur
   final TextEditingController _fournisseurTelController = TextEditingController();
-  final TextEditingController _modelController = TextEditingController();
+  final TextEditingController _marqueModeleController = TextEditingController();
   double? _fournisseurLatitude;
   double? _fournisseurLongitude;
   String _fournisseurAddress = '';
@@ -55,7 +55,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   bool _useSupplierCurrentLocation = false;
   bool _loadingSupplierAddress = false;
   String? _selectedPieceType;
-  String? _selectedFuelType;
+  bool _loadingPhone = true;
   
   // Variables pour l'upload d'images - Liste dynamique
   List<File?> _uploadedImages = [];
@@ -70,15 +70,6 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   bool get _isAnyUploading => _isUploadingImage.contains(true) || _isUploadingVideo;
 
   final List<String> _pieceTypes = ['Nouveau', 'Occasion'];
-  final List<String> _fuelTypes = [
-    'Essence',
-    'Gazoil',
-    'Diesel',
-    'Electrique',
-    'Hybride',
-    'Aucun',
-  ];
-  String? _customFuelType;
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
@@ -101,13 +92,8 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       _titleController.text = (init['titre'] ?? '').toString();
       _anneeController.text = (init['annee'] ?? '').toString();
       _prixController.text = (init['prix'] ?? '').toString();
-      _descriptionController.text = (init['description'] ?? '').toString();
-      _companyController.text = (init['entreprise'] ?? '').toString();
-      _modelController.text = (init['modele'] ?? '').toString();
+      _marqueModeleController.text = (init['modele'] ?? '').toString();
       _selectedPieceType = (init['pieceType'] ?? init['condition'])?.toString();
-      _selectedFuelType = (init['typeMoteur'] ?? '').toString().isNotEmpty
-          ? (init['typeMoteur']).toString()
-          : null;
       if (init['photos'] is List) {
         final urls = (init['photos'] as List).map((e) => e?.toString()).whereType<String>().where((e) => e.isNotEmpty).toList();
         _cloudinaryUrls = urls.map((e) => e).toList();
@@ -131,6 +117,50 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       if (_fournisseurAddress.isEmpty) {
         _fournisseurAddress = _localisationController.text.trim();
       }
+      _loadingPhone = false;
+    } else {
+      _prefillSupplierPhone();
+    }
+  }
+
+  Future<void> _prefillSupplierPhone() async {
+    if (widget.editMode && _fournisseurTelController.text.isNotEmpty) {
+      if (mounted) setState(() => _loadingPhone = false);
+      return;
+    }
+    try {
+      final cached = await local_auth.AuthProvider.loadUserFromPrefs();
+      final cachedTel = cached?['telephone']?.toString().trim() ?? '';
+      if (cachedTel.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _fournisseurTelController.text = cachedTel;
+            _loadingPhone = false;
+          });
+        }
+        return;
+      }
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => _loadingPhone = false);
+        return;
+      }
+      final idToken = await user.getIdToken();
+      final resp = await Dio(
+        BaseOptions(
+          baseUrl: UserService().dio.options.baseUrl,
+          headers: {'Authorization': 'Bearer $idToken'},
+        ),
+      ).get('/protected/me');
+      final tel = resp.data['user']?['telephone']?.toString().trim() ?? '';
+      if (mounted) {
+        setState(() {
+          if (tel.isNotEmpty) _fournisseurTelController.text = tel;
+          _loadingPhone = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingPhone = false);
     }
   }
 
@@ -253,6 +283,65 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       _cloudinaryUrls.removeAt(index);
       _isUploadingImage.removeAt(index);
     });
+  }
+
+  Future<void> _takePhotoFromCamera() async {
+    if (_uploadedImages.length >= _maxMediaSlots) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vous avez atteint le maximum de 12 images')),
+      );
+      return;
+    }
+
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+    if (image == null) return;
+
+    final file = File(image.path);
+    final newIndex = _uploadedImages.length;
+
+    setState(() {
+      _uploadedImages.add(file);
+      _cloudinaryUrls.add(null);
+      _isUploadingImage.add(true);
+    });
+
+    try {
+      final url = await uploadImageToCloudinary(
+        file,
+        folder: CloudinaryFolders.pieceImages,
+      );
+      if (!mounted) return;
+      if (url != null) {
+        setState(() {
+          _cloudinaryUrls[newIndex] = url;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de l\'upload de l\'image.')),
+        );
+        setState(() {
+          _uploadedImages.removeAt(newIndex);
+          _cloudinaryUrls.removeAt(newIndex);
+          _isUploadingImage.removeAt(newIndex);
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload échoué: $e')),
+      );
+      setState(() {
+        _uploadedImages.removeAt(newIndex);
+        _cloudinaryUrls.removeAt(newIndex);
+        _isUploadingImage.removeAt(newIndex);
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isUploadingImage[newIndex] = false;
+      });
+    }
   }
 
   Future<void> _addNewImage() async {
@@ -388,32 +477,6 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     return Text(
       isRequired ? '$text *' : text,
       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-    );
-  }
-
-  Widget _buildDropdown({
-    required String? value,
-    required String hint,
-    required List<String> items,
-    required Function(String?) onChanged,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text(hint, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-          isExpanded: true,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          items: items.map((String item) {
-            return DropdownMenuItem<String>(value: item, child: Text(item));
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
     );
   }
 
@@ -565,21 +628,17 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     final title = _titleController.text.trim();
     final annee = _anneeController.text.trim();
     final prix = _prixController.text.trim();
-    final description = _descriptionController.text.trim().isNotEmpty 
-        ? _descriptionController.text.trim() 
-        : 'Description non renseignée';
-    final company = _companyController.text.trim();
+    const description = '';
+    const company = '';
     final pieceType = _selectedPieceType;
-    final fuelType = _selectedFuelType == 'Aucun' ? _customFuelType : _selectedFuelType;
-    final model = _modelController.text.trim();
+    final model = _marqueModeleController.text.trim();
+    final phone = _fournisseurTelController.text.trim();
 
     if (title.isEmpty ||
         pieceType == null ||
-        annee.isEmpty ||
-        (fuelType == null || fuelType.isEmpty) ||
         model.isEmpty ||
         prix.isEmpty ||
-        company.isEmpty) {
+        phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires.')),
       );
@@ -603,7 +662,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
 
     final images = _cloudinaryUrls.whereType<String>().where((url) => url.isNotEmpty).toList();
     final fournisseur = {
-      'telephone': _fournisseurTelController.text.trim(),
+      'telephone': phone,
       'latitude': _fournisseurLatitude,
       'longitude': _fournisseurLongitude,
       'adresseTexte': _fournisseurAddress.isNotEmpty
@@ -618,7 +677,6 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         description: description,
         company: company,
         prix: prix,
-        fuelType: fuelType,
         model: model,
         pieceType: pieceType,
         images: images,
@@ -639,7 +697,6 @@ class CreateSellPage2State extends State<CreateSellPage2> {
           company: company,
           location: _fournisseurAddress.isNotEmpty ? _fournisseurAddress : null,
           price: prix,
-          fuelType: fuelType,
           model: model,
           pieceType: pieceType,
           images: images,
@@ -659,7 +716,6 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     required String description,
     required String company,
     required String prix,
-    required String? fuelType,
     required String model,
     required String? pieceType,
     required List<String> images,
@@ -679,7 +735,6 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         'description': description,
         'entreprise': company,
         'prix': prix,
-        'typeMoteur': fuelType,
         'modele': model,
         'pieceType': pieceType,
         'photos': images,
@@ -717,12 +772,14 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -730,19 +787,35 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     // IMAGES
                     _buildLabel('Images (max 12)', isRequired: false),
                     const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _addNewImage,
-                        icon: const Icon(Icons.add_photo_alternate, size: 20),
-                        label: Text('Ajouter des images (${_uploadedImages.length}/$_maxMediaSlots)'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF8BF13),
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _addNewImage,
+                            icon: const Icon(Icons.add_photo_alternate, size: 20),
+                            label: Text(
+                              'Ajouter des images (${_uploadedImages.length}/$_maxMediaSlots)',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF8BF13),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        IconButton(
+                          tooltip: 'Prendre une photo',
+                          onPressed: _takePhotoFromCamera,
+                          icon: const Icon(Icons.photo_camera),
+                          color: const Color(0xFFF8BF13),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     
@@ -828,12 +901,27 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     // Infos fournisseur
                     const Text('Informations du fournisseur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
-                    _buildLabel('Téléphone'),
+                    _buildLabel('Téléphone', isRequired: false),
                     const SizedBox(height: 8),
-                    TextField(
-                      controller: _fournisseurTelController,
-                      keyboardType: TextInputType.phone,
-                      decoration: _inputDecoration('Téléphone du fournisseur'),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F2F2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: _loadingPhone
+                          ? const Text('Chargement du numéro...', style: TextStyle(color: Colors.black54))
+                          : Text(
+                              _fournisseurTelController.text.isNotEmpty
+                                  ? _fournisseurTelController.text
+                                  : 'Numéro non renseigné sur votre profil',
+                              style: TextStyle(
+                                color: _fournisseurTelController.text.isNotEmpty
+                                    ? Colors.black87
+                                    : Colors.red,
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 16),
                     _buildLabel('Localisation fournisseur'),
@@ -900,7 +988,10 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(color: const Color(0xFFFFCC00), borderRadius: BorderRadius.circular(12)),
-                                    child: Text(_fournisseurCity, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black)),
+                                    child: Text(
+                                      truncateWithEllipsis(_fournisseurCity, maxLen: 28),
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black),
+                                    ),
                                   ),
                                 ],
                               ],
@@ -909,7 +1000,12 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                             if (_loadingSupplierAddress)
                               const Text('Récupération de l\'adresse...', style: TextStyle(color: Colors.black54))
                             else
-                              Text(_fournisseurAddress.isNotEmpty ? _fournisseurAddress : 'Adresse non disponible', style: const TextStyle(color: Colors.black87)),
+                              Text(
+                                _fournisseurAddress.isNotEmpty
+                                    ? truncateWithEllipsis(_fournisseurAddress)
+                                    : 'Adresse non disponible',
+                                style: const TextStyle(color: Colors.black87),
+                              ),
                           ],
                         ),
                       )
@@ -952,12 +1048,12 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildLabel('Année'),
+                              _buildLabel('Année', isRequired: false),
                               const SizedBox(height: 8),
                               TextField(
                                 controller: _anneeController,
                                 keyboardType: TextInputType.number,
-                                decoration: _inputDecoration('Ex: 2020'),
+                                decoration: _inputDecoration('Ex: 2020 (optionnel)'),
                               ),
                             ],
                           ),
@@ -966,52 +1062,11 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Type moteur et Modèle
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Type de moteur'),
-                              const SizedBox(height: 8),
-                              _buildDropdown(
-                                value: _selectedFuelType,
-                                hint: 'Type de moteur',
-                                items: _fuelTypes,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedFuelType = value;
-                                    if (value != 'Aucun') _customFuelType = null;
-                                  });
-                                },
-                              ),
-                              if (_selectedFuelType == 'Aucun')
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: TextField(
-                                    decoration: _inputDecoration('Précisez le type'),
-                                    onChanged: (val) => setState(() => _customFuelType = val),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Modèle'),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _modelController,
-                                decoration: _inputDecoration('Ex: Corolla, Hilux...'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    _buildLabel('Marque & modèle'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _marqueModeleController,
+                      decoration: _inputDecoration('Ex: Toyota Corolla, Honda Civic...'),
                     ),
                     const SizedBox(height: 20),
 
@@ -1020,27 +1075,12 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _prixController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        ...decimalOptionalInputFormatters,
+                        LengthLimitingTextInputFormatter(14),
+                      ],
                       decoration: _inputDecoration('Prix en FCFA'),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Description (optionnelle)
-                    _buildLabel('Description de la pièce', isRequired: false),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _descriptionController,
-                      maxLines: 4,
-                      decoration: _inputDecoration('Description (optionnel)'),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Nom de l'entreprise
-                    _buildLabel('Nom de l\'entreprise'),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _companyController,
-                      decoration: _inputDecoration('Nom de l\'entreprise'),
                     ),
                     const SizedBox(height: 32),
                   ],
@@ -1061,10 +1101,8 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     _anneeController.dispose();
     _localisationController.dispose();
     _prixController.dispose();
-    _descriptionController.dispose();
-    _companyController.dispose();
     _fournisseurTelController.dispose();
-    _modelController.dispose();
+    _marqueModeleController.dispose();
     super.dispose();
   }
 }

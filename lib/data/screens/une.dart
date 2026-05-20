@@ -1115,7 +1115,9 @@ class _UneState extends State<Une> {
 
         // Préparation des données de publicité pour standalone
         final pubData = {
-          'description': _descriptionController.text.trim(),
+          'description': _descriptionController.text.trim().isEmpty
+              ? 'Publicité sans description'
+              : _descriptionController.text.trim(),
           'typePub': currentType,
           'duree': _selectedDuree,
           'prix': int.tryParse(_prixController.text) ?? 0,
@@ -1228,7 +1230,9 @@ class _UneState extends State<Une> {
 
       // Préparation des données de publicité
       final pubData = {
-        'description': _descriptionController.text.trim(),
+        'description': _descriptionController.text.trim().isEmpty
+            ? 'Publicité sans description'
+            : _descriptionController.text.trim(),
         'typePub': currentType,
         'duree': _selectedDuree,
         'prix': int.tryParse(_prixController.text) ?? 0,
@@ -1287,6 +1291,7 @@ class _UneState extends State<Une> {
       if (user == null) return;
       final token = await user.getIdToken();
       log('[DEMO_EVENT] send $eventType page=$page');
+      print('[DEMO_EVENT] send $eventType page=$page');
       final dio = Dio(
         BaseOptions(
           baseUrl: UserService().dio.options.baseUrl,
@@ -1302,8 +1307,9 @@ class _UneState extends State<Une> {
         'client': 'mobile',
       });
       log('[DEMO_EVENT] resp status=${resp.statusCode} data=${resp.data}');
-    } catch (_) {
-      // best-effort
+      print('[DEMO_EVENT] resp status=${resp.statusCode} data=${resp.data}');
+    } catch (e) {
+      print('[DEMO_EVENT] erreur track: $e');
     }
   }
 

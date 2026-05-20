@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tranoo_pro/data/screens/wallet_screen.dart';
-import 'package:tranoo_pro/data/screens/wallet_vendeur_screen.dart';
 import 'package:tranoo_pro/data/screens/marque.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/piece.dart';
@@ -25,6 +24,9 @@ import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
 import 'package:tranoo_pro/data/screens/profil3.dart';
 import 'package:tranoo_pro/data/screens/settings_type_vendeur_page.dart';
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/page_refresh_registry.dart';
+import 'package:tranoo_pro/main.dart';
+import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
 
 class AvantHome extends StatefulWidget {
   const AvantHome({super.key});
@@ -33,7 +35,10 @@ class AvantHome extends StatefulWidget {
   State<AvantHome> createState() => _AvantHomeState();
 }
 
-class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
+class _AvantHomeState extends State<AvantHome>
+    with WidgetsBindingObserver, RegisterPageRefresh {
+  @override
+  Future<void> onPagePullRefresh() async => _runLightRefresh(force: true);
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _didRedirectToLogin = false;
@@ -46,7 +51,12 @@ class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _runLightRefresh(force: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _runLightRefresh(force: true);
+      AlertIncomingCallService.tryShowFromAppLaunchOnly(
+        navigatorKey: NotificationService.navigatorKey,
+      );
+    });
     _lightRefreshTimer = Timer.periodic(
       const Duration(seconds: 90),
       (_) => _runLightRefresh(),
@@ -480,23 +490,23 @@ class _AvantHomeState extends State<AvantHome> with WidgetsBindingObserver {
                                     size: iconSize,
                                   ),
                                 ),
-                                _buildDrawerButton(
-                                  context,
-                                  text: 'Portefeuille',
-                                  onTap: () => Navigator.push(
+                                if (role != 'vendeur')
+                                  _buildDrawerButton(
                                     context,
-                                    MaterialPageRoute(
-                                      builder: (context) => role == 'vendeur'
-                                          ? const WalletVendeurScreen()
-                                          : const WalletScreen(),
+                                    text: 'Portefeuille',
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const WalletScreen(),
+                                      ),
+                                    ),
+                                    icon: Icon(
+                                      Icons.account_balance_wallet,
+                                      color: Colors.black,
+                                      size: iconSize,
                                     ),
                                   ),
-                                  icon: Icon(
-                                    Icons.account_balance_wallet,
-                                    color: Colors.black,
-                                    size: iconSize,
-                                  ),
-                                ),
                                 if (role == 'vendeur')
                                   _buildDrawerButton(
                                     context,

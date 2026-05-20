@@ -15,6 +15,8 @@ import 'verification_payment.dart'; // Import pour la page de vérification de p
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
+import 'package:tranoo_pro/utils/amount_display.dart';
+import 'package:tranoo_pro/utils/article_view_helper.dart';
 
 class CarsInfo extends StatefulWidget {
   final String? id;
@@ -35,6 +37,7 @@ class CarsInfo extends StatefulWidget {
   final String? couleur; // Couleur
   final bool? dedouanement; // Dédouanement
   final String? lieu;
+  final Map<String, dynamic>? fournisseur;
   final List<String> images;
   final List<String> videos;
   final String? video;
@@ -66,6 +69,7 @@ class CarsInfo extends StatefulWidget {
     this.couleur,
     this.dedouanement,
     this.lieu,
+    this.fournisseur,
     required this.images,
     this.videos = const [],
     this.video,
@@ -117,10 +121,44 @@ class _CarsinfoState extends State<CarsInfo> {
   ];
   late ConfettiController _confettiController;
   bool _isOnline = false;
+  int _verificationPrice = 20000;
+
+  String _formatFcfa(int value) {
+    final priceStr = value.toString();
+    final reversed = priceStr.split('').reversed.join('');
+    final withDots = reversed.replaceAllMapped(
+      RegExp(r'(\d{3})(?=\d)'),
+      (Match m) => '${m[0]}.',
+    );
+    return withDots.split('').reversed.join('');
+  }
+
+  String get _verificationPriceLabel => '${_formatFcfa(_verificationPrice)} FCFA';
+
+  Future<void> _loadVerificationPrice() async {
+    try {
+      final url =
+          '${UserService().dio.options.baseUrl}/admin/verification-pricing';
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final raw = data['prixVerification'] ??
+            (data['pricing'] is Map
+                ? data['pricing']['prixVerification']
+                : null);
+        final parsed = int.tryParse('$raw');
+        if (parsed != null && parsed >= 0 && mounted) {
+          setState(() => _verificationPrice = parsed);
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
+    trackArticleView(widget.id);
+    _loadVerificationPrice();
     // Log toutes les valeurs reçues
     log('[CarsInfo] titre: ${widget.titre}');
     log('[CarsInfo] description: ${widget.description}');
@@ -673,7 +711,7 @@ class _CarsinfoState extends State<CarsInfo> {
         const SizedBox(height: 8),
         Text(
           (widget.prix != null && widget.prix!.isNotEmpty)
-              ? '${widget.prix!} FCFA'
+              ? '${formatFcfaDots(widget.prix!)} FCFA'
               : 'Non renseigné',
           style: TextStyle(
             fontSize: screenWidth * 0.05,
@@ -731,6 +769,13 @@ class _CarsinfoState extends State<CarsInfo> {
               ? widget.distance!
               : 'Non renseigné',
           Icons.speed,
+        ),
+        _buildSpecCard(
+          'Localisation',
+          (widget.lieu != null && widget.lieu!.trim().isNotEmpty)
+              ? truncateWithEllipsis(widget.lieu!.trim())
+              : 'Non renseigné',
+          Icons.location_on,
         ),
         _buildSpecCard(
           'Sièges',
@@ -1126,9 +1171,9 @@ class _CarsinfoState extends State<CarsInfo> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          const Text(
-                            '10 000 FCFA',
-                            style: TextStyle(
+                          Text(
+                            _verificationPriceLabel,
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF00A86B),
                               fontSize: 16,
@@ -1336,9 +1381,9 @@ class _CarsinfoState extends State<CarsInfo> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        '10 000 FCFA',
-                        style: TextStyle(
+                      Text(
+                        _verificationPriceLabel,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF00A86B),
                           fontSize: 16,
@@ -1507,9 +1552,9 @@ class _CarsinfoState extends State<CarsInfo> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        '10 000 FCFA',
-                        style: TextStyle(
+                      Text(
+                        _verificationPriceLabel,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF00A86B),
                           fontSize: 16,
@@ -1596,6 +1641,7 @@ class _CarsinfoState extends State<CarsInfo> {
                         'dedouanement': widget.dedouanement,
                         'lieu': widget.lieu,
                         'localisation': widget.lieu,
+                        if (widget.fournisseur != null) 'fournisseur': widget.fournisseur,
                         'photos': widget.images,
                         'video': _primaryVideo,
                         'entreprise': widget.entreprise,

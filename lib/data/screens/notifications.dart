@@ -13,6 +13,7 @@ import 'create_sell.dart';
 import 'create_sell2.dart';
 import 'cars_info.dart';
 import 'mastervacpage.dart';
+import 'package:tranoo_pro/widgets/notification_list_ui.dart';
 
 // --------- HELPERS SÉCURISÉS ----------
 List<String> getNotifImages(Map notif) {
@@ -449,6 +450,25 @@ class NotificationProvider with ChangeNotifier {
     }
   }
 
+  Future<void> markNotificationAsUnread(String id, String token) async {
+    try {
+      final response = await http.put(
+        Uri.parse('${getBaseUrl()}/notifications/$id/unread'),
+        headers: {"Authorization": "Bearer $token"},
+      );
+      if (response.statusCode == 200) {
+        for (final notif in _notifications) {
+          if (notif['_id'] == id) {
+            notif['isRead'] = false;
+          }
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Erreur marquage notification non lue: $e');
+    }
+  }
+
   Future<void> handleVerificationAction(
     String id,
     String action,
@@ -506,19 +526,23 @@ class NotificationProvider with ChangeNotifier {
 }
 
 class Notifications extends StatelessWidget {
-  const Notifications({super.key});
+  final String? openNotificationId;
+
+  const Notifications({super.key, this.openNotificationId});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => NotificationProvider(),
-      child: const NotificationsBody(),
+      child: NotificationsBody(openNotificationId: openNotificationId),
     );
   }
 }
 
 class NotificationsBody extends StatefulWidget {
-  const NotificationsBody({super.key});
+  final String? openNotificationId;
+
+  const NotificationsBody({super.key, this.openNotificationId});
 
   @override
   State<NotificationsBody> createState() => _NotificationsBodyState();
@@ -581,6 +605,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           provider.loadNotificationsFromAPI(token).then((_) {
             if (!mounted) return;
             _syncUnreadCountWithHeader(provider);
+            _openPendingNotificationIfNeeded(provider, token);
           });
         }
       });
@@ -588,6 +613,87 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       print(
           'Aucun utilisateur connecté. Impossible de charger les notifications.');
     }
+  }
+
+  void _openPendingNotificationIfNeeded(
+    NotificationProvider provider,
+    String token,
+  ) {
+    final pendingId = widget.openNotificationId;
+    if (pendingId == null || pendingId.isEmpty || !mounted) return;
+    Map<String, dynamic>? target;
+    for (final n in provider.notifications) {
+      if ((n['_id'] ?? '').toString() == pendingId) {
+        target = Map<String, dynamic>.from(n);
+        break;
+      }
+    }
+    if (target == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showNotificationDetail(context, target!, provider, token);
+    });
+  }
+
+  Future<void> _handleAlertMenuAction({
+    required String action,
+    required Map<String, dynamic> notif,
+    required NotificationProvider provider,
+  }) async {
+    final notifId = (_safeGetString(notif, '_id') ?? '').toString();
+    if (notifId.isEmpty) return;
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (token == null) return;
+
+    if (action == 'delete') {
+      final ok = await provider.deleteNotification(notifId, token);
+      if (!mounted) return;
+      if (ok) {
+        _syncUnreadCountWithHeader(provider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notification supprimée')),
+        );
+      }
+      return;
+    }
+
+    if (action == 'unread') {
+      await provider.markNotificationAsUnread(notifId, token);
+      if (!mounted) return;
+      _syncUnreadCountWithHeader(provider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marquée comme non lue')),
+      );
+    }
+  }
+
+  void _showImageFullscreen(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.network(url, fit: BoxFit.contain),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -708,168 +814,48 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           final isSelected =
               notifId.isNotEmpty && _selectedNotificationIds.contains(notifId);
 
-          return GestureDetector(
-            onTap: () async {
-              if (_selectionMode) {
-                if (notifId.isNotEmpty) _toggleSelection(notifId);
-                return;
-              }
-              if (isVerification) {
-                final token = await user?.getIdToken();
-                final notificationId = _safeGetString(notif, '_id');
-                if (token != null && notificationId != null) {
-                  await provider.markNotificationAsRead(notificationId, token);
-                  if (mounted) {
-                    _syncUnreadCountWithHeader(provider);
-                  }
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (ctx) =>
-                        VerificationDetailPage(notification: notif),
-                  ),
-                );
-              } else {
-                final token = await user?.getIdToken();
-                if (token != null) {
-                  _showNotificationDetail(context, notif, provider, token);
-                  if (mounted) {
-                    _syncUnreadCountWithHeader(provider);
-                  }
+          Future<void> handleTap() async {
+            if (_selectionMode) {
+              if (notifId.isNotEmpty) _toggleSelection(notifId);
+              return;
+            }
+            if (isVerification) {
+              final token = await user?.getIdToken();
+              final notificationId = _safeGetString(notif, '_id');
+              if (token != null && notificationId != null) {
+                await provider.markNotificationAsRead(notificationId, token);
+                if (mounted) {
+                  _syncUnreadCountWithHeader(provider);
                 }
               }
-            },
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) =>
+                      VerificationDetailPage(notification: notif),
+                ),
+              );
+            } else {
+              final token = await user?.getIdToken();
+              if (token != null) {
+                _showNotificationDetail(context, notif, provider, token);
+                if (mounted) {
+                  _syncUnreadCountWithHeader(provider);
+                }
+              }
+            }
+          }
+
+          return _buildUnifiedNotificationListItem(
+            notif: Map<String, dynamic>.from(notif),
+            isUnread: isUnread,
+            isSelected: isSelected,
+            onTap: () => handleTap(),
             onLongPress: () {
               if (notifId.isEmpty) return;
               _toggleSelection(notifId);
             },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-              decoration: BoxDecoration(
-                color: isVerification
-                    ? Colors.amber[50]
-                    : (isAlert ? const Color(0xFFFFF1F1) : Colors.blue[50]),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFF111827)
-                      : (isAlert
-                          ? const Color(0xFFE57373).withOpacity(0.35)
-                          : Colors.transparent),
-                  width: isSelected ? 1.2 : 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                leading: isProposalNotification && proposalThumb.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          proposalThumb,
-                          width: 44,
-                          height: 44,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              CircleAvatar(
-                            backgroundColor:
-                                isVerification
-                                    ? Colors.amber
-                                    : (isAlert
-                                        ? const Color(0xFFE57373)
-                                        : Colors.blue),
-                            child: Icon(
-                              isVerification
-                                  ? Icons.verified
-                                  : Icons.notifications,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      )
-                    : CircleAvatar(
-                        backgroundColor: isVerification
-                            ? Colors.amber
-                            : (isAlert ? const Color(0xFFE57373) : Colors.blue),
-                        child: Icon(
-                            isVerification ? Icons.verified : Icons.notifications,
-                            color: Colors.white),
-                      ),
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _safeGetString(notif, 'title') ?? '-',
-                        style: TextStyle(
-                          fontWeight:
-                              isUnread ? FontWeight.bold : FontWeight.normal,
-                          color: isVerification
-                              ? Colors.amber[800]
-                              : (isAlert
-                                  ? const Color(0xFFB91C1C)
-                                  : Colors.blue[800]),
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                    if (isUnread)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.red[300],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text('Nouveau',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isProposalNotification && proposalTitle.isNotEmpty)
-                      Text(
-                        proposalTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    Text(
-                      _safeGetString(notif, 'message') != null
-                          ? (_safeGetString(notif, 'message')!.length > 52
-                              ? _safeGetString(notif, 'message')!.substring(0, 52) +
-                                  '...'
-                              : _safeGetString(notif, 'message')!)
-                          : '-',
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-                trailing: Text(
-                  notif['date'] is DateTime ? _formatDate(notif['date']) : '',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-              ),
-            ),
+            provider: provider,
           );
         },
       );
@@ -886,6 +872,200 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     if (diff.inDays > 0) return 'Il y a ${diff.inDays} jours';
     if (diff.inHours > 0) return 'Il y a ${diff.inHours}h';
     return 'Il y a ${diff.inMinutes} minutes';
+  }
+
+  Map<String, dynamic> _notifDataMap(Map<String, dynamic> notif) {
+    if (notif['data'] is Map) {
+      return Map<String, dynamic>.from(notif['data']);
+    }
+    return <String, dynamic>{};
+  }
+
+  String? _alertImageUrl(Map<String, dynamic> notif) {
+    final data = _notifDataMap(notif);
+    final thumb = (data['thumbnailUrl'] ?? '').toString();
+    if (thumb.isNotEmpty) return thumb;
+    final photos = data['photos'];
+    if (photos is List && photos.isNotEmpty) {
+      return photos.first.toString();
+    }
+    return null;
+  }
+
+  String _alertPreviewText(Map<String, dynamic> notif) {
+    final data = _notifDataMap(notif);
+    final requestType = (data['requestType'] ?? '').toString();
+    final isPiece = requestType == 'piece_search';
+    final parts = <String>[];
+    final marque = (data['marque'] ?? '').toString().trim();
+    final modele = (data['modele'] ?? '').toString().trim();
+    if (marque.isNotEmpty) parts.add(marque);
+    if (modele.isNotEmpty) parts.add(modele);
+    if (isPiece) {
+      final piece = (data['pieceName'] ?? '').toString().trim();
+      if (piece.isNotEmpty) parts.add(piece);
+    } else {
+      final budget = (data['budget'] ?? data['budgetMax'] ?? '').toString().trim();
+      if (budget.isNotEmpty) parts.add('Budget $budget FCFA');
+    }
+    if (parts.isNotEmpty) return parts.join(' · ');
+    final msg = (_safeGetString(notif, 'message') ?? '').trim();
+    if (msg.length > 90) return '${msg.substring(0, 90)}...';
+    return msg.isNotEmpty ? msg : 'Nouvelle demande acheteur';
+  }
+
+  bool _isAlertNotification(Map<String, dynamic> notif) {
+    final data = _notifDataMap(notif);
+    final requestType = (data['requestType'] ?? '').toString();
+    return _safeGetString(notif, 'type') == 'alerte' ||
+        requestType == 'vehicle_search' ||
+        requestType == 'piece_search';
+  }
+
+  Widget _alertThumbnail(String? url, {bool isPiece = false}) {
+    const w = 112.0;
+    const h = 63.0;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: url != null && url.isNotEmpty
+          ? Image.network(
+              url,
+              width: w,
+              height: h,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _alertThumbnailPlaceholder(isPiece),
+            )
+          : _alertThumbnailPlaceholder(isPiece),
+    );
+  }
+
+  Widget _alertThumbnailPlaceholder(bool isPiece) {
+    return Container(
+      width: 112,
+      height: 63,
+      color: Colors.grey[200],
+      alignment: Alignment.center,
+      child: Icon(
+        isPiece ? Icons.build_outlined : Icons.directions_car_outlined,
+        color: Colors.grey[500],
+        size: 32,
+      ),
+    );
+  }
+
+  Widget _buildUnifiedNotificationListItem({
+    required Map<String, dynamic> notif,
+    required bool isUnread,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required VoidCallback onLongPress,
+    required NotificationProvider provider,
+  }) {
+    final kind = resolveNotificationVisualKind(notif);
+    final imageUrl = notificationThumbUrl(notif) ?? _alertImageUrl(notif);
+    final title = _safeGetString(notif, 'title') ?? 'Notification';
+    final preview = _isAlertNotification(notif)
+        ? _alertPreviewText(notif)
+        : notificationPreviewText(notif);
+    final dateStr =
+        notif['date'] is DateTime ? _formatDate(notif['date'] as DateTime) : '';
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            bottom: BorderSide(color: Colors.grey.shade200),
+            left: isSelected
+                ? const BorderSide(color: Colors.black, width: 3)
+                : BorderSide.none,
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isUnread)
+              Padding(
+                padding: const EdgeInsets.only(top: 22, right: 6),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF065FD4),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            buildNotificationLeadingAvatar(
+              kind: kind,
+              appLogoAsset: 'assets/images/logo_tramoo.png',
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isUnread ? FontWeight.w700 : FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    preview,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black87,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (dateStr.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      dateStr,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            buildNotificationThumbnail(imageUrl, kind),
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: Colors.grey[700], size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              onSelected: (action) => _handleAlertMenuAction(
+                action: action,
+                notif: notif,
+                provider: provider,
+              ),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'unread',
+                  child: Text('Marquer comme non lue'),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Supprimer'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String? _safeGetString(dynamic obj, String key) {
@@ -1237,325 +1417,243 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     );
   }
 
-  // ========== NOUVEAU DESIGN DES ALERTES ==========
+  String? _alertAnneeValue(Map<String, dynamic> dataMap, bool isPiece) {
+    final annee = (dataMap['annee'] ?? '').toString().trim();
+    if (annee.isNotEmpty) return annee;
+    if (!isPiece) {
+      final min = (dataMap['anneeMin'] ?? '').toString().trim();
+      if (min.isNotEmpty) return min;
+    }
+    return null;
+  }
+
+  String? _alertBudgetValue(Map<String, dynamic> dataMap) {
+    final budget = (dataMap['budget'] ?? dataMap['budgetMax'] ?? '')
+        .toString()
+        .trim();
+    return budget.isNotEmpty ? budget : null;
+  }
+
   Widget _buildAlertContent(Map<String, dynamic> notification, String bodyHtml) {
-    final dataMap = (notification['data'] is Map)
-        ? Map<String, dynamic>.from(notification['data'])
-        : <String, dynamic>{};
+    final dataMap = _notifDataMap(notification);
     final requestType = (dataMap['requestType'] ?? '').toString();
-    final fallbackMessage = (_safeGetString(notification, 'message') ?? '').toLowerCase();
-    final isPiece = requestType == 'piece_search' ||
-        fallbackMessage.contains('pièce') ||
-        fallbackMessage.contains('piece');
-    
-    // Construction des caractéristiques
-    final List<MapEntry<String, String>> characteristics = [];
-    
-    if ((dataMap['marque'] ?? '').toString().isNotEmpty) {
-      characteristics.add(MapEntry('Marque', dataMap['marque'].toString()));
-    }
-    if ((dataMap['modele'] ?? '').toString().isNotEmpty) {
-      characteristics.add(MapEntry('Modèle', dataMap['modele'].toString()));
-    }
-    if ((dataMap['pieceName'] ?? '').toString().isNotEmpty && isPiece) {
-      characteristics.add(MapEntry('Pièce recherchée', dataMap['pieceName'].toString()));
-    }
-    if ((dataMap['annee'] ?? '').toString().isNotEmpty && isPiece) {
-      characteristics.add(MapEntry('Année', dataMap['annee'].toString()));
-    }
-    if ((dataMap['anneeMin'] ?? '').toString().isNotEmpty && !isPiece) {
-      characteristics.add(MapEntry('Année min', dataMap['anneeMin'].toString()));
-    }
-    if ((dataMap['anneeMax'] ?? '').toString().isNotEmpty && !isPiece) {
-      characteristics.add(MapEntry('Année max', dataMap['anneeMax'].toString()));
-    }
-    if ((dataMap['budgetMax'] ?? '').toString().isNotEmpty) {
-      characteristics.add(MapEntry('Budget max', '${dataMap['budgetMax']} FCFA'));
-    }
-    if ((dataMap['quantity'] ?? '').toString().isNotEmpty) {
-      characteristics.add(
-        MapEntry('Quantité recherchée', dataMap['quantity'].toString()),
-      );
-    }
-    if ((dataMap['localisation'] ?? '').toString().isNotEmpty) {
-      characteristics.add(MapEntry('Localisation', dataMap['localisation'].toString()));
-    }
-    if ((dataMap['urgence'] ?? '').toString().isNotEmpty) {
-      characteristics.add(MapEntry('Urgence', dataMap['urgence'].toString()));
-    }
-    if ((dataMap['etat'] ?? '').toString().isNotEmpty && !isPiece) {
-      characteristics.add(MapEntry('État', dataMap['etat'].toString()));
-    }
-
+    final isPiece = requestType == 'piece_search';
+    final imageUrl = _alertImageUrl(notification);
+    final title = _safeGetString(notification, 'title') ?? 'Alerte';
+    final preview = _alertPreviewText(notification);
     final description = (dataMap['description'] ?? '').toString();
+    final anneeVal = _alertAnneeValue(dataMap, isPiece);
+    final budgetVal = _alertBudgetValue(dataMap);
+    final dateStr = notification['date'] is DateTime
+        ? _formatDate(notification['date'] as DateTime)
+        : '';
 
-    const primaryAmber = Color(0xFFE57373);
-    const borderColor = Color(0xFFE5E7EB);
-    const bgColor = Color(0xFFF9FAFB);
-    const textPrimary = Color(0xFF111827);
-    const textSecondary = Color(0xFF4B5563);
+    final details = <MapEntry<String, String>>[
+      if ((dataMap['marque'] ?? '').toString().trim().isNotEmpty)
+        MapEntry('Marque', (dataMap['marque'] ?? '').toString().trim()),
+      if ((dataMap['modele'] ?? '').toString().trim().isNotEmpty)
+        MapEntry('Modèle', (dataMap['modele'] ?? '').toString().trim()),
+      if (isPiece && (dataMap['pieceName'] ?? '').toString().trim().isNotEmpty)
+        MapEntry('Pièce', (dataMap['pieceName'] ?? '').toString().trim()),
+      if (anneeVal != null) MapEntry('Année', anneeVal),
+      if (budgetVal != null) MapEntry('Budget', '$budgetVal FCFA'),
+      if ((dataMap['urgence'] ?? '').toString().trim().isNotEmpty)
+        MapEntry('Urgence', (dataMap['urgence'] ?? '').toString().trim()),
+      if (!isPiece && (dataMap['etat'] ?? '').toString().trim().isNotEmpty)
+        MapEntry('État', (dataMap['etat'] ?? '').toString().trim()),
+    ];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: primaryAmber.withOpacity(0.35)),
-                ),
-                child: Icon(
-                  isPiece ? Icons.build_circle : Icons.directions_car,
-                  color: primaryAmber,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isPiece ? "Alerte piece detachee" : "Alerte vehicule",
-                      style: const TextStyle(
-                        color: textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Nouvelle demande d'achat",
-                      style: const TextStyle(
-                        color: textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: bgColor,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (imageUrl != null && imageUrl.isNotEmpty) ...[
+          GestureDetector(
+            onTap: () => _showImageFullscreen(context, imageUrl),
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
-            ),
-            child: Text(
-              isPiece
-                  ? "Un acheteur recherche activement une pièce détachée. Voici les détails de sa demande :"
-                  : "Un acheteur souhaite acquérir un véhicule. Consultez les critères de sa recherche :",
-              style: const TextStyle(
-                color: textPrimary,
-                fontSize: 14,
-                height: 1.4,
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: primaryAmber,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                "Détails de la demande",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: textPrimary,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 12),
-          
-          if (characteristics.isNotEmpty)
-            Container(
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: borderColor),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: characteristics.map((char) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: borderColor,
-                        width: 1,
+              child: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 160,
+                      color: Colors.grey[200],
+                      alignment: Alignment.center,
+                      child: Icon(
+                        isPiece
+                            ? Icons.build_outlined
+                            : Icons.directions_car_outlined,
+                        size: 48,
+                        color: Colors.grey[500],
                       ),
                     ),
-                    child: Row(
+                  ),
+                  Container(
+                    margin: const EdgeInsets.all(10),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          _getIconForField(char.key),
-                          size: 14,
-                          color: primaryAmber,
-                        ),
-                        const SizedBox(width: 6),
+                        Icon(Icons.zoom_in, color: Colors.white, size: 16),
+                        SizedBox(width: 4),
                         Text(
-                          "${char.key}: ",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            color: textSecondary,
+                          'Agrandir',
+                          style: TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Colors.black,
+            letterSpacing: -0.3,
+          ),
+        ),
+        if (dateStr.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            dateStr,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+        ],
+        const SizedBox(height: 10),
+        Text(
+          preview,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black87,
+            height: 1.4,
+          ),
+        ),
+        if (details.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+          const Text(
+            'Détails de la recherche',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...details.map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _getIconForField(e.key),
+                    size: 18,
+                    color: Colors.black54,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          e.key,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         Text(
-                          char.value,
+                          e.value,
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
                           ),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-          
-          if (description.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: borderColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Information complementaire",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      color: textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: textPrimary,
-                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
-          
-          const SizedBox(height: 20),
-          
-          // Bouton "Proposer une offre"
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                final sourceNotificationId = _safeGetString(notification, '_id');
-                final buyerId = _safeGetString(dataMap, 'buyerId') ??
-                    _safeGetString(notification['sender'], '_id') ??
-                    _safeGetString(notification, 'sender');
-                final parentContext = this.context;
-                Navigator.of(context, rootNavigator: true).pop();
-                final route = MaterialPageRoute(
-                  builder: (_) => isPiece
-                      ? CreateSellPage2(
-                          alertNotificationId: sourceNotificationId,
-                          alertBuyerId: buyerId,
-                          alertRequestType: requestType.isNotEmpty ? requestType : 'piece_search',
-                        )
-                      : CreateSellPage(
-                          alertNotificationId: sourceNotificationId,
-                          alertBuyerId: buyerId,
-                          alertRequestType:
-                              requestType.isNotEmpty ? requestType : 'vehicle_search',
-                        ),
-                );
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!mounted) return;
-                  Navigator.of(parentContext).push(route);
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE57373),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 2,
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.send, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Proposer une offre',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 8),
-          
-          // Message de contact
-          Center(
-            child: Text(
-              "Envoyez votre proposition d'offre à l'acheteur ",
-              style: TextStyle(
-                fontSize: 11,
-                color: const Color(0xFFB91C1C).withOpacity(0.7),
               ),
             ),
           ),
         ],
-      ),
+        if (description.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black87,
+              height: 1.45,
+            ),
+          ),
+        ],
+        const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              final sourceNotificationId = _safeGetString(notification, '_id');
+              final buyerId = _safeGetString(dataMap, 'buyerId') ??
+                  _safeGetString(notification['sender'], '_id') ??
+                  _safeGetString(notification, 'sender');
+              final parentContext = this.context;
+              Navigator.of(context, rootNavigator: true).pop();
+              final route = MaterialPageRoute(
+                builder: (_) => isPiece
+                    ? CreateSellPage2(
+                        alertNotificationId: sourceNotificationId,
+                        alertBuyerId: buyerId,
+                        alertRequestType: requestType.isNotEmpty
+                            ? requestType
+                            : 'piece_search',
+                      )
+                    : CreateSellPage(
+                        alertNotificationId: sourceNotificationId,
+                        alertBuyerId: buyerId,
+                        alertRequestType: requestType.isNotEmpty
+                            ? requestType
+                            : 'vehicle_search',
+                      ),
+              );
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                Navigator.of(parentContext).push(route);
+              });
+            },
+            icon: const Icon(Icons.send, size: 18),
+            label: const Text('Proposer une offre'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1568,10 +1666,8 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       case 'Pièce recherchée':
         return Icons.build;
       case 'Année':
-      case 'Année min':
-      case 'Année max':
         return Icons.calendar_today;
-      case 'Budget max':
+      case 'Budget':
         return Icons.monetization_on;
       case 'Localisation':
         return Icons.location_on;

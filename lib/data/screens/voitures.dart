@@ -9,7 +9,27 @@ import 'cars_info.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'create_sell.dart';
+import 'package:tranoo_pro/utils/article_list_sort.dart';
+import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/utils/page_refresh_registry.dart';
+
+// Fonction utilitaire pour formater les prix avec des séparateurs de milliers
+String formatPrice(dynamic price) {
+  if (price == null) return '0';
+  try {
+    final priceNum = double.tryParse(price.toString()) ?? 0;
+    final priceStr = priceNum.toStringAsFixed(0);
+    final reversed = priceStr.split('').reversed.join('');
+    final withDots = reversed.replaceAllMapped(
+      RegExp(r'(\d{3})(?=\d)'),
+      (Match m) => '${m[0]}.',
+    );
+    return withDots.split('').reversed.join('');
+  } catch (e) {
+    return price.toString();
+  }
+}
 
 class VoituresPage extends StatefulWidget {
   const VoituresPage({super.key});
@@ -19,7 +39,9 @@ class VoituresPage extends StatefulWidget {
 }
 
 class _VoituresPageState extends State<VoituresPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RegisterPageRefresh {
+  @override
+  Future<void> onPagePullRefresh() async => fetchVoitures();
   List<dynamic> voitures = [];
   bool isLoading = true;
   String? error;
@@ -133,7 +155,9 @@ class _VoituresPageState extends State<VoituresPage>
         },
       ).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final List<dynamic> data = sortArticleMapsNewestFirst(
+          jsonDecode(response.body) as List<dynamic>,
+        );
         setState(() {
           voitures = data;
           _isVisible = List.generate(data.length, (index) => true);
@@ -275,6 +299,27 @@ class _VoituresPageState extends State<VoituresPage>
     );
   }
 
+  Widget _sellerCardAction({
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onPressed,
+  }) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: Icon(icon, color: color, size: 18),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTabButton(String title, int index, {bool isWide = false}) {
     bool isSelected = _tabController.index == index;
     const selectedColor = Color(0xFFF8BF13);
@@ -331,14 +376,14 @@ class _VoituresPageState extends State<VoituresPage>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SizedBox(
-        height: 100 + 16,
+        height: 70 + 16,
         child: GridView.builder(
           scrollDirection: Axis.horizontal,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 1,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-            mainAxisExtent: 100,
+            mainAxisExtent: 70,
           ),
           itemCount: marques.length,
           itemBuilder: (context, index) {
@@ -386,19 +431,6 @@ class _VoituresPageState extends State<VoituresPage>
                         },
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item["name"] ?? '',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _selectedBrand == item["name"]
-                            ? Colors.white
-                            : Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                   ],
                 ),
               ),
@@ -428,14 +460,14 @@ class _VoituresPageState extends State<VoituresPage>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SizedBox(
-        height: 90 + 16,
+        height: 60 + 16,
         child: GridView.builder(
           scrollDirection: Axis.horizontal,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 1,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-            mainAxisExtent: 120,
+            mainAxisExtent: 80,
           ),
           itemCount: modeles.length,
           itemBuilder: (context, index) {
@@ -873,6 +905,10 @@ class _VoituresPageState extends State<VoituresPage>
                                       children: [
                                         GestureDetector(
                                           onTap: () {
+                                            final articleMap =
+                                                Map<String, dynamic>.from(voiture);
+                                            trackArticleView(
+                                                articleIdFromMap(articleMap));
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
@@ -1109,6 +1145,61 @@ class _VoituresPageState extends State<VoituresPage>
                                                           },
                                                         ),
                                                       ),
+                                                      Positioned(
+                                                        bottom: 8,
+                                                        left: 8,
+                                                        child: buildArticleViewBadge(
+                                                          articleViewsFromMap(
+                                                            Map<String, dynamic>.from(voiture),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (isVendeur)
+                                                        Positioned(
+                                                          right: 6,
+                                                          bottom: 6,
+                                                          child: Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize.min,
+                                                            children: [
+                                                              _sellerCardAction(
+                                                                icon: Icons.edit,
+                                                                color: const Color(
+                                                                    0xFF0461B6),
+                                                                onPressed: () {
+                                                                  final id = (voiture['_id'] ??
+                                                                          voiture['id'] ??
+                                                                          voiture['articleId'] ??
+                                                                          voiture['Id'] ??
+                                                                          voiture['article'])
+                                                                      ?.toString();
+                                                                  Navigator.push(
+                                                                    context,
+                                                                    MaterialPageRoute(
+                                                                      builder: (context) =>
+                                                                          CreateSellPage(
+                                                                        editMode: true,
+                                                                        editArticleId: id,
+                                                                        initialData: Map<String, dynamic>.from(voiture),
+                                                                      ),
+                                                                    ),
+                                                                  ).then((_) => fetchVoitures());
+                                                                },
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              _sellerCardAction(
+                                                                icon: Icons.close,
+                                                                color: Colors.red,
+                                                                onPressed: () {
+                                                                  _deleteVoiture(
+                                                                    voiture['_id'] ?? '',
+                                                                    index,
+                                                                  );
+                                                                },
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
                                                     ],
                                                   ),
                                                 ),
@@ -1176,7 +1267,7 @@ class _VoituresPageState extends State<VoituresPage>
                                                             const SizedBox(
                                                                 width: 4),
                                                             Text(
-                                                              '${voiture['prix'] ?? ''} FCFA',
+                                                              '${formatPrice(voiture['prix'])} FCFA',
                                                               style:
                                                                   const TextStyle(
                                                                 fontSize: 14,
@@ -1285,56 +1376,6 @@ class _VoituresPageState extends State<VoituresPage>
                                             ),
                                           ),
                                         ),
-                                        if (isVendeur)
-                                          Positioned(
-                                            top: 8,
-                                            right: 8,
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  tooltip: 'Modifier',
-                                                  icon: const Icon(
-                                                    Icons.edit,
-                                                    color: Color(0xFF0461B6),
-                                                    size: 22,
-                                                  ),
-                                                  onPressed: () {
-                                                    final id = (voiture['_id'] ??
-                                                            voiture['id'] ??
-                                                            voiture['articleId'] ??
-                                                            voiture['Id'] ??
-                                                            voiture['article'])
-                                                        ?.toString();
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            CreateSellPage(
-                                                          editMode: true,
-                                                          editArticleId: id,
-                                                          initialData: Map<String, dynamic>.from(voiture),
-                                                        ),
-                                                      ),
-                                                    ).then((_) => fetchVoitures());
-                                                  },
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.close,
-                                                    color: Colors.red,
-                                                    size: 24,
-                                                  ),
-                                                  onPressed: () {
-                                                    _deleteVoiture(
-                                                      voiture['_id'] ?? '',
-                                                      index,
-                                                    );
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ),
                                       ],
                                     ),
                                   );

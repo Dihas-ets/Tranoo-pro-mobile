@@ -12,8 +12,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   @override
   void initState() {
     super.initState();
-    // Auto-redirection après 3 secondes
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) {
         _goToHome();
       }
@@ -21,6 +20,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   }
 
   void _goToHome() {
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const AvantHome()),
       (route) => false,
@@ -29,7 +29,14 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) {
+          _goToHome();
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -124,6 +131,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
           ),
         ),
       ),
+    ),
     );
   }
 }

@@ -23,7 +23,12 @@ import 'package:tranoo_pro/providers/locale_provider.dart';
 import 'package:tranoo_pro/widgets/location_permission_dialog.dart';
 import 'package:tranoo_pro/widgets/first_launch_location_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
-
+import 'package:tranoo_pro/utils/feexpay_choice_callback_page.dart';
+import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
+import 'package:tranoo_pro/widgets/app_refresh_shell.dart';
+import 'package:tranoo_pro/services/alert_launch_bootstrap.dart';
+import 'package:tranoo_pro/data/screens/notifications.dart';
+import 'package:tranoo_pro/services/alert_message_utils.dart';
 // import 'package:flutter/services.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/marque.dart';
@@ -41,6 +46,21 @@ import 'package:tranoo_pro/data/screens/reset/create_new_password_page.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   Logger('FCM').info('Message reçu en arrière-plan: ${message.messageId}');
+  if (isAlertFcmMessage(message)) {
+    await LocalNotificationService.initialize();
+    final data = message.data.map(
+      (k, v) => MapEntry(k, v?.toString() ?? ''),
+    );
+    await LocalNotificationService.showAlertIncomingCallNotification(
+      title: message.notification?.title ??
+          data['title'] ??
+          'Nouvelle alerte Tranoo',
+      body: message.notification?.body ??
+          data['message'] ??
+          'Un acheteur recherche un article',
+      data: data,
+    );
+  }
 }
 
 // Service pour gérer les notifications
@@ -80,6 +100,16 @@ class NotificationService {
         _logger.info(
           'Message reçu en premier plan: ${message.notification?.title}',
         );
+
+        // Alerte : plein écran dans l'app (pas la notif générique)
+        if (AlertIncomingCallService.isAlertMessage(message)) {
+          AlertIncomingCallService.show(
+            message,
+            navigatorKey: NotificationService.navigatorKey,
+          );
+          return;
+        }
+
         _showLocalNotification(message);
 
         // Tricycle: ouvrir automatiquement le popup (via écran chauffeur)
@@ -97,17 +127,28 @@ class NotificationService {
         }
       });
 
-      // Gestionnaire pour les notifications cliquées
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         _logger.info('Notification cliquée: ${message.notification?.title}');
+        if (isAlertFcmMessage(message)) {
+          _openAlertNotificationFromTap(message);
+          return;
+        }
         _handleNotificationTap(message);
       });
 
       // Cas app fermée/tuée: notification cliquée
-      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+      final initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
       if (initialMessage != null) {
-        _logger.info('Initial message (app lancée via notif): ${initialMessage.messageId}');
-        _handleNotificationTap(initialMessage);
+        _logger.info(
+            'Initial message (app lancée via notif): ${initialMessage.messageId}');
+        if (isAlertFcmMessage(initialMessage)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _openAlertNotificationFromTap(initialMessage);
+          });
+        } else {
+          _handleNotificationTap(initialMessage);
+        }
       }
 
       // Récupérer le token FCM
@@ -159,7 +200,7 @@ class NotificationService {
 
   void _showLocalNotification(RemoteMessage message) {
     _logger.info('Notification locale: ${message.notification?.title}');
-    
+
     // Afficher une notification locale visible même en foreground
     if (message.data['type'] == 'otp') {
       final code = message.data['code'] as String?;
@@ -188,6 +229,21 @@ class NotificationService {
     }
   }
 
+  void _openAlertNotificationFromTap(RemoteMessage message) {
+    final notificationId = message.data['notificationId']?.toString();
+    if (notificationId == null || notificationId.isEmpty) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const Notifications()),
+      );
+      return;
+    }
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => Notifications(openNotificationId: notificationId),
+      ),
+    );
+  }
+
   void _handleNotificationTap(RemoteMessage message) {
     // Navigation vers une page spécifique selon le type de notification
     _logger.info(
@@ -200,7 +256,8 @@ class NotificationService {
         case 'tricycle':
           // Ouvrir la page chauffeur tricycle, avec le contact concerné
           final contactId = message.data['contactId'];
-          _logger.info('Navigation vers ChauffeurTricycleHome pour contact $contactId');
+          _logger.info(
+              'Navigation vers ChauffeurTricycleHome pour contact $contactId');
           NotificationService.navigatorKey.currentState?.push(
             MaterialPageRoute(
               builder: (context) =>
@@ -217,8 +274,15 @@ class NotificationService {
         case 'system':
           _logger.info('Notification système: ${message.notification?.body}');
           break;
+        case 'alerte':
+          _openAlertNotificationFromTap(message);
+          break;
         default:
-          _logger.info('Navigation par défaut');
+          if (AlertIncomingCallService.isAlertMessage(message)) {
+            _openAlertNotificationFromTap(message);
+          } else {
+            _logger.info('Navigation par défaut');
+          }
           break;
       }
     }
@@ -227,7 +291,7 @@ class NotificationService {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   } catch (e) {
@@ -235,7 +299,8 @@ void main() async {
   }
 
   try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
     print('Firebase initialisé avec succès');
   } catch (e, stackTrace) {
     print('ERREUR Firebase initialization: $e');
@@ -312,13 +377,16 @@ class MyApp extends StatelessWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       builder: (context, child) {
-        // Définir le contexte pour BlockedUserService
         WidgetsBinding.instance.addPostFrameCallback((_) {
           BlockedUserService.setContext(context);
         });
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(),
-          child: DevicePreview.appBuilder(context, child),
+        return AppRefreshShell(
+          child: AlertLaunchBootstrap(
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(),
+              child: DevicePreview.appBuilder(context, child),
+            ),
+          ),
         );
       },
       theme: ThemeData(
@@ -328,6 +396,18 @@ class MyApp extends StatelessWidget {
       home: const AppInitializer(),
       routes: {
         '/marque': (context) => const Marque(),
+        '/payment-success': (context) =>
+            const FeexPayChoiceCallbackPage(success: true),
+        '/payment-error': (context) =>
+            const FeexPayChoiceCallbackPage(success: false),
+        '/subscription-success': (context) =>
+            const FeexPayChoiceCallbackPage(success: true),
+        '/subscription-error': (context) =>
+            const FeexPayChoiceCallbackPage(success: false),
+        '/cart-payment-success': (context) =>
+            const FeexPayChoiceCallbackPage(success: true),
+        '/cart-payment-error': (context) =>
+            const FeexPayChoiceCallbackPage(success: false),
         '/verification-success': (context) => _buildVerificationSuccessPage(),
         '/verification-error': (context) => _buildVerificationErrorPage(),
         '/auth/forgot-password': (context) => const ForgotPasswordPage(),
@@ -474,6 +554,9 @@ class AppInitializer extends StatefulWidget {
 
 class _AppInitializerState extends State<AppInitializer>
     with SingleTickerProviderStateMixin {
+  static const String _welcomeSeenKey = 'tranoo_pro_has_seen_welcome';
+  static bool _welcomeFlowStarted = false;
+
   late final AnimationController _carController;
   late final Animation<double> _carOffset;
 
@@ -504,15 +587,22 @@ class _AppInitializerState extends State<AppInitializer>
     // Définir le contexte pour BlockedUserService
     BlockedUserService.setContext(context);
 
-    // Vérifier si c'est le premier lancement pour afficher la divulgation de localisation
-    final prefs = await SharedPreferences.getInstance();
-    final bool isFirstLaunch = prefs.getBool('is_first_launch') ?? true;
+    // Popup bienvenue / localisation : une seule fois (première installation)
+    if (!_welcomeFlowStarted && mounted) {
+      _welcomeFlowStarted = true;
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeenWelcome = prefs.getBool(_welcomeSeenKey) ?? false;
+      // Compat ancienne clé
+      final legacySeen = prefs.getBool('is_first_launch') == false;
 
-    if (isFirstLaunch) {
-      // Afficher la divulgation de localisation au premier lancement
-      await _showLocationDisclosure();
-      // Marquer que ce n'est plus le premier lancement
-      await prefs.setBool('is_first_launch', false);
+      if (!hasSeenWelcome && !legacySeen) {
+        if (mounted) {
+          await _showLocationDisclosure();
+        }
+      } else if (!hasSeenWelcome && legacySeen) {
+        await prefs.setBool(_welcomeSeenKey, true);
+        await prefs.setBool('is_first_launch', false);
+      }
     }
 
     // Vérifier le statut de blocage
@@ -529,9 +619,10 @@ class _AppInitializerState extends State<AppInitializer>
 
     // Vérifier le type de vendeur pour la migration
     if (mounted) {
-      final authProvider = Provider.of<myauth.AuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<myauth.AuthProvider>(context, listen: false);
       await authProvider.checkTypeVendeurMigration(context);
-      
+
       // Naviguer vers l'écran principal
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const AvantHome()),
