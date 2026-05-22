@@ -25,7 +25,6 @@ import 'package:tranoo_pro/widgets/first_launch_location_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:tranoo_pro/utils/feexpay_choice_callback_page.dart';
 import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
-import 'package:tranoo_pro/widgets/app_refresh_shell.dart';
 import 'package:tranoo_pro/services/alert_launch_bootstrap.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/services/alert_message_utils.dart';
@@ -380,12 +379,10 @@ class MyApp extends StatelessWidget {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           BlockedUserService.setContext(context);
         });
-        return AppRefreshShell(
-          child: AlertLaunchBootstrap(
-            child: MediaQuery(
-              data: MediaQuery.of(context).copyWith(),
-              child: DevicePreview.appBuilder(context, child),
-            ),
+        return AlertLaunchBootstrap(
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(),
+            child: DevicePreview.appBuilder(context, child),
           ),
         );
       },

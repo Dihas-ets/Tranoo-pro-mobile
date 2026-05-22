@@ -385,7 +385,10 @@ class Profil3State extends State<Profil3> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  userData["nom"] ?? "",
+                  [
+                    (userData["prenoms"] ?? "").toString().trim(),
+                    (userData["nom"] ?? "").toString().trim(),
+                  ].where((s) => s.isNotEmpty).join(' '),
                   style: const TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.bold,

@@ -19,6 +19,7 @@ import 'map_picker_screen.dart';
 import '../../widgets/location_permission_dialog.dart';
 import 'movie.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
+import 'package:tranoo_pro/services/seller_profile_locations.dart';
 
 class CreateSellPage extends StatefulWidget {
   final String? alertNotificationId;
@@ -254,7 +255,23 @@ class _CreateSellPageState extends State<CreateSellPage> {
         _cloudinaryVideoUrls[0] = init['video']?.toString();
       }
       _hydrateVehicleLocationFromInit(init);
+    } else {
+      _loadVehicleLocationFromProfile();
     }
+  }
+
+  Future<void> _loadVehicleLocationFromProfile() async {
+    final profile = await SellerProfileLocations.load();
+    if (!mounted || profile == null) return;
+    setState(() {
+      _vehicleLatitude = profile.sellerLat;
+      _vehicleLongitude = profile.sellerLng;
+      _vehicleAddress = profile.sellerAddress;
+      _vehicleCity = profile.sellerCity;
+      if (_vehicleAddress.isNotEmpty) {
+        _locationController.text = _vehicleAddress;
+      }
+    });
   }
 
   String get _effectiveLieu =>
@@ -597,6 +614,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
     }
   }
 
+  bool _isSaving = false;
+
   bool get _isAnyUploading =>
       _isUploadingImage.contains(true) || _isUploadingVideo.contains(true);
 
@@ -736,6 +755,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
     final id = (widget.editArticleId ?? '').toString();
     if (id.isEmpty) return;
 
+    setState(() => _isSaving = true);
+
     // Reuse validation (same checks)
     if (_isAnyUploading) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -767,6 +788,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires.')),
       );
+      if (mounted) setState(() => _isSaving = false);
       return;
     }
 
@@ -838,6 +860,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur sauvegarde: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -884,7 +908,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       width: double.infinity,
       margin: const EdgeInsets.only(top: 16),
       child: ElevatedButton(
-        onPressed: _isAnyUploading ? null : _onValidate,
+        onPressed: (_isAnyUploading || _isSaving) ? null : _onValidate,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFFFCC00),
           foregroundColor: Colors.black,
@@ -892,17 +916,19 @@ class _CreateSellPageState extends State<CreateSellPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 0,
         ),
-        child: _isAnyUploading
-            ? const Row(
+        child: (_isAnyUploading || _isSaving)
+            ? Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(width: 12),
-                  Text('Upload en cours...'),
+                  const SizedBox(width: 12),
+                  Text(
+                    _isSaving ? 'Enregistrement...' : 'Upload en cours...',
+                  ),
                 ],
               )
             : Text(
@@ -1318,134 +1344,46 @@ class _CreateSellPageState extends State<CreateSellPage> {
   }
 
   Widget _buildVehicleLocationSection() {
+    final hasLoc = _vehicleLatitude != null && _vehicleLongitude != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildLabel('Localisation du véhicule', isRequired: false),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _useCurrentVehicleLocation,
-                icon: const Icon(Icons.my_location),
-                label: const Text('Position actuelle'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.push<Map<String, double>>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MapPickerScreen(
-                        initialLatitude: _vehicleLatitude,
-                        initialLongitude: _vehicleLongitude,
-                      ),
-                    ),
-                  );
-                  if (result != null) {
-                    final lat = result['latitude'];
-                    final lng = result['longitude'];
-                    if (lat != null && lng != null) {
-                      await _setVehicleLocation(
-                        lat: lat,
-                        lng: lng,
-                        fromCurrent: false,
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.map_outlined),
-                label: const Text('Choisir sur carte'),
-              ),
-            ),
-          ],
+        const Text(
+          'Reprise de votre position enregistrée à l\'inscription (profil).',
+          style: TextStyle(fontSize: 12, color: Colors.black54, height: 1.35),
         ),
-        const SizedBox(height: 8),
-        if (_vehicleLatitude != null && _vehicleLongitude != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFCC00).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: const Color(0xFFFFCC00).withOpacity(0.65),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _useVehicleCurrentLocation
-                          ? Icons.my_location
-                          : Icons.map,
-                      size: 16,
-                      color: const Color(0xFFB45309),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _useVehicleCurrentLocation
-                          ? 'Position actuelle'
-                          : 'Position sélectionnée',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFB45309),
-                      ),
-                    ),
-                    if (_vehicleCity.isNotEmpty) ...[
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFCC00),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          truncateWithEllipsis(_vehicleCity, maxLen: 28),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (_loadingVehicleAddress)
-                  const Text(
-                    'Récupération de l\'adresse...',
-                    style: TextStyle(color: Colors.black54),
-                  )
-                else
-                  Text(
-                    _vehicleAddress.isNotEmpty
-                        ? truncateWithEllipsis(_vehicleAddress)
-                        : 'Adresse non disponible',
-                    style: const TextStyle(color: Colors.black87),
-                  ),
-              ],
-            ),
-          )
-        else if (_vehicleAddress.isNotEmpty)
-          Text(
-            truncateWithEllipsis(_vehicleAddress),
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
-          )
-        else
-          const Text(
-            'Localisation du véhicule non définie',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF2F2F2),
+            borderRadius: BorderRadius.circular(8),
           ),
+          child: hasLoc
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_vehicleCity.isNotEmpty)
+                      Text(
+                        _vehicleCity,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    Text(
+                      _vehicleAddress.isNotEmpty
+                          ? truncateWithEllipsis(_vehicleAddress)
+                          : 'Position GPS enregistrée',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                )
+              : const Text(
+                  'Aucune position sur le profil — mettez à jour votre position dans Profil.',
+                  style: TextStyle(fontSize: 12, color: Colors.red),
+                ),
+        ),
       ],
     );
   }

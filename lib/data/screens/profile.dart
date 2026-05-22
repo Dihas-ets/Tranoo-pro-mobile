@@ -26,16 +26,16 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   bool loading = true;
   String? errorMsg;
 
-  // Ajout pour édition dynamique
+  // Édition compte
   bool isEditingName = false;
-  bool isEditingEmail = false;
-  bool isEditingPhone = false;
   bool isEditingPassword = false;
-  String? editedName;
-  String? editedEmail;
-  String? editedPhone;
   String? newPassword;
   bool isSaving = false;
+
+  final TextEditingController _nomController = TextEditingController();
+  final TextEditingController _prenomsController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _telephoneController = TextEditingController();
   
   // Animation pour alerte photo manquante
   late AnimationController _alertController;
@@ -70,7 +70,24 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   @override
   void dispose() {
     _alertController.dispose();
+    _nomController.dispose();
+    _prenomsController.dispose();
+    _emailController.dispose();
+    _telephoneController.dispose();
     super.dispose();
+  }
+
+  String get _fullDisplayName {
+    final p = (userData?['prenoms'] ?? '').toString().trim();
+    final n = (userData?['nom'] ?? '').toString().trim();
+    return [p, n].where((s) => s.isNotEmpty).join(' ');
+  }
+
+  void _syncControllersFromUserData() {
+    _nomController.text = userData?['nom']?.toString() ?? '';
+    _prenomsController.text = userData?['prenoms']?.toString() ?? '';
+    _emailController.text = userData?['email']?.toString() ?? '';
+    _telephoneController.text = userData?['telephone']?.toString() ?? '';
   }
   
   bool get _needsPhotoAlert {
@@ -105,9 +122,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
         userData = response.data['user'];
         loading = false;
         errorMsg = null;
-        editedName = userData?["nom"] ?? "";
-        editedEmail = userData?["email"] ?? "";
-        editedPhone = userData?["telephone"] ?? "";
+        _syncControllersFromUserData();
       });
     } catch (e) {
       setState(() {
@@ -162,35 +177,78 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
     }
   }
 
-  // Edition des infos utilisateur
-  Future<void> _saveProfileField(String field, String value) async {
-    setState(() {
-      isSaving = true;
-    });
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final idToken = await user.getIdToken();
-    final String baseUrl = getBaseUrl();
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: baseUrl,
-        headers: {'Authorization': 'Bearer $idToken'},
-      ),
-    );
-    await dio.patch('/users/me', data: {field: value});
-    final me = await dio.get('/protected/me');
-    final refreshedUser = me.data['user'];
-    await local_auth.AuthProvider.saveUserToPrefs(idToken, refreshedUser);
-    if (mounted) {
-      context.read<local_auth.AuthProvider>().reloadUser();
+  Future<void> _saveProfile() async {
+    final nom = _nomController.text.trim();
+    final prenoms = _prenomsController.text.trim();
+    final email = _emailController.text.trim();
+    final telephone = _telephoneController.text.trim();
+
+    if (nom.isEmpty || prenoms.isEmpty || email.isEmpty || telephone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez remplir tous les champs.')),
+      );
+      return;
     }
-    await fetchUser();
-    setState(() {
-      isSaving = false;
-      isEditingName = false;
-      isEditingEmail = false;
-      isEditingPhone = false;
-    });
+
+    setState(() => isSaving = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => isSaving = false);
+      return;
+    }
+
+    try {
+      final idToken = await user.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: getBaseUrl(),
+          headers: {'Authorization': 'Bearer $idToken'},
+        ),
+      );
+      await dio.patch('/users/me', data: {
+        'nom': nom,
+        'prenoms': prenoms,
+        'email': email,
+        'telephone': telephone,
+      });
+      final me = await dio.get('/protected/me');
+      final refreshedUser = me.data['user'];
+      await local_auth.AuthProvider.saveUserToPrefs(idToken, refreshedUser);
+      if (mounted) {
+        await context.read<local_auth.AuthProvider>().reloadUser();
+      }
+      await fetchUser();
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+          isEditingName = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil mis à jour.')),
+        );
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.response?.data?['message']?.toString() ??
+                  'Erreur lors de la mise à jour.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la mise à jour.')),
+        );
+      }
+    } finally {
+      if (mounted && isSaving) {
+        setState(() => isSaving = false);
+      }
+    }
   }
 
   // Edition du mot de passe
@@ -398,18 +456,28 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 isEditingName
-                                    ? TextField(
-                                        autofocus: true,
-                                        onChanged: (v) => editedName = v,
-                                        controller: TextEditingController(
-                                          text: editedName,
-                                        ),
-                                        decoration: const InputDecoration(
-                                          labelText: "Nom complet",
-                                        ),
+                                    ? Column(
+                                        children: [
+                                          TextField(
+                                            controller: _prenomsController,
+                                            autofocus: true,
+                                            decoration: const InputDecoration(
+                                              labelText: "Prénom(s)",
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          TextField(
+                                            controller: _nomController,
+                                            decoration: const InputDecoration(
+                                              labelText: "Nom",
+                                            ),
+                                          ),
+                                        ],
                                       )
                                     : Text(
-                                        userData?["nom"] ?? "",
+                                        _fullDisplayName.isNotEmpty
+                                            ? _fullDisplayName
+                                            : (userData?["nom"] ?? ""),
                                         style: const TextStyle(
                                           fontSize: 22,
                                           fontWeight: FontWeight.bold,
@@ -418,10 +486,8 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                 const SizedBox(height: 4),
                                 isEditingName
                                     ? TextField(
-                                        onChanged: (v) => editedEmail = v,
-                                        controller: TextEditingController(
-                                          text: editedEmail,
-                                        ),
+                                        controller: _emailController,
+                                        keyboardType: TextInputType.emailAddress,
                                         decoration: const InputDecoration(
                                           labelText: "Email",
                                         ),
@@ -437,10 +503,8 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                 const SizedBox(height: 4),
                                 isEditingName
                                     ? TextField(
-                                        onChanged: (v) => editedPhone = v,
-                                        controller: TextEditingController(
-                                          text: editedPhone,
-                                        ),
+                                        controller: _telephoneController,
+                                        keyboardType: TextInputType.phone,
                                         decoration: const InputDecoration(
                                           labelText: "Téléphone",
                                         ),
@@ -464,50 +528,30 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                               setState(() {
                                 if (isEditingName) {
                                   isEditingName = false;
-                                  editedName = userData?["nom"] ?? "";
-                                  editedEmail = userData?["email"] ?? "";
-                                  editedPhone = userData?["telephone"] ?? "";
+                                  _syncControllersFromUserData();
                                 } else {
                                   isEditingName = true;
-                                  editedName = userData?["nom"] ?? "";
-                                  editedEmail = userData?["email"] ?? "";
-                                  editedPhone = userData?["telephone"] ?? "";
+                                  _syncControllersFromUserData();
                                 }
                               });
                             },
                           ),
                           if (isEditingName)
                             IconButton(
-                              icon: const Icon(
-                                Icons.check,
-                                color: Color(0xFFF8BF13),
-                              ),
-                              onPressed: isSaving
-                                  ? null
-                                  : () async {
-                                      if ((editedName ?? '').trim().isEmpty ||
-                                          (editedEmail ?? '').trim().isEmpty ||
-                                          (editedPhone ?? '').trim().isEmpty) {
-                                        return;
-                                      }
-                                      setState(() => isSaving = true);
-                                      await _saveProfileField(
-                                        "nom",
-                                        editedName!.trim(),
-                                      );
-                                      await _saveProfileField(
-                                        "email",
-                                        editedEmail!.trim(),
-                                      );
-                                      await _saveProfileField(
-                                        "telephone",
-                                        editedPhone!.trim(),
-                                      );
-                                      setState(() {
-                                        isSaving = false;
-                                        isEditingName = false;
-                                      });
-                                    },
+                              icon: isSaving
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFFF8BF13),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.check,
+                                      color: Color(0xFFF8BF13),
+                                    ),
+                              onPressed: isSaving ? null : _saveProfile,
                             ),
                         ],
                       ),
@@ -520,20 +564,26 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                           _buildProfileItem(
                             context,
                             icon: Icons.person,
-                            label: "Nom complet",
-                            value: "********",
+                            label: "Prénom(s)",
+                            value: userData?['prenoms']?.toString() ?? '—',
+                          ),
+                          _buildProfileItem(
+                            context,
+                            icon: Icons.person_outline,
+                            label: "Nom",
+                            value: userData?['nom']?.toString() ?? '—',
                           ),
                           _buildProfileItem(
                             context,
                             icon: Icons.email,
                             label: "Email",
-                            value: "********",
+                            value: userData?['email']?.toString() ?? '—',
                           ),
                           _buildProfileItem(
                             context,
                             icon: Icons.phone,
                             label: "Téléphone",
-                            value: "********",
+                            value: userData?['telephone']?.toString() ?? '—',
                           ),
                         ],
                       ),

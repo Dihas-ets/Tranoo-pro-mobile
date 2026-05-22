@@ -20,6 +20,7 @@ import 'une.dart' as pub_page; // Import pour la page de demande de pub avec pr�
 // import 'verification_payment.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
+import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart'; // Pour la sélection d'images
 import 'package:flutter/services.dart'; // Pour decodeImageFromList
@@ -87,6 +88,7 @@ class _MastervacPageState extends State<MastervacPage> {
   // Variables pour la gestion des images
   List<File> _selectedImages = [];
   bool _isUploading = false;
+  bool _isPublishing = false;
   final ImagePicker _imagePicker = ImagePicker();
   
   // Constantes pour la validation
@@ -914,9 +916,9 @@ class _MastervacPageState extends State<MastervacPage> {
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             Text(
-              widget.company.isNotEmpty
-                  ? widget.company
-                  : 'Entreprise non renseignée',
+              AuthConfig.displayEntreprise(
+                widget.company.isNotEmpty ? widget.company : null,
+              ),
               style: const TextStyle(fontSize: 16, color: Colors.black87),
             ),
           ],
@@ -1181,9 +1183,10 @@ class _MastervacPageState extends State<MastervacPage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: _isOnline
+              onPressed: (_isOnline || _isPublishing)
                   ? null
                   : () async {
+                      setState(() => _isPublishing = true);
                       log('[DEBUG] Bouton Vendez votre pièce cliqué');
                       final pieceData = {
                         'type': 'piece',
@@ -1249,12 +1252,25 @@ class _MastervacPageState extends State<MastervacPage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Erreur réseau ou serveur')),
                         );
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isPublishing = false);
+                        }
                       }
                     },
-              child: const Text(
-                'Vendez votre pièce',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+              child: _isPublishing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Text(
+                      'Vendez votre pièce',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
             ),
           ),
           const SizedBox(height: 12),

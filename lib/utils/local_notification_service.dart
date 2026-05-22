@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:tranoo_pro/services/alert_notification_handler.dart';
+import 'package:tranoo_pro/utils/notification_sounds.dart';
 
 class LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -9,12 +10,6 @@ class LocalNotificationService {
 
   static bool _initialized = false;
 
-  static const String tricycleChannelId = 'tricycle_channel';
-  static const String alertCallChannelId = 'alert_call_channel';
-  static const String tricycleSoundAndroid = 'driver_request_sound';
-  static const String tricycleSoundIOS = 'driver_request_sound.wav';
-
-  /// INIT
   static Future<void> initialize() async {
     if (_initialized) return;
 
@@ -41,42 +36,52 @@ class LocalNotificationService {
           AlertNotificationHandler.handleBackgroundResponse,
     );
 
-    // Android channel setup
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidPlugin != null) {
       await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          tricycleChannelId,
+        AndroidNotificationChannel(
+          NotificationSounds.tricycleChannelId,
           'Tricycle',
-          description: 'Notifications Tricycle (demandes, annulations, rejets)',
+          description: 'Notifications Tricycle',
           importance: Importance.high,
           playSound: true,
-          sound: RawResourceAndroidNotificationSound(
-            tricycleSoundAndroid,
+          sound: const RawResourceAndroidNotificationSound(
+            NotificationSounds.generalAndroid,
           ),
         ),
       );
       await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          alertCallChannelId,
+        AndroidNotificationChannel(
+          NotificationSounds.generalChannelId,
+          'Notifications Tranoo',
+          description: 'Annonces, messages et mises à jour',
+          importance: Importance.high,
+          playSound: true,
+          sound: const RawResourceAndroidNotificationSound(
+            NotificationSounds.generalAndroid,
+          ),
+        ),
+      );
+      await androidPlugin.createNotificationChannel(
+        AndroidNotificationChannel(
+          NotificationSounds.alertCallChannelId,
           'Alertes urgentes',
-          description: 'Nouvelles demandes acheteur (style appel)',
+          description: 'Alertes acheteur — style appel entrant',
           importance: Importance.max,
           playSound: true,
           enableVibration: true,
+          sound: const RawResourceAndroidNotificationSound(
+            NotificationSounds.alertRingAndroid,
+          ),
         ),
       );
-      if (androidPlugin != null) {
-        await androidPlugin.requestFullScreenIntentPermission();
-      }
     }
 
     _initialized = true;
   }
 
-  /// Lance l'écran appel si l'app a été ouverte via la notif plein écran.
   static Future<Map<String, String>?> getAlertLaunchData() async {
     await initialize();
     final details = await _notifications.getNotificationAppLaunchDetails();
@@ -94,13 +99,11 @@ class LocalNotificationService {
     return null;
   }
 
-  /// BACKGROUND TAP HANDLER
   @pragma('vm:entry-point')
   static void notificationTapBackground(NotificationResponse response) {
     print('📩 Background notification: ${response.payload}');
   }
 
-  /// OTP NOTIFICATION
   static Future<void> showOTPNotification(String code) async {
     await initialize();
 
@@ -111,12 +114,17 @@ class LocalNotificationService {
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound(
+        NotificationSounds.generalAndroid,
+      ),
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      sound: NotificationSounds.generalIos,
     );
 
     const details = NotificationDetails(
@@ -133,20 +141,26 @@ class LocalNotificationService {
     );
   }
 
-  /// GENERAL NOTIFICATION
   static Future<void> showNotification(String title, String body) async {
     await initialize();
 
     const androidDetails = AndroidNotificationDetails(
-      'general_channel',
-      'Notifications générales',
-      channelDescription: 'Notifications générales de l\'app',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
+      NotificationSounds.generalChannelId,
+      'Notifications Tranoo',
+      channelDescription: 'Notifications générales',
+      importance: Importance.high,
+      priority: Priority.high,
       icon: '@mipmap/ic_launcher',
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound(
+        NotificationSounds.generalAndroid,
+      ),
     );
 
-    const iosDetails = DarwinNotificationDetails();
+    const iosDetails = DarwinNotificationDetails(
+      presentSound: true,
+      sound: NotificationSounds.generalIos,
+    );
 
     const details = NotificationDetails(
       android: androidDetails,
@@ -161,7 +175,6 @@ class LocalNotificationService {
     );
   }
 
-  /// ALERTE ACHETEUR — plein écran / haute priorité (arrière-plan)
   static Future<void> showAlertIncomingCallNotification({
     required String title,
     required String body,
@@ -172,7 +185,7 @@ class LocalNotificationService {
     final payload = 'alert:${jsonEncode(data)}';
 
     final androidDetails = AndroidNotificationDetails(
-      alertCallChannelId,
+      NotificationSounds.alertCallChannelId,
       'Alertes urgentes',
       channelDescription: 'Demandes acheteur — style appel entrant',
       importance: Importance.max,
@@ -182,7 +195,10 @@ class LocalNotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      ticker: 'Alerte Tranoo — nouvelle demande',
+      ticker: 'Alerte Tranoo',
+      sound: const RawResourceAndroidNotificationSound(
+        NotificationSounds.alertRingAndroid,
+      ),
       styleInformation: BigTextStyleInformation(
         body,
         contentTitle: title,
@@ -208,6 +224,7 @@ class LocalNotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      sound: NotificationSounds.alertRingIos,
       interruptionLevel: InterruptionLevel.timeSensitive,
     );
 
@@ -225,7 +242,6 @@ class LocalNotificationService {
     );
   }
 
-  /// TRICYCLE NOTIFICATION (SOUND CUSTOM)
   static Future<void> showTricycleNotification(
     String title,
     String body,
@@ -233,7 +249,7 @@ class LocalNotificationService {
     await initialize();
 
     const androidDetails = AndroidNotificationDetails(
-      tricycleChannelId,
+      NotificationSounds.tricycleChannelId,
       'Tricycle',
       channelDescription: 'Notifications Tricycle',
       importance: Importance.high,
@@ -241,7 +257,7 @@ class LocalNotificationService {
       icon: '@mipmap/ic_launcher',
       playSound: true,
       sound: RawResourceAndroidNotificationSound(
-        tricycleSoundAndroid,
+        NotificationSounds.generalAndroid,
       ),
     );
 
@@ -249,7 +265,7 @@ class LocalNotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-      sound: tricycleSoundIOS,
+      sound: NotificationSounds.generalIos,
     );
 
     const details = NotificationDetails(

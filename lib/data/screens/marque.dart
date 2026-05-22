@@ -18,6 +18,7 @@ import 'package:tranoo_pro/utils/article_list_sort.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:tranoo_pro/services/views_service.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -1175,7 +1176,7 @@ class _MarqueState extends State<Marque>
   // Section Recommandé :
   Widget buildVoituresRecommandeesGrid() {
     if (isLoadingVoitures) {
-      return const Center(child: CircularProgressIndicator());
+      return SkeletonPresets.articleGrid(count: 2);
     }
     if (errorVoitures != null) {
       return Center(child: Text(errorVoitures!));
@@ -1488,7 +1489,7 @@ class _MarqueState extends State<Marque>
 
   Widget buildPiecesGrid() {
     if (isLoadingPieces) {
-      return const Center(child: CircularProgressIndicator());
+      return SkeletonPresets.articleGrid(count: 2);
     }
     if (errorPieces != null) {
       return Center(child: Text(errorPieces!));
@@ -1720,7 +1721,8 @@ Padding(
 ),
 
 
-        if (isLoadingVoitures) const Center(child: CircularProgressIndicator()),
+        if (isLoadingVoitures && voituresRecommandees.isEmpty)
+          SkeletonPresets.articleGrid(count: 2),
         if (errorVoitures != null) Center(child: Text(errorVoitures!)),
         if (!isLoadingVoitures && errorVoitures == null)
           _applyFilters(voituresEnLigne).isEmpty
@@ -2051,7 +2053,8 @@ Padding(
 ),
 
 
-        if (isLoadingPieces) const Center(child: CircularProgressIndicator()),
+        if (isLoadingPieces && articlesPieces.isEmpty)
+          SkeletonPresets.articleGrid(count: 2),
         if (errorPieces != null) Center(child: Text(errorPieces!)),
         if (!isLoadingPieces && errorPieces == null)
           piecesEnLigne.isEmpty
@@ -2264,10 +2267,7 @@ Padding(
           ),
         ),
         if (isLoadingPubs)
-          const SizedBox(
-            height: 100,
-            child: Center(child: CircularProgressIndicator()),
-          )
+          SkeletonPresets.pubBanner(height: 100)
         else if (errorPubs != null)
           SizedBox(height: 100, child: Center(child: Text(errorPubs!)))
         else if (pubsValides.isEmpty)
@@ -2453,7 +2453,7 @@ Padding(
   // SECTION À LA UNE (carrousel)
 Widget buildPubsALaUneCarousel() {
   if (isLoadingPubs) {
-    return const Center(child: CircularProgressIndicator());
+    return SkeletonPresets.articleGrid(count: 2);
   }
   if (errorPubs != null) {
     return Center(child: Text(errorPubs!));
@@ -2886,12 +2886,7 @@ Widget buildPubsALaUneCarousel() {
           ),
           const SizedBox(height: 8),
           if (_isLoadingEnAttente)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(),
-              ),
-            )
+            SkeletonPresets.articleList(count: 3)
           else if (_errorEnAttente != null)
             Text(
               _errorEnAttente!,

@@ -5,6 +5,7 @@ import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/services/alert_call_payload.dart';
 import 'package:tranoo_pro/services/alert_message_utils.dart';
 import 'package:tranoo_pro/services/alert_pending_store.dart';
+import 'package:tranoo_pro/services/notification_ringtone_player.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
 
 /// Écran plein écran style appel entrant pour les alertes acheteur (vendeurs).
@@ -36,10 +37,12 @@ class _AlertIncomingCallOverlayState extends State<AlertIncomingCallOverlay>
       duration: const Duration(milliseconds: 2200),
     )..repeat();
     HapticFeedback.mediumImpact();
+    NotificationRingtonePlayer.playAlertLoop();
   }
 
   @override
   void dispose() {
+    NotificationRingtonePlayer.stop();
     _pulseController.dispose();
     _ringController.dispose();
     super.dispose();

@@ -13,6 +13,8 @@ import 'package:tranoo_pro/utils/article_list_sort.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
+import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -290,6 +292,17 @@ class _PieceState extends State<Piece>
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
+  Future<void> _openSubscriptionPage() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SellerSubscriptionPage(),
+      ),
+    );
+    await _refreshAccessStatus();
+    if (mounted) fetchPieces();
+  }
+
   Future<void> _handleAddPieceWithSubscription() async {
     SellerAccessStatus status;
     try {
@@ -306,27 +319,36 @@ class _PieceState extends State<Piece>
 
     if (!mounted) return;
 
-    final bool canContinue = status.canCreateArticle;
-    final bool isFree = status.freeTrialActive && !status.paidPlanActive;
-    final String subtitle = isFree
-        ? 'Vous etes dans le ${status.currentPlanLabel}. Fin de l\'essai: ${_formatDate(status.freeTrialEndsAt)}.'
-        : status.paidPlanActive
-            ? 'Votre Plan Pro est actif jusqu\'au ${_formatDate(status.paidPlanEndsAt)}.'
-            : 'Votre essai gratuit est termine. Activez un abonnement pour continuer.';
+    // Plan actif : aller directement à la création d'annonce.
+    if (status.canCreateArticle) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const CreateSellPage2(),
+        ),
+      );
+      if (mounted) fetchPieces();
+      return;
+    }
 
-    final action = await showDialog<String>(
+    // Pas de plan actif : popup puis page abonnement si l'utilisateur accepte.
+    final String subtitle = status.freeTrialActive && !status.paidPlanActive
+        ? 'Vous etes dans le ${status.currentPlanLabel}. Fin de l\'essai: ${_formatDate(status.freeTrialEndsAt)}.'
+        : 'Votre essai gratuit est termine. Activez un abonnement pour publier des pieces.';
+
+    final goSubscribe = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          title: Row(
+          title: const Row(
             children: [
-              const Icon(Icons.workspace_premium, color: Color(0xFFF8BF13)),
-              const SizedBox(width: 8),
+              Icon(Icons.workspace_premium, color: Color(0xFFF8BF13)),
+              SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  canContinue ? 'Plan actif' : 'Abonnement requis',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  'Abonnement requis',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -346,64 +368,29 @@ class _PieceState extends State<Piece>
                 'Tarif Plan Pro: ${status.monthlyPriceFcfa} FCFA / mois',
                 style: const TextStyle(color: Color(0xFFB45309)),
               ),
-              if (status.freeTrialActive && !status.paidPlanActive) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'Vous pouvez souscrire maintenant: le Plan Pro commencera apres la fin du Plan Decouverte.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
-                ),
-              ],
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Fermer'),
             ),
-            OutlinedButton(
-              onPressed: () => Navigator.pop(ctx, 'subscribe'),
-              style: OutlinedButton.styleFrom(
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF8BF13),
                 foregroundColor: Colors.black,
-                side: const BorderSide(color: Color(0xFFF8BF13)),
               ),
-              child: Text(canContinue ? 'Souscrire' : 'Voir abonnement'),
+              child: const Text('Voir abonnement'),
             ),
-            if (canContinue)
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, 'continue'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF8BF13),
-                  foregroundColor: Colors.black,
-                ),
-                child: const Text('Continuer'),
-              ),
           ],
         );
       },
     );
 
     if (!mounted) return;
-
-    if (action == 'continue' && canContinue) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const CreateSellPage2(),
-        ),
-      ).then((_) => fetchPieces());
-      return;
-    }
-
-    if (action == 'subscribe') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const SellerSubscriptionPage(),
-        ),
-      ).then((_) async {
-        await _refreshAccessStatus();
-        if (mounted) fetchPieces();
-      });
+    if (goSubscribe == true) {
+      await _openSubscriptionPage();
     }
   }
 
@@ -922,25 +909,45 @@ class _PieceState extends State<Piece>
           if (isVendeur && !_loadingAccessStatus)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: (_accessStatus?.canCreateArticle ?? false)
-                      ? Colors.green.shade100
-                      : Colors.blue.shade100,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openSubscriptionPage,
                   borderRadius: BorderRadius.circular(20),
-                ),
-                child: Center(
-                  child: Text(
-                    _accessStatus?.currentPlanLabel ?? 'Plan inconnu',
-                    style: TextStyle(
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
                       color: (_accessStatus?.canCreateArticle ?? false)
-                          ? Colors.green.shade800
-                          : Colors.blue.shade800,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                          ? Colors.green.shade100
+                          : Colors.blue.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.workspace_premium,
+                          size: 14,
+                          color: (_accessStatus?.canCreateArticle ?? false)
+                              ? Colors.green.shade800
+                              : Colors.blue.shade800,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _accessStatus?.currentPlanLabel ?? 'Plan inconnu',
+                          style: TextStyle(
+                            color: (_accessStatus?.canCreateArticle ?? false)
+                                ? Colors.green.shade800
+                                : Colors.blue.shade800,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -954,11 +961,22 @@ class _PieceState extends State<Piece>
             ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-              ? Center(child: Text(error!))
-              : Column(
+      body: PagePullRefresh(
+        onRefresh: () => fetchPieces(),
+        refreshSkeleton: SkeletonPresets.sellerCatalog(),
+        child: isLoading && pieces.isEmpty
+            ? SkeletonPresets.sellerCatalog()
+            : error != null
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.35,
+                        child: Center(child: Text(error!)),
+                      ),
+                    ],
+                  )
+                : Column(
                   children: [
                     if (isVendeur &&
                         !_loadingAccessStatus &&
@@ -1467,6 +1485,7 @@ class _PieceState extends State<Piece>
                     ),
                   ],
                 ),
+      ),
     );
   }
 }

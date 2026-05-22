@@ -252,6 +252,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/widgets/auth_message_popup.dart';
+import 'package:tranoo_pro/utils/phone_country_config.dart';
 
 import 'inscription_page.dart';
 
@@ -263,14 +264,122 @@ class ConnexionPage extends StatefulWidget {
 }
 
 class _ConnexionPageState extends State<ConnexionPage> {
-  bool isEmailFocused = false;
+  bool isPhoneFocused = false;
   bool isPasswordFocused = false;
   final userService = UserService();
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  String? selectedCountry;
+  String? selectedCountryCode;
   bool _isLoading = false;
   final _logger = Logger('ConnexionPage');
   bool _obscurePasswordLogin = true;
+  bool _useLegacyEmail = false;
+
+  PhoneCountryConfig get _phoneCountry =>
+      phoneCountryByName(selectedCountry);
+
+  @override
+  void initState() {
+    super.initState();
+    selectedCountry = kPhoneCountries.first.name;
+    selectedCountryCode = kPhoneCountries.first.code;
+  }
+
+  Future<void> _openCountryPicker() async {
+    final controller = TextEditingController();
+    var filtered = List<PhoneCountryConfig>.from(kPhoneCountries);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.72,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        controller: controller,
+                        decoration: InputDecoration(
+                          hintText: 'Rechercher un pays ou indicatif',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (v) {
+                          final q = v.trim().toLowerCase();
+                          setModal(() {
+                            filtered = kPhoneCountries.where((c) {
+                              return c.name.toLowerCase().contains(q) ||
+                                  c.code.toLowerCase().contains(q);
+                            }).toList();
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, index) {
+                          final c = filtered[index];
+                          return ListTile(
+                            leading: Text(
+                              c.flag,
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                            title: Text(c.name),
+                            trailing: Text(
+                              c.code,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            onTap: () {
+                              setState(() {
+                                selectedCountry = c.name;
+                                selectedCountryCode = c.code;
+                                _phoneController.clear();
+                              });
+                              Navigator.pop(ctx);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   Future<String?> fetchUserRole() async {
     // Récupère le token Firebase de l'utilisateur connecté
@@ -331,48 +440,130 @@ class _ConnexionPageState extends State<ConnexionPage> {
               ),
               SizedBox(height: screenHeight * (isPortrait ? 0.05 : 0.1)),
 
-              // Champ Email
-              Focus(
-                onFocusChange: (focused) {
-                  setState(() => isEmailFocused = focused);
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Numéro')),
+                  ButtonSegment(
+                    value: true,
+                    label: Text('Email (ancien compte)'),
+                  ),
+                ],
+                selected: {_useLegacyEmail},
+                onSelectionChanged: (s) {
+                  setState(() {
+                    _useLegacyEmail = s.first;
+                    _phoneController.clear();
+                  });
                 },
-                child: TextField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    labelStyle: TextStyle(
-                      color: Colors.grey,
-                      fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.email_outlined,
-                      color: isEmailFocused ? Colors.amber : Colors.grey,
-                      size: screenWidth * (isPortrait ? 0.06 : 0.04),
-                    ),
-                    hintText: "exemple@mail.com",
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.02,
-                      horizontal: screenWidth * 0.04,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Colors.grey,
-                        width: 2,
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              SizedBox(height: screenHeight * 0.02),
+
+              if (_useLegacyEmail)
+                Focus(
+                  onFocusChange: (focused) {
+                    setState(() => isPhoneFocused = focused);
+                  },
+                  child: TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    decoration: InputDecoration(
+                      labelText: 'Adresse email',
+                      hintText: 'exemple@mail.com',
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: EdgeInsets.symmetric(
+                        vertical: screenHeight * 0.02,
+                        horizontal: screenWidth * 0.04,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.amber),
                       ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.amber),
+                  ),
+                )
+              else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InkWell(
+                    onTap: _openCountryPicker,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _phoneCountry.flag,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            selectedCountryCode ?? '+229',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const Icon(Icons.keyboard_arrow_down, size: 18),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Focus(
+                      onFocusChange: (focused) {
+                        setState(() => isPhoneFocused = focused);
+                      },
+                      child: TextField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Numéro de téléphone',
+                          hintText: _phoneCountry.digitHint,
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: screenHeight * 0.02,
+                            horizontal: screenWidth * 0.04,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.grey),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.amber),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               SizedBox(height: screenHeight * 0.02),
@@ -460,8 +651,9 @@ class _ConnexionPageState extends State<ConnexionPage> {
                       ? null
                       : () async {
                           // Vérification des champs obligatoires
-                          if (_emailController.text.trim().isEmpty ||
-                              _passwordController.text.trim().isEmpty) {
+                          final identifier = _phoneController.text.trim();
+                          final password = _passwordController.text.trim();
+                          if (identifier.isEmpty || password.isEmpty) {
                             AuthMessagePopup.showWarning(
                               context,
                               title: 'Certains champs sont manquants.',
@@ -473,17 +665,46 @@ class _ConnexionPageState extends State<ConnexionPage> {
                           setState(() {
                             _isLoading = true;
                           });
-                          _logger.info(
-                            'Tentative de connexion avec email: ${_emailController.text.trim()}',
-                          );
                           try {
-                            await userService.loginUser(
-                              email: _emailController.text.trim(),
-                              password: _passwordController.text.trim(),
-                            );
-                            _logger.info(
-                              'Connexion Firebase réussie pour: ${_emailController.text.trim()}',
-                            );
+                            if (_useLegacyEmail) {
+                              if (!identifier.contains('@')) {
+                                AuthMessagePopup.showWarning(
+                                  context,
+                                  title: 'Email invalide',
+                                  subtitle:
+                                      'Sélectionnez « Email » et saisissez votre ancienne adresse.',
+                                );
+                                setState(() => _isLoading = false);
+                                return;
+                              }
+                              _logger.info(
+                                'Connexion legacy email: $identifier',
+                              );
+                              await userService.loginUser(
+                                email: identifier,
+                                password: password,
+                              );
+                            } else {
+                              if (!_phoneCountry
+                                  .isValidNationalNumber(identifier)) {
+                                AuthMessagePopup.showWarning(
+                                  context,
+                                  title: 'Numéro invalide',
+                                  subtitle:
+                                      'Entrez ${_phoneCountry.digitHint} pour ${selectedCountry ?? 'ce pays'}.',
+                                );
+                                setState(() => _isLoading = false);
+                                return;
+                              }
+                              final cc = selectedCountryCode ?? '+229';
+                              _logger.info('Connexion téléphone Pro: $cc$identifier');
+                              await userService.loginWithPhone(
+                                countryCode: cc,
+                                nationalNumber: identifier,
+                                password: password,
+                                app: TranooAuthApp.pro,
+                              );
+                            }
 
                             // Charger l'utilisateur et le rôle via AuthProvider puis naviguer
                             final auth = context.read<myauth.AuthProvider>();
@@ -506,15 +727,13 @@ class _ConnexionPageState extends State<ConnexionPage> {
                             }
                             final userRole =
                                 auth.user?['role']?.toString().toLowerCase();
-                            if (userRole == 'acheteur') {
+                            if (isTranooBuyerAppRole(userRole)) {
                               await FirebaseAuth.instance.signOut();
                               if (!mounted) return;
                               AuthMessagePopup.showError(
                                 context,
-                                title:
-                                    'Compte acheteur non autorisé sur Tranoo Pro.',
-                                subtitle:
-                                    'Utilisez l\'application Tranoo (Acheteur).',
+                                title: kTranooProBuyerBlockedTitle,
+                                subtitle: kTranooProBuyerBlockedSubtitle,
                                 buttonText: 'Compris',
                               );
                               return;
@@ -582,7 +801,8 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                 'Impossible de se connecter avec ces informations.';
                             String? subtitle;
                             if (e.toString().contains('user-not-found')) {
-                              title = "Aucun compte n'est associé à cet email.";
+                              title =
+                                  "Aucun compte Pro n'est associé à ce numéro.";
                               subtitle = 'Créez un compte pour continuer.';
                             } else if (e.toString().contains(
                                   'wrong-password',
@@ -593,7 +813,8 @@ class _ConnexionPageState extends State<ConnexionPage> {
                             } else if (e.toString().contains(
                                   'invalid-credential',
                                 )) {
-                              title = 'Email ou mot de passe incorrect.';
+                              title =
+                                  'Numéro, email ou mot de passe incorrect.';
                               subtitle =
                                   'Vérifiez vos informations et réessayez.';
                             } else if (e.toString().contains('user-disabled')) {

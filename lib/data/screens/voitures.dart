@@ -13,6 +13,8 @@ import 'package:tranoo_pro/utils/article_list_sort.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
+import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -794,11 +796,22 @@ class _VoituresPageState extends State<VoituresPage>
             ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-              ? Center(child: Text(error!))
-              : Column(
+      body: PagePullRefresh(
+        onRefresh: () => fetchVoitures(),
+        refreshSkeleton: SkeletonPresets.sellerCatalog(),
+        child: isLoading && voitures.isEmpty
+            ? SkeletonPresets.sellerCatalog()
+            : error != null
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.35,
+                        child: Center(child: Text(error!)),
+                      ),
+                    ],
+                  )
+                : Column(
                   children: [
                     // Barre de recherche
                     Padding(
@@ -1385,6 +1398,7 @@ class _VoituresPageState extends State<VoituresPage>
                     ),
                   ],
                 ),
+      ),
     );
   }
 }

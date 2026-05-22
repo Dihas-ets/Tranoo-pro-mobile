@@ -26,6 +26,7 @@ class _Profile2State extends State<Profile2> {
 
   // Controllers pour champs dynamiques
   final TextEditingController _nomController = TextEditingController();
+  final TextEditingController _prenomsController = TextEditingController();
   final TextEditingController _entrepriseController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
@@ -38,6 +39,23 @@ class _Profile2State extends State<Profile2> {
   void initState() {
     super.initState();
     fetchUser();
+  }
+
+  @override
+  void dispose() {
+    _nomController.dispose();
+    _prenomsController.dispose();
+    _entrepriseController.dispose();
+    _emailController.dispose();
+    _telephoneController.dispose();
+    _newPasswordController.dispose();
+    super.dispose();
+  }
+
+  String get _fullDisplayName {
+    final p = (userData?['prenoms'] ?? '').toString().trim();
+    final n = (userData?['nom'] ?? '').toString().trim();
+    return [p, n].where((s) => s.isNotEmpty).join(' ');
   }
 
   Future<void> fetchUser() async {
@@ -65,6 +83,7 @@ class _Profile2State extends State<Profile2> {
         loading = false;
         errorMsg = null;
         _nomController.text = userData?["nom"] ?? "";
+        _prenomsController.text = userData?["prenoms"] ?? "";
         _entrepriseController.text = userData?["entreprise"] ?? "";
         _emailController.text = userData?["email"] ?? "";
         _telephoneController.text = userData?["telephone"] ?? "";
@@ -177,7 +196,9 @@ class _Profile2State extends State<Profile2> {
               ),
               SizedBox(height: spacing * 2),
               Text(
-                userData?["nom"] ?? "",
+                _fullDisplayName.isNotEmpty
+                    ? _fullDisplayName
+                    : (userData?["nom"] ?? ""),
                 style: TextStyle(
                   fontSize: fontSize * 1.2,
                   fontWeight: FontWeight.bold,
@@ -191,8 +212,14 @@ class _Profile2State extends State<Profile2> {
 
               // Champs dynamiques
               _buildTextField(
+                controller: _prenomsController,
+                hintText: "Prénom(s)",
+                fontSize: fontSize,
+              ),
+              SizedBox(height: spacing),
+              _buildTextField(
                 controller: _nomController,
-                hintText: "Nom complet",
+                hintText: "Nom",
                 fontSize: fontSize,
               ),
               SizedBox(height: spacing),
@@ -444,6 +471,7 @@ class _Profile2State extends State<Profile2> {
 
     final Map<String, dynamic> data = {
       'nom': _nomController.text.trim(),
+      'prenoms': _prenomsController.text.trim(),
       'entreprise': _entrepriseController.text.trim(),
       'email': _emailController.text.trim(),
       'telephone': _telephoneController.text.trim(),
@@ -513,10 +541,19 @@ class _Profile2State extends State<Profile2> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 0,
         ),
-        child: Text(
-          isSaving ? "Enregistrement..." : "Mettre à jour le profil",
-          style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w500),
-        ),
+        child: isSaving
+            ? SizedBox(
+                height: fontSize * 1.2,
+                width: fontSize * 1.2,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.black,
+                ),
+              )
+            : Text(
+                "Mettre à jour le profil",
+                style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w500),
+              ),
       ),
     );
   }

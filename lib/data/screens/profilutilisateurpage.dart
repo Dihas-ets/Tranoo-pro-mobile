@@ -14,6 +14,7 @@ import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
 import 'package:tranoo_pro/services/subscription_access_service.dart';
+import 'package:tranoo_pro/widgets/profile_location_tile.dart';
 
 void main() {
   runApp(const MyApp());
@@ -437,6 +438,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 15),
+            ProfileLocationTile(onUpdated: fetchUser),
             // Profile card dynamique
             Container(
               padding: const EdgeInsets.all(16),
@@ -538,7 +540,10 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        userData?["nom"] ?? "",
+                        [
+                          (userData?["prenoms"] ?? "").toString().trim(),
+                          (userData?["nom"] ?? "").toString().trim(),
+                        ].where((s) => s.isNotEmpty).join(' '),
                         style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'blocked_user_service.dart';
 import 'push_otp_service.dart';
 import '../config/backend_config.dart';
+import '../utils/phone_country_config.dart';
 
 String getBaseUrl() => getApiBaseUrl();
 
@@ -100,6 +101,11 @@ class UserService extends ChangeNotifier {
     String? registreCommerce,
     String? numeroIFU,
     String? entrepriseProvenance,
+    double? latitude,
+    double? longitude,
+    String? adresse,
+    String? ville,
+    Map<String, dynamic>? fournisseurProfil,
     String? referralCode,
     // Champs véhicule (livreur/chauffeur)
     String? vehiculeImmatriculation,
@@ -133,8 +139,14 @@ class UserService extends ChangeNotifier {
       if (entreprise != null) data['entreprise'] = entreprise;
       if (registreCommerce != null) data['registreCommerce'] = registreCommerce;
       if (numeroIFU != null) data['numeroIFU'] = numeroIFU;
-      if (entrepriseProvenance != null)
+      if (entrepriseProvenance != null) {
         data['entrepriseProvenance'] = entrepriseProvenance;
+      }
+      if (latitude != null) data['latitude'] = latitude;
+      if (longitude != null) data['longitude'] = longitude;
+      if (adresse != null && adresse.isNotEmpty) data['adresse'] = adresse;
+      if (ville != null && ville.isNotEmpty) data['ville'] = ville;
+      if (fournisseurProfil != null) data['fournisseurProfil'] = fournisseurProfil;
       if (referralCode != null) data['referralCode'] = referralCode;
       
       // Ajouter les données véhicule (livreur/chauffeur)
@@ -166,13 +178,28 @@ class UserService extends ChangeNotifier {
     }
   }
 
+  /// Connexion par numéro national + indicatif (email Firebase synthétique).
+  Future<UserCredential> loginWithPhone({
+    required String countryCode,
+    required String nationalNumber,
+    required String password,
+    TranooAuthApp app = TranooAuthApp.pro,
+  }) {
+    final email = syntheticEmailFromPhone(
+      countryCode,
+      nationalNumber,
+      app: app,
+    );
+    return loginUser(email: email, password: password);
+  }
+
   // Connexion : authentifie avec Firebase, puis récupère le token
   Future<UserCredential> loginUser({
     required String email,
     required String password,
   }) async {
     final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
+      email: email.trim(),
       password: password,
     );
 

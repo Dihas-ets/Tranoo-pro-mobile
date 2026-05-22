@@ -437,11 +437,12 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
             title: "Mon compte",
             subtitle: "Apporter des modifications à votre compte",
             icon: Icons.person,
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => Profile2()),
               );
+              await fetchUser();
             },
           ),
           _buildListTile(

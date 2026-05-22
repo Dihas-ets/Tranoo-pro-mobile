@@ -46,7 +46,8 @@ class TranooAlertMessagingService : FlutterFirebaseMessagingService() {
 
     private fun isAlertMessage(data: Map<String, String>): Boolean {
         val type = data["type"] ?: ""
-        if (type == "alerte") return true
+        if (type == "alerte" || type == "proposition_alerte") return true
+        if (data["action"] == "view_proposal") return true
         val requestType = data["requestType"] ?: ""
         return requestType == "vehicle_search" || requestType == "piece_search"
     }

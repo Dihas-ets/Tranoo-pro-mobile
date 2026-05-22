@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/widgets/auth_message_popup.dart';
+import 'package:tranoo_pro/utils/phone_country_config.dart';
+import 'package:tranoo_pro/utils/auth_config.dart';
+import 'package:tranoo_pro/widgets/registration_location_section.dart';
 import 'avant_home.dart';
 
 import 'connexion_page.dart'; // Assurez-vous que ce fichier existe
@@ -19,14 +22,12 @@ class _InscriptionPageState extends State<InscriptionPage> {
   // Contrôleurs pour les champs du formulaire
   final TextEditingController _nomController = TextEditingController();
   final TextEditingController _prenomController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-  final TextEditingController _entrepriseProvenanceController =
-      TextEditingController();
   final TextEditingController _referralController = TextEditingController();
+  CapturedProfileLocation? _profileLocation;
   // Contrôleurs pour les champs véhicule (livreur/chauffeur)
   final TextEditingController _immatriculationController = TextEditingController();
   final TextEditingController _vehiculeTypeController = TextEditingController();
@@ -38,62 +39,34 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
   String? selectedCountry;
   String? selectedCountryCode;
-  int selectedDigits = 8;
   String? selectedRole;
   String? _typeVendeur; // Pour la sélection du type de vendeur
   int _currentStep = 0; // 0: infos, 1: rôle, 2: sécurité
-  final List<Map<String, dynamic>> countries = [
-    {'name': 'Bénin', 'code': '+229', 'flag': '🇧🇯', 'digits': 8},
-    {'name': 'Côte d\'Ivoire', 'code': '+225', 'flag': '🇨🇮', 'digits': 10},
-    {'name': 'Sénégal', 'code': '+221', 'flag': '🇸🇳', 'digits': 9},
-    {'name': 'Togo', 'code': '+228', 'flag': '🇹🇬', 'digits': 8},
-    {'name': 'Mali', 'code': '+223', 'flag': '🇲🇱', 'digits': 8},
-    {'name': 'Burkina Faso', 'code': '+226', 'flag': '🇧🇫', 'digits': 8},
-    {'name': 'Niger', 'code': '+227', 'flag': '🇳🇪', 'digits': 8},
-    {'name': 'Ghana', 'code': '+233', 'flag': '🇬🇭', 'digits': 9},
-    {'name': 'Nigeria', 'code': '+234', 'flag': '🇳🇬', 'digits': 10},
-    {'name': 'Cameroun', 'code': '+237', 'flag': '🇨🇲', 'digits': 9},
-    {'name': 'Gabon', 'code': '+241', 'flag': '🇬🇦', 'digits': 8},
-    {'name': 'Congo', 'code': '+242', 'flag': '🇨🇬', 'digits': 9},
-    {'name': 'RDC', 'code': '+243', 'flag': '🇨🇩', 'digits': 9},
-    {'name': 'Tchad', 'code': '+235', 'flag': '🇹🇩', 'digits': 8},
-    {'name': 'Centrafrique', 'code': '+236', 'flag': '🇨🇫', 'digits': 8},
-    {'name': 'Guinée', 'code': '+224', 'flag': '🇬🇳', 'digits': 9},
-    {'name': 'Guinée-Bissau', 'code': '+245', 'flag': '🇬🇼', 'digits': 7},
-    {'name': 'Liberia', 'code': '+231', 'flag': '🇱🇷', 'digits': 8},
-    {'name': 'Sierra Leone', 'code': '+232', 'flag': '🇸🇱', 'digits': 8},
-    {'name': 'Mauritanie', 'code': '+222', 'flag': '🇲🇷', 'digits': 8},
-    {'name': 'Gambie', 'code': '+220', 'flag': '🇬🇲', 'digits': 7},
-    {'name': 'Cap-Vert', 'code': '+238', 'flag': '🇨🇻', 'digits': 7},
-    {'name': 'Maroc', 'code': '+212', 'flag': '🇲🇦', 'digits': 9},
-    {'name': 'Algérie', 'code': '+213', 'flag': '🇩🇿', 'digits': 9},
-    {'name': 'Tunisie', 'code': '+216', 'flag': '🇹🇳', 'digits': 8},
-    {'name': 'Libye', 'code': '+218', 'flag': '🇱🇾', 'digits': 9},
-    {'name': 'Égypte', 'code': '+20', 'flag': '🇪🇬', 'digits': 10},
-    {'name': 'Soudan', 'code': '+249', 'flag': '🇸🇩', 'digits': 9},
-    {'name': 'Éthiopie', 'code': '+251', 'flag': '🇪🇹', 'digits': 9},
-    {'name': 'Kenya', 'code': '+254', 'flag': '🇰🇪', 'digits': 9},
-    {'name': 'Tanzanie', 'code': '+255', 'flag': '🇹🇿', 'digits': 9},
-    {'name': 'Ouganda', 'code': '+256', 'flag': '🇺🇬', 'digits': 9},
-    {'name': 'Rwanda', 'code': '+250', 'flag': '🇷🇼', 'digits': 9},
-    {'name': 'Burundi', 'code': '+257', 'flag': '🇧🇮', 'digits': 8},
-    {'name': 'Afrique du Sud', 'code': '+27', 'flag': '🇿🇦', 'digits': 9},
-    {'name': 'Botswana', 'code': '+267', 'flag': '🇧🇼', 'digits': 8},
-    {'name': 'Namibie', 'code': '+264', 'flag': '🇳🇦', 'digits': 8},
-    {'name': 'Zambie', 'code': '+260', 'flag': '🇿🇲', 'digits': 9},
-    {'name': 'Zimbabwe', 'code': '+263', 'flag': '🇿🇼', 'digits': 9},
-    {'name': 'Mozambique', 'code': '+258', 'flag': '🇲🇿', 'digits': 9},
-    {'name': 'Madagascar', 'code': '+261', 'flag': '🇲🇬', 'digits': 9},
-    {'name': 'Maurice', 'code': '+230', 'flag': '🇲🇺', 'digits': 8},
-    {'name': 'France', 'code': '+33', 'flag': '🇫🇷', 'digits': 10},
-    {'name': 'Belgique', 'code': '+32', 'flag': '🇧🇪', 'digits': 9},
-    {'name': 'Allemagne', 'code': '+49', 'flag': '🇩🇪', 'digits': 11},
-    {'name': 'Italie', 'code': '+39', 'flag': '🇮🇹', 'digits': 10},
-    {'name': 'Espagne', 'code': '+34', 'flag': '🇪🇸', 'digits': 9},
-    {'name': 'Portugal', 'code': '+351', 'flag': '🇵🇹', 'digits': 9},
-    {'name': 'Suisse', 'code': '+41', 'flag': '🇨🇭', 'digits': 9},
-    {'name': 'Pays-Bas', 'code': '+31', 'flag': '🇳🇱', 'digits': 9},
-  ];
+
+  PhoneCountryConfig get _phoneCountry => kPhoneCountries.firstWhere(
+        (c) => c.name == selectedCountry,
+        orElse: () => kPhoneCountries.first,
+      );
+
+  List<Map<String, dynamic>> get countries => kPhoneCountries
+      .map(
+        (c) => <String, dynamic>{
+          'name': c.name,
+          'code': c.code,
+          'flag': c.flag,
+          'minDigits': c.minDigits,
+          'maxDigits': c.maxDigits,
+        },
+      )
+      .toList();
+
+  Map<String, dynamic> get _selectedCountryMap {
+    if (selectedCountry == null) return countries.first;
+    for (final c in countries) {
+      if (c['name'] == selectedCountry) return c;
+    }
+    return countries.first;
+  }
 
   final List<String> roles = [
     'Transitaire',
@@ -151,9 +124,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
   void initState() {
     super.initState();
     // Initialiser le pays par défaut (Bénin)
-    selectedCountry = countries[0]['name'] as String?;
-    selectedCountryCode = countries[0]['code'] as String?;
-    selectedDigits = countries[0]['digits'] as int;
+    selectedCountry = kPhoneCountries.first.name;
+    selectedCountryCode = kPhoneCountries.first.code;
     selectedRole = roles.isNotEmpty ? roles.first : null;
   }
 
@@ -270,7 +242,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                               setState(() {
                                 selectedCountry = c['name'] as String?;
                                 selectedCountryCode = c['code'] as String?;
-                                selectedDigits = c['digits'] as int? ?? 8;
                                 _telephoneController.clear();
                               });
                               Navigator.pop(ctx);
@@ -353,16 +324,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                 ),
                 SizedBox(height: screenHeight * 0.02),
                 buildTextFieldWithController(
-                  controller: _emailController,
-                  label: "Adresse email",
-                  icon: Icons.email,
-                  placeholder: "jean.dupont@email.com",
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  isPortrait: isPortrait,
-                ),
-                SizedBox(height: screenHeight * 0.02),
-                buildTextFieldWithController(
                   controller: _referralController,
                   label: "Code de parrainage (optionnel)",
                   icon: Icons.card_giftcard,
@@ -391,13 +352,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              countries
-                                      .firstWhere(
-                                        (c) => c['name'] == selectedCountry,
-                                        orElse: () => countries[0],
-                                      )['flag']
-                                      ?.toString() ??
-                                  '',
+                              _selectedCountryMap['flag']?.toString() ?? '',
                               style: const TextStyle(fontSize: 16),
                             ),
                             const SizedBox(width: 6),
@@ -419,9 +374,12 @@ class _InscriptionPageState extends State<InscriptionPage> {
                       child: TextField(
                         controller: _telephoneController,
                         keyboardType: TextInputType.number,
-                        maxLength: selectedDigits,
+                        maxLength: _phoneCountry.maxDigits,
                         decoration: InputDecoration(
-                          labelText: 'Téléphone ($selectedDigits chiffres)',
+                          labelText: 'Numéro WhatsApp',
+                          hintText:
+                              'WhatsApp · ${_phoneCountry.digitHint}',
+                          prefixIcon: AuthConfig.whatsAppPhonePrefixIcon(),
                           counterText: '',
                           filled: true,
                           fillColor: Colors.white,
@@ -469,12 +427,21 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     onPressed: () {
                       if (_nomController.text.trim().isEmpty ||
                           _prenomController.text.trim().isEmpty ||
-                          _emailController.text.trim().isEmpty ||
                           _telephoneController.text.trim().isEmpty) {
                         AuthMessagePopup.showWarning(
                           context,
                           title: 'Certains champs sont manquants.',
                           subtitle: 'Veuillez compléter les informations requises.',
+                        );
+                        return;
+                      }
+                      final phone = _telephoneController.text.trim();
+                      if (!_phoneCountry.isValidNationalNumber(phone)) {
+                        AuthMessagePopup.showWarning(
+                          context,
+                          title: 'Numéro invalide',
+                          subtitle:
+                              'Entrez ${_phoneCountry.digitHint} (ex. Bénin : 8 ou 10 chiffres).',
                         );
                         return;
                       }
@@ -583,17 +550,16 @@ class _InscriptionPageState extends State<InscriptionPage> {
                 ],
                 if (selectedRole == 'Vendeur') ...[
                   SizedBox(height: screenHeight * 0.02),
-                  buildTextFieldWithController(
-                    controller: _entrepriseProvenanceController,
-                    label: "Entreprise de provenance",
-                    icon: Icons.factory,
-                    placeholder: "Nom de l'entreprise",
-                    screenWidth: screenWidth,
-                    screenHeight: screenHeight,
-                    isPortrait: isPortrait,
-                  ),
-                  SizedBox(height: screenHeight * 0.02),
                   _buildTypeVendeurSelector(screenWidth, screenHeight, isPortrait),
+                ],
+                if (selectedRole == 'Vendeur' || selectedRole == 'Transitaire') ...[
+                  SizedBox(height: screenHeight * 0.02),
+                  RegistrationLocationSection(
+                    userRole: selectedRole == 'Vendeur' ? 'vendeur' : 'transitaire',
+                    onChanged: (loc) {
+                      setState(() => _profileLocation = loc);
+                    },
+                  ),
                 ],
                 if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
                   SizedBox(height: screenHeight * 0.02),
@@ -754,6 +720,17 @@ class _InscriptionPageState extends State<InscriptionPage> {
                               title: 'Informations véhicule manquantes.',
                               subtitle:
                                   'Immatriculation, type, marque et modèle sont requis.',
+                            );
+                            return;
+                          }
+                          if ((selectedRole == 'Vendeur' ||
+                                  selectedRole == 'Transitaire') &&
+                              _profileLocation == null) {
+                            AuthMessagePopup.showWarning(
+                              context,
+                              title: 'Position requise',
+                              subtitle:
+                                  'Enregistrez votre position actuelle pour continuer.',
                             );
                             return;
                           }
@@ -932,7 +909,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                             : () async {
                                 if (_nomController.text.trim().isEmpty ||
                                     _prenomController.text.trim().isEmpty ||
-                                    _emailController.text.trim().isEmpty ||
                                     _telephoneController.text.trim().isEmpty ||
                                     _passwordController.text.trim().isEmpty ||
                                     _confirmPasswordController.text.trim().isEmpty ||
@@ -958,15 +934,14 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   return;
                                 }
 
-                                if (selectedRole == 'Vendeur' &&
-                                    _entrepriseProvenanceController.text
-                                        .trim()
-                                        .isEmpty) {
+                                if ((selectedRole == 'Vendeur' ||
+                                        selectedRole == 'Transitaire') &&
+                                    _profileLocation == null) {
                                   AuthMessagePopup.showWarning(
                                     context,
-                                    title: 'Ce champ est obligatoire.',
+                                    title: 'Position requise',
                                     subtitle:
-                                        'Veuillez renseigner l’entreprise de provenance.',
+                                        'Enregistrez votre position actuelle.',
                                   );
                                   return;
                                 }
@@ -994,16 +969,23 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   return;
                                 }
 
-                                final email = _emailController.text.trim();
-                                final emailRegex =
-                                    RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                                if (!emailRegex.hasMatch(email)) {
+                                final phone = _telephoneController.text.trim();
+                                if (!_phoneCountry.isValidNationalNumber(phone)) {
                                   AuthMessagePopup.showError(
                                     context,
-                                    title: 'Veuillez entrer une adresse email valide.',
+                                    title: 'Numéro invalide',
+                                    subtitle:
+                                        'Entrez ${_phoneCountry.digitHint}.',
                                   );
                                   return;
                                 }
+
+                                final cc = selectedCountryCode ?? '+229';
+                                final email = syntheticEmailFromPhone(
+                                  cc,
+                                  phone,
+                                  app: TranooAuthApp.pro,
+                                );
 
                                 if (_passwordController.text.length < 8) {
                                   AuthMessagePopup.showError(
@@ -1023,22 +1005,23 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   return;
                                 }
 
-                                final phone = _telephoneController.text.trim();
-                                final phoneRegex =
-                                    RegExp('^\\d{$selectedDigits}\$');
-                                if (!phoneRegex.hasMatch(phone)) {
-                                  AuthMessagePopup.showError(
-                                    context,
-                                    title: 'Numéro invalide',
-                                    subtitle: 'Entrez $selectedDigits chiffres.',
-                                  );
-                                  return;
-                                }
-
                                 setState(() => _isLoading = true);
                                 try {
                                   final fullPhone =
                                       (selectedCountryCode ?? '+229') + phone;
+                                  final loc = _profileLocation;
+                                  Map<String, dynamic>? fournisseurProfil;
+                                  if (loc != null &&
+                                      (selectedRole == 'Vendeur' ||
+                                          selectedRole == 'Transitaire')) {
+                                    fournisseurProfil = {
+                                      'telephone': fullPhone,
+                                      'adresseTexte': loc.address,
+                                      'ville': loc.city,
+                                      'latitude': loc.latitude,
+                                      'longitude': loc.longitude,
+                                    };
+                                  }
 
                                   final prefs =
                                       await SharedPreferences.getInstance();
@@ -1073,10 +1056,11 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     // Vendeur: on retire RC + IFU à l'inscription
                                     registreCommerce: null,
                                     numeroIFU: null,
-                                    entrepriseProvenance: selectedRole == 'Vendeur'
-                                        ? _entrepriseProvenanceController.text
-                                            .trim()
-                                        : null,
+                                    latitude: loc?.latitude,
+                                    longitude: loc?.longitude,
+                                    adresse: loc?.address,
+                                    ville: loc?.city,
+                                    fournisseurProfil: fournisseurProfil,
                                     referralCode: pendingReferral,
                                     vehiculeImmatriculation:
                                         (selectedRole == 'Livreur' ||
@@ -1181,8 +1165,9 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                         'email-already-in-use',
                                       )) {
                                     title =
-                                        'Un compte existe déjà avec cette adresse email.';
-                                    subtitle = 'Essayez de vous connecter.';
+                                        'Un compte existe déjà avec ce numéro.';
+                                    subtitle =
+                                        'Connectez-vous ou utilisez un autre numéro.';
                                   } else if (e.toString().contains(
                                         'weak-password',
                                       )) {

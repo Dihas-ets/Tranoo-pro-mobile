@@ -91,37 +91,20 @@ class PushOTPService {
     }
   }
 
-  /// Demander un code OTP (mot de passe oublié) par notification push sur CE device uniquement.
-  /// - [identifier] : email (ou identifiant unique)
-  /// - [deviceId] : identifiant du téléphone demandeur
-  /// - [fcmToken] : token FCM de ce même device
+  /// Mot de passe oublié : OTP WhatsApp au numéro enregistré sur le compte.
   static Future<Map<String, dynamic>> requestPasswordReset({
-    required String identifier,
-    required String deviceId,
-    required String fcmToken,
+    required String telephone,
   }) async {
     try {
-      if (identifier.trim().isEmpty) {
-        return {'success': false, 'message': 'Veuillez entrer votre identifiant.'};
-      }
-      if (deviceId.trim().isEmpty) {
-        return {'success': false, 'message': 'Impossible d’identifier ce téléphone.'};
-      }
-      if (fcmToken.trim().isEmpty) {
-        return {
-          'success': false,
-          'message':
-              'Autorisez les notifications pour recevoir le code sur cet appareil.',
-        };
+      if (telephone.trim().isEmpty) {
+        return {'success': false, 'message': 'Veuillez entrer votre numéro.'};
       }
 
       final response = await http.post(
         Uri.parse('$_baseUrl/api/push-otp/request'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'identifier': identifier.trim(),
-          'deviceId': deviceId.trim(),
-          'fcmToken': fcmToken.trim(),
+          'telephone': telephone.trim(),
         }),
       );
 
@@ -130,8 +113,9 @@ class PushOTPService {
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'message': data['message'] as String? ?? 'Code envoyé par notification.',
+          'message': data['message'] as String? ?? 'Code envoyé sur WhatsApp.',
           'requestId': data['requestId'],
+          'deviceId': data['deviceId'],
           'expiresInSeconds': data['expiresInSeconds'],
         };
       } else {

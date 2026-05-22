@@ -27,6 +27,7 @@ import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/main.dart';
 import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
+import 'package:tranoo_pro/widgets/alert_display_permission_dialog.dart';
 
 class AvantHome extends StatefulWidget {
   const AvantHome({super.key});
@@ -56,6 +57,7 @@ class _AvantHomeState extends State<AvantHome>
       AlertIncomingCallService.tryShowFromAppLaunchOnly(
         navigatorKey: NotificationService.navigatorKey,
       );
+      AlertDisplayPermissionDialog.showIfNeeded(context);
     });
     _lightRefreshTimer = Timer.periodic(
       const Duration(seconds: 90),
@@ -74,6 +76,7 @@ class _AvantHomeState extends State<AvantHome>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _runLightRefresh(force: true);
+      AlertDisplayPermissionDialog.showIfNeeded(context);
     }
   }
 
@@ -562,7 +565,8 @@ class _AvantHomeState extends State<AvantHome>
                   unselectedItemColor: Colors.black,
                   currentIndex: _selectedIndex,
                   onTap: (i) => _onItemTapped(i, role),
-                  items: (role == 'vendeur' || role?.startsWith('vendeur') == true)
+                  items: (role == 'vendeur' ||
+                          role?.startsWith('vendeur') == true)
                       ? _buildVendeurMenuItems(role, iconSize)
                       : role == 'transitaire'
                           ? [
@@ -594,7 +598,8 @@ class _AvantHomeState extends State<AvantHome>
                                         label: 'Accueil',
                                       ),
                                       BottomNavigationBarItem(
-                                        icon: Icon(Icons.person, size: iconSize),
+                                        icon:
+                                            Icon(Icons.person, size: iconSize),
                                         label: 'Profil',
                                       ),
                                     ]
@@ -604,7 +609,8 @@ class _AvantHomeState extends State<AvantHome>
                                         label: 'Accueil',
                                       ),
                                       BottomNavigationBarItem(
-                                        icon: Icon(Icons.person, size: iconSize),
+                                        icon:
+                                            Icon(Icons.person, size: iconSize),
                                         label: 'Profil',
                                       ),
                                     ],
@@ -645,9 +651,10 @@ class _AvantHomeState extends State<AvantHome>
   }
 
   // Méthode pour construire le menu des vendeurs selon le type
-  List<BottomNavigationBarItem> _buildVendeurMenuItems(String? role, double iconSize) {
+  List<BottomNavigationBarItem> _buildVendeurMenuItems(
+      String? role, double iconSize) {
     final userService = UserService();
-    
+
     // Menu selon vendeurType (compat: null => mixte)
     if (userService.peutVendreVehicules && userService.peutVendrePieces) {
       return [
@@ -669,7 +676,7 @@ class _AvantHomeState extends State<AvantHome>
         ),
       ];
     }
-    
+
     // Vendeur de véhicules uniquement
     if (userService.peutVendreVehicules && !userService.peutVendrePieces) {
       return [
@@ -687,7 +694,7 @@ class _AvantHomeState extends State<AvantHome>
         ),
       ];
     }
-    
+
     // Vendeur de pièces uniquement
     if (userService.peutVendrePieces && !userService.peutVendreVehicules) {
       return [
@@ -705,7 +712,7 @@ class _AvantHomeState extends State<AvantHome>
         ),
       ];
     }
-    
+
     // Menu par défaut (fallback)
     return [
       BottomNavigationBarItem(

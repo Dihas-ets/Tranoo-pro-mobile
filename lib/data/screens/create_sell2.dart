@@ -16,6 +16,7 @@ import 'map_picker_screen.dart';
 import '../../widgets/location_permission_dialog.dart';
 import 'movie.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
+import 'package:tranoo_pro/services/seller_profile_locations.dart';
 
 class CreateSellPage2 extends StatefulWidget {
   final String? alertNotificationId;
@@ -68,6 +69,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   double _videoUploadProgress = 0.0;
 
   bool get _isAnyUploading => _isUploadingImage.contains(true) || _isUploadingVideo;
+  bool _isSaving = false;
 
   final List<String> _pieceTypes = ['Nouveau', 'Occasion'];
 
@@ -119,8 +121,27 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       }
       _loadingPhone = false;
     } else {
-      _prefillSupplierPhone();
+      _loadLocationsFromProfile();
     }
+  }
+
+  Future<void> _loadLocationsFromProfile() async {
+    setState(() => _loadingPhone = true);
+    final profile = await SellerProfileLocations.load();
+    if (!mounted) return;
+    if (profile != null) {
+      setState(() {
+        _fournisseurTelController.text = profile.fournisseurTel;
+        _fournisseurLatitude = profile.fournisseurLat;
+        _fournisseurLongitude = profile.fournisseurLng;
+        _fournisseurAddress = profile.fournisseurAddress;
+        _fournisseurCity = profile.fournisseurCity;
+        _localisationController.text = profile.fournisseurAddress;
+        _loadingPhone = false;
+      });
+      return;
+    }
+    await _prefillSupplierPhone();
   }
 
   Future<void> _prefillSupplierPhone() async {
@@ -344,21 +365,10 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     }
   }
 
-  Future<void> _addNewImage() async {
-    if (_uploadedImages.length >= _maxMediaSlots) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vous avez atteint le maximum de 12 images')),
-      );
-      return;
-    }
+  Future<void> _uploadGalleryFile(File file) async {
+    if (_uploadedImages.length >= _maxMediaSlots) return;
 
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image == null) return;
-
-    final file = File(image.path);
     final newIndex = _uploadedImages.length;
-    
     setState(() {
       _uploadedImages.add(file);
       _cloudinaryUrls.add(null);
@@ -400,6 +410,34 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       setState(() {
         _isUploadingImage[newIndex] = false;
       });
+    }
+  }
+
+  Future<void> _pickMultipleImages() async {
+    if (_uploadedImages.length >= _maxMediaSlots) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vous avez atteint le maximum de 12 images')),
+      );
+      return;
+    }
+
+    final ImagePicker picker = ImagePicker();
+    try {
+      final List<XFile>? images = await picker.pickMultiImage();
+      if (images == null || images.isEmpty) return;
+
+      for (final image in images) {
+        if (_uploadedImages.length >= _maxMediaSlots) break;
+        await _uploadGalleryFile(File(image.path));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -584,12 +622,60 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     );
   }
 
+  Widget _buildProfileFournisseurSummary() {
+    if (_loadingPhone) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text('Chargement du profil...', style: TextStyle(color: Colors.black54)),
+      );
+    }
+    final hasLoc =
+        _fournisseurLatitude != null && _fournisseurLongitude != null;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F2F2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _fournisseurTelController.text.isNotEmpty
+                ? 'Tél. ${_fournisseurTelController.text}'
+                : 'Téléphone non renseigné — complétez votre profil',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: _fournisseurTelController.text.isNotEmpty
+                  ? Colors.black87
+                  : Colors.red,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (hasLoc)
+            Text(
+              _fournisseurAddress.isNotEmpty
+                  ? truncateWithEllipsis(_fournisseurAddress)
+                  : 'Position GPS enregistrée',
+              style: const TextStyle(fontSize: 13),
+            )
+          else
+            const Text(
+              'Localisation manquante — mettez à jour votre position dans le profil.',
+              style: TextStyle(fontSize: 12, color: Colors.red),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildVerificationButton(BuildContext context) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 16),
       child: ElevatedButton(
-        onPressed: _isAnyUploading ? null : _onValidate,
+        onPressed: (_isAnyUploading || _isSaving) ? null : _onValidate,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFFFCC00),
           foregroundColor: Colors.black,
@@ -597,17 +683,21 @@ class CreateSellPage2State extends State<CreateSellPage2> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 0,
         ),
-        child: _isAnyUploading
-            ? const Row(
+        child: (_isAnyUploading || _isSaving)
+            ? Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(width: 12),
-                  Text('Upload en cours...'),
+                  const SizedBox(width: 12),
+                  Text(
+                    _isSaving
+                        ? 'Enregistrement...'
+                        : 'Upload en cours...',
+                  ),
                 ],
               )
             : Text(
@@ -724,6 +814,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   }) async {
     final id = (widget.editArticleId ?? '').toString();
     if (id.isEmpty) return;
+    setState(() => _isSaving = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
       final token = await user?.getIdToken();
@@ -766,6 +857,8 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur sauvegarde: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -791,7 +884,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: _addNewImage,
+                            onPressed: _pickMultipleImages,
                             icon: const Icon(Icons.add_photo_alternate, size: 20),
                             label: Text(
                               'Ajouter des images (${_uploadedImages.length}/$_maxMediaSlots)',
@@ -898,119 +991,18 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Infos fournisseur
-                    const Text('Informations du fournisseur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text(
+                      'Fournisseur (profil)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Téléphone et localisation repris de votre inscription. '
+                      'Mettez à jour votre profil si besoin.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54, height: 1.35),
+                    ),
                     const SizedBox(height: 12),
-                    _buildLabel('Téléphone', isRequired: false),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2F2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: _loadingPhone
-                          ? const Text('Chargement du numéro...', style: TextStyle(color: Colors.black54))
-                          : Text(
-                              _fournisseurTelController.text.isNotEmpty
-                                  ? _fournisseurTelController.text
-                                  : 'Numéro non renseigné sur votre profil',
-                              style: TextStyle(
-                                color: _fournisseurTelController.text.isNotEmpty
-                                    ? Colors.black87
-                                    : Colors.red,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLabel('Localisation fournisseur'),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _useCurrentSupplierLocation,
-                            icon: const Icon(Icons.my_location),
-                            label: const Text('Position actuelle'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              final result = await Navigator.push<Map<String, double>>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => MapPickerScreen(
-                                    initialLatitude: _fournisseurLatitude,
-                                    initialLongitude: _fournisseurLongitude,
-                                  ),
-                                ),
-                              );
-                              if (result != null) {
-                                final lat = result['latitude'];
-                                final lng = result['longitude'];
-                                if (lat != null && lng != null) {
-                                  await _setSupplierLocation(lat: lat, lng: lng, fromCurrent: false);
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.map_outlined),
-                            label: const Text('Choisir sur carte'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (_fournisseurLatitude != null && _fournisseurLongitude != null)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFCC00).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFFCC00).withOpacity(0.65)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(_useSupplierCurrentLocation ? Icons.my_location : Icons.map, size: 16, color: const Color(0xFFB45309)),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _useSupplierCurrentLocation ? 'Position actuelle' : 'Position sélectionnée',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFB45309)),
-                                ),
-                                if (_fournisseurCity.isNotEmpty) ...[
-                                  const Spacer(),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(color: const Color(0xFFFFCC00), borderRadius: BorderRadius.circular(12)),
-                                    child: Text(
-                                      truncateWithEllipsis(_fournisseurCity, maxLen: 28),
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            if (_loadingSupplierAddress)
-                              const Text('Récupération de l\'adresse...', style: TextStyle(color: Colors.black54))
-                            else
-                              Text(
-                                _fournisseurAddress.isNotEmpty
-                                    ? truncateWithEllipsis(_fournisseurAddress)
-                                    : 'Adresse non disponible',
-                                style: const TextStyle(color: Colors.black87),
-                              ),
-                          ],
-                        ),
-                      )
-                    else
-                      const Text('Localisation fournisseur non définie', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    _buildProfileFournisseurSummary(),
                     const SizedBox(height: 20),
 
                     // Type et Année

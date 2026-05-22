@@ -13,6 +13,7 @@ import 'une.dart' as pub_page; // Import pour la page de demande de pub avec pr�
 import 'dart:developer';
 import 'verification_payment.dart'; // Import pour la page de vérification de paiement
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
@@ -121,6 +122,7 @@ class _CarsinfoState extends State<CarsInfo> {
   ];
   late ConfettiController _confettiController;
   bool _isOnline = false;
+  bool _isPublishing = false;
   int _verificationPrice = 20000;
 
   String _formatFcfa(int value) {
@@ -698,9 +700,7 @@ class _CarsinfoState extends State<CarsInfo> {
         ),
         //Nom de l'entreprise
         Text(
-          (widget.entreprise != null && widget.entreprise!.isNotEmpty)
-              ? widget.entreprise!
-              : 'Entreprise non renseignée',
+          AuthConfig.displayEntreprise(widget.entreprise),
           style: TextStyle(
             fontSize: screenWidth * 0.05,
             fontWeight: FontWeight.bold,
@@ -1617,9 +1617,10 @@ class _CarsinfoState extends State<CarsInfo> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _isOnline
+              onPressed: (_isOnline || _isPublishing)
                   ? null
                   : () async {
+                      setState(() => _isPublishing = true);
                       // Vendeur : enregistre l'article dans la BDD puis redirige vers la page de succès
                       final articleData = {
                         'type': 'voiture',
@@ -1695,6 +1696,10 @@ class _CarsinfoState extends State<CarsInfo> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Erreur réseau ou serveur')),
                         );
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isPublishing = false);
+                        }
                       }
                     },
               style: ElevatedButton.styleFrom(
@@ -1705,10 +1710,22 @@ class _CarsinfoState extends State<CarsInfo> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                'Vendre ma voiture',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              child: _isPublishing
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Text(
+                      'Vendre ma voiture',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 12),
