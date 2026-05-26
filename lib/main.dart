@@ -369,7 +369,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
     return MaterialApp(
-      title: 'Tranoo',
+      title: 'Tranoo Pro',
       debugShowCheckedModeBanner: false,
       navigatorKey: NotificationService.navigatorKey,
       locale: localeProvider.locale ?? DevicePreview.locale(context),

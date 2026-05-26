@@ -15,6 +15,7 @@ import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
+import 'package:tranoo_pro/utils/catalog_display.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -1411,34 +1412,7 @@ class _PieceState extends State<Piece>
                                                     ),
                                                   ),
                                                   const SizedBox(height: 10),
-                                                  Container(
-                                                    width: double.infinity,
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 5),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(
-                                                          0xFFFFF5E5),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              14),
-                                                    ),
-                                                    child: Text(
-                                                      piece['prix'] != null
-                                                          ? "${formatPrice(piece['prix'])} FCFA"
-                                                          : 'Prix non communiqué',
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      style: const TextStyle(
-                                                        color:
-                                                            Color(0xFFB45309),
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        fontSize: 11,
-                                                      ),
-                                                    ),
-                                                  ),
+                                                  catalogPiecePricePill(piece['prix']),
                                                 ],
                                               ),
                                             ),

@@ -261,15 +261,27 @@ class SubscriptionAccessService {
 
     final response = await dio.get(
       '/payments',
-      queryParameters: {'type': 'Abonnement', 'limit': limit},
+      queryParameters: {
+        'type': 'subscription',
+        'limit': limit,
+      },
     );
 
     final data = response.data;
     if (data is Map<String, dynamic> && data['transactions'] is List) {
-      return List<Map<String, dynamic>>.from(
+      final list = List<Map<String, dynamic>>.from(
         (data['transactions'] as List).whereType<Map>(),
       );
+      developer.log(
+        '[SUB_HISTORY] ${list.length} paiement(s) abonnement (limit=$limit)',
+        name: 'SubscriptionAccessService',
+      );
+      return list;
     }
+    developer.log(
+      '[SUB_HISTORY] réponse inattendue: ${response.statusCode}',
+      name: 'SubscriptionAccessService',
+    );
     return [];
   }
 }
