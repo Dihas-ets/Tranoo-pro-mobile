@@ -22,13 +22,11 @@ class LocalNotificationService {
       requestSoundPermission: true,
     );
 
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
     await _notifications.initialize(
-      initSettings,
+      settings: const InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      ),
       onDidReceiveNotificationResponse: (details) {
         AlertNotificationHandler.handleResponse(details);
       },
@@ -133,10 +131,10 @@ class LocalNotificationService {
     );
 
     await _notifications.show(
-      1001,
-      'Code de vérification Tranoo',
-      'Votre code: $code',
-      details,
+      id: 1001,
+      title: 'Code de vérification Tranoo',
+      body: 'Votre code: $code',
+      notificationDetails: details,
       payload: 'otp_code',
     );
   }
@@ -168,10 +166,10 @@ class LocalNotificationService {
     );
 
     await _notifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      title,
-      body,
-      details,
+      id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title: title,
+      body: body,
+      notificationDetails: details,
     );
   }
 
@@ -191,7 +189,7 @@ class LocalNotificationService {
       importance: Importance.max,
       priority: Priority.max,
       category: AndroidNotificationCategory.call,
-      fullScreenIntent: true,
+      fullScreenIntent: false,
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
@@ -234,10 +232,10 @@ class LocalNotificationService {
     );
 
     await _notifications.show(
-      9001,
-      title,
-      body,
-      details,
+      id: 9001,
+      title: title,
+      body: body,
+      notificationDetails: details,
       payload: payload,
     );
   }
@@ -274,10 +272,10 @@ class LocalNotificationService {
     );
 
     await _notifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      title,
-      body,
-      details,
+      id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title: title,
+      body: body,
+      notificationDetails: details,
     );
   }
 }
