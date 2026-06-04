@@ -405,8 +405,10 @@ class MyApp extends StatelessWidget {
             const FeexPayChoiceCallbackPage(success: true),
         '/cart-payment-error': (context) =>
             const FeexPayChoiceCallbackPage(success: false),
-        '/verification-success': (context) => _buildVerificationSuccessPage(),
-        '/verification-error': (context) => _buildVerificationErrorPage(),
+        '/verification-success': (context) =>
+            const FeexPayChoiceCallbackPage(success: true),
+        '/verification-error': (context) =>
+            const FeexPayChoiceCallbackPage(success: false),
         '/auth/forgot-password': (context) => const ForgotPasswordPage(),
         '/auth/verify-reset': (context) => const VerifyResetCodePage(),
         '/auth/create-password': (context) {

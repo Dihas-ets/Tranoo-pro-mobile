@@ -13,10 +13,20 @@ import 'package:http/http.dart' as http;
 import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
 import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
 
-final fpToken = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
-final idUser = dotenv.env['ID_USER_FEEXPAY'] ?? '';
-final successUrl = dotenv.env['FEEXPAY_SUCCESS_URL'] ?? '';
-final errorUrl = dotenv.env['FEEXPAY_ERROR_URL'] ?? '';
+String get _fpToken {
+  final a = (dotenv.env['FP_TOKEN_FEEXPAY'] ?? '').trim();
+  if (a.isNotEmpty) return a;
+  return (dotenv.env['FEEXPAY_API_TOKEN'] ?? '').trim();
+}
+
+String get _idUser {
+  final a = (dotenv.env['ID_USER_FEEXPAY'] ?? '').trim();
+  if (a.isNotEmpty) return a;
+  return (dotenv.env['FEEXPAY_SHOP_ID'] ?? '').trim();
+}
+
+const String _kVerificationSuccessRoute = '/verification-success';
+const String _kVerificationErrorRoute = '/verification-error';
 
 class VerificationPaymentScreen extends StatefulWidget {
   final String? articleId; // Optionnel: pour lier le paiement à un article
@@ -328,23 +338,22 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
-      if (fpToken.isEmpty || idUser.isEmpty) {
-        throw Exception('Configuration FeexPay manquante');
+      if (_fpToken.isEmpty || _idUser.isEmpty) {
+        throw Exception(
+          'Configuration FeexPay manquante (FP_TOKEN_FEEXPAY / ID_USER_FEEXPAY)',
+        );
       }
 
       FeexPayCallbackState.clearPendingAtNewCheckout();
-      // Navigation vers FeexPay avec le package officiel
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ChoicePage(
-            token: fpToken,
-            id: idUser,
+            token: _fpToken,
+            id: _idUser,
             amount: _verificationPrice.toString(),
-            redirecturl:
-                (successUrl.isNotEmpty ? successUrl : '/verification-success'),
-            errorredirecturl:
-                (errorUrl.isNotEmpty ? errorUrl : '/verification-error'),
+            redirecturl: _kVerificationSuccessRoute,
+            errorredirecturl: _kVerificationErrorRoute,
             trans_key: transKey,
           ),
         ),
@@ -382,20 +391,34 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
         try {
           await _processVerificationRequest();
         } catch (e) {
-          if (mounted) {
-            setState(() => errorMessage = 'Erreur enregistrement: $e');
-          }
-          return;
+          debugPrint('[VerificationPayment] verification/request: $e');
         }
         if (!mounted) return;
-        // Affiche notre écran de succès après la fermeture du flux FeexPay (le SDK peut montrer son propre message avant).
-        await _showHtmlResultAndRedirect(success: true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Paiement reçu. Votre demande de vérification est en cours de traitement.',
+            ),
+            backgroundColor: Color(0xFF00A86B),
+          ),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const Marque()),
+          (route) => false,
+        );
+      } else {
+        if (mounted) {
+          setState(() {
+            errorMessage =
+                'Paiement annulé ou non confirmé. Réessayez si besoin.';
+          });
+        }
       }
-      // Échec / annulation FeexPay : pas de page d'erreur HTML (évite double UX avec le SDK).
     } catch (e) {
-      setState(() {
-        errorMessage = 'Erreur: $e';
-      });
+      debugPrint('[VerificationPayment] erreur flux: $e');
+      if (mounted) {
+        setState(() => errorMessage = 'Erreur: $e');
+      }
     } finally {
       setState(() {
         isLoading = false;

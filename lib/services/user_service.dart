@@ -95,6 +95,7 @@ class UserService extends ChangeNotifier {
     required String prenoms,
     required String telephone,
     required String role,
+    required String authApp,
     String? vendeurType,
     String? fcmToken,
     String? entreprise,
@@ -131,6 +132,7 @@ class UserService extends ChangeNotifier {
         'prenoms': prenoms,
         'telephone': telephone,
         'role': role.toLowerCase(),
+        'authApp': authApp,
         'fcmToken': fcmToken,
       };
       if (vendeurType != null) data['vendeurType'] = vendeurType;

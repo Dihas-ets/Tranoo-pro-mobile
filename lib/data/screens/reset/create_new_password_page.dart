@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tranoo_pro/services/push_otp_service.dart';
 import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:tranoo_pro/widgets/auth_message_popup.dart';
+import 'package:tranoo_pro/widgets/password_strength_fields.dart';
 
 class CreateNewPasswordPage extends StatefulWidget {
   final String requestId;
@@ -17,47 +18,14 @@ class CreateNewPasswordPage extends StatefulWidget {
   State<CreateNewPasswordPage> createState() => _CreateNewPasswordPageState();
 }
 
-class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
-    with SingleTickerProviderStateMixin {
+class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _loading = false;
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialiser les animations
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeIn,
-      ),
-    );
-    
-    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-    
-    _animationController.forward();
-  }
 
   @override
   void dispose() {
-    _animationController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -71,8 +39,16 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
       AuthMessagePopup.showError(
         context,
         title: 'Mot de passe trop court.',
-        subtitle:
-            'Minimum ${AuthConfig.passwordMinLength} caractères (comme à l\'inscription).',
+        subtitle: 'Minimum ${AuthConfig.passwordMinLength} caractères.',
+        buttonText: 'OK',
+      );
+      return;
+    }
+
+    if (pwd != _confirmPasswordController.text) {
+      AuthMessagePopup.showError(
+        context,
+        title: 'Les mots de passe ne correspondent pas.',
         buttonText: 'OK',
       );
       return;
@@ -90,17 +66,13 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
       if (!mounted) return;
 
       if (result['success']) {
-        // Animation de succès
-        _animationController.reverse().then((_) {
-          if (mounted) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          }
-        });
-        
-        AuthMessagePopup.showSuccess(
+        await AuthMessagePopup.showSuccess(
           context,
-          title: result['message']?.toString() ?? 'Mot de passe modifié avec succès.',
+          title: result['message']?.toString() ??
+              'Mot de passe modifié avec succès.',
         );
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         AuthMessagePopup.showError(
           context,
@@ -110,10 +82,17 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
       }
     } catch (e) {
       if (!mounted) return;
+      final err = e.toString().toLowerCase();
+      final isNetwork = err.contains('network') ||
+          err.contains('socket') ||
+          err.contains('host lookup') ||
+          err.contains('connection');
       AuthMessagePopup.showError(
         context,
-        title: 'Une erreur est survenue.',
-        subtitle: 'Vérifiez votre connexion et réessayez.',
+        title: isNetwork
+            ? 'Impossible de se connecter au serveur.'
+            : 'Une erreur est survenue.',
+        subtitle: isNetwork ? 'Vérifiez votre connexion internet.' : null,
         buttonText: 'Réessayer',
       );
     } finally {
@@ -123,191 +102,89 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage>
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Créer un nouveau mot de passe'),
+        title: const Text('Sécurité'),
         centerTitle: true,
         backgroundColor: const Color(0xFFF9FAFB),
         foregroundColor: Colors.black,
         elevation: 0,
       ),
       backgroundColor: const Color(0xFFF9FAFB),
-      body: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Opacity(
-              opacity: _fadeAnimation.value,
-              child: Transform.translate(
-                offset: Offset(0, _slideAnimation.value),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header avec icône animée
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8BF13).withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.lock_reset,
-                            size: 48,
-                            color: Color(0xFFF8BF13),
-                          ),
-                        ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8BF13),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const SizedBox(height: 24),
-                      // Titre principal
-                      const Center(
-                        child: Text(
-                          'Créez un nouveau mot de passe',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: Text(
-                          'Minimum ${AuthConfig.passwordMinLength} caractères (même règle qu\'à l\'inscription).',
-                          style: const TextStyle(fontSize: 16, color: Colors.grey),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-              // Nouveau mot de passe
-              TextFormField(
-                controller: _newPasswordController,
-                obscureText: _obscureNewPassword,
-                decoration: InputDecoration(
-                  labelText: 'Nouveau mot de passe',
-                  hintText: 'Min. ${AuthConfig.passwordMinLength} caractères',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  prefixIcon: const Icon(Icons.lock, color: Colors.grey),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureNewPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      color: Colors.grey,
                     ),
-                    onPressed: () {
-                      setState(
-                        () => _obscureNewPassword = !_obscureNewPassword,
-                      );
-                    },
                   ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un mot de passe';
-                  }
-                  if (!AuthConfig.isPasswordValid(value)) {
-                    return 'Au moins ${AuthConfig.passwordMinLength} caractères';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Confirmer mot de passe
-              TextFormField(
-                controller: _confirmPasswordController,
-                obscureText: _obscureConfirmPassword,
-                decoration: InputDecoration(
-                  labelText: 'Confirmer mot de passe',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  prefixIcon: const Icon(Icons.lock, color: Colors.grey),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureConfirmPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      color: Colors.grey,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8BF13),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    onPressed: () {
-                      setState(
-                        () =>
-                            _obscureConfirmPassword = !_obscureConfirmPassword,
-                      );
-                    },
                   ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez confirmer le mot de passe';
-                  }
-                  if (value != _newPasswordController.text) {
-                    return 'Les mots de passe ne correspondent pas';
-                  }
-                  return null;
-                },
+                ],
               ),
-              const SizedBox(height: 32),
-
-              // Bouton Enregistrer
+              const SizedBox(height: 10),
+              const Text(
+                'Sécurité',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: screenHeight * 0.02),
+              PasswordStrengthFields(
+                passwordController: _newPasswordController,
+                confirmController: _confirmPasswordController,
+              ),
+              SizedBox(height: screenHeight * 0.03),
               SizedBox(
                 width: double.infinity,
-                height: 50,
                 child: ElevatedButton(
                   onPressed: _loading ? null : _createNewPassword,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF8BF13), // Jaune de l'app
+                    backgroundColor: const Color(0xFFF8BF13),
                     foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    elevation: 2,
                   ),
-                  child:
-                      _loading
-                          ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.black,
-                              ),
-                            ),
-                          )
-                          : const Text(
-                            'Enregistrer',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                  child: _loading
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
                           ),
+                        )
+                      : const Text(
+                          'Enregistrer',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }
-
 }

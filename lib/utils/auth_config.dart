@@ -13,6 +13,36 @@ class AuthConfig {
 
   static const int otpLength = 6;
   static final RegExp otpPattern = RegExp(r'^\d{6}$');
+  static const int otpValiditySeconds = 600;
+
+  static ({double score, String label, Color color}) evaluatePasswordStrength(
+    String value,
+  ) {
+    double score = 0;
+    if (value.isNotEmpty) {
+      if (value.length >= 6) score += 0.3;
+      if (value.length >= 8) score += 0.2;
+      if (RegExp(r'[A-Z]').hasMatch(value)) score += 0.15;
+      if (RegExp(r'[a-z]').hasMatch(value)) score += 0.15;
+      if (RegExp(r'\d').hasMatch(value)) score += 0.1;
+      if (RegExp(r'[!@#$%^&*(),.?":{}|<>_\-]').hasMatch(value)) score += 0.1;
+      if (score > 1) score = 1;
+    }
+
+    if (score == 0) {
+      return (score: 0.0, label: '', color: Colors.transparent);
+    }
+    if (score < 0.4) {
+      return (score: score, label: 'Faible', color: Colors.red);
+    }
+    if (score < 0.7) {
+      return (score: score, label: 'Moyen', color: Colors.orange);
+    }
+    if (score < 0.9) {
+      return (score: score, label: 'Fort', color: Colors.lightGreen);
+    }
+    return (score: score, label: 'Super fort', color: Colors.green);
+  }
 
   static String displayEntreprise(String? entreprise) {
     final v = entreprise?.trim();

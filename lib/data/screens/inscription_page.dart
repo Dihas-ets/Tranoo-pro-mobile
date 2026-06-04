@@ -1038,6 +1038,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     nom: _nomController.text.trim(),
                                     prenoms: _prenomController.text.trim(),
                                     telephone: fullPhone,
+                                    authApp: 'tranoo_pro',
                                     // Le backend accepte role='vendeur' uniquement.
                                     // Le type vendeur est porté par vendeurType.
                                     role: selectedRole == 'Vendeur'
