@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SuccesScreen extends StatelessWidget {
   const SuccesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true, // Permet au contenu de passer sous l'AppBar
@@ -44,8 +46,7 @@ class SuccesScreen extends StatelessWidget {
                           width: 120,
                         ),
                         const SizedBox(height: 24), // Espacement augmenté
-                        const Text(
-                          'Woo hoo !!',
+                        Text(l10n.wooHoo,
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,

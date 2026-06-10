@@ -7,6 +7,7 @@ import 'package:tranoo_pro/utils/role_redirect.dart'; // Importer RoleRedirect p
 import 'package:tranoo_pro/data/screens/succes_vente.dart'; // Importer SuccesVenteScreen
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:confetti/confetti.dart';
 import 'une.dart' as pub_page; // Import pour la page de demande de pub avec préfixe
@@ -88,6 +89,8 @@ class CarsInfo extends StatefulWidget {
 }
 
 class _CarsinfoState extends State<CarsInfo> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   late int _currentImageIndex; // Gère l'image actuelle affichée
   late PageController _pageController;
   late List<String> _videos; // Vidéos associées
@@ -296,6 +299,7 @@ class _CarsinfoState extends State<CarsInfo> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final userService = UserService(); // Instance du service utilisateur
     final isChauffeur =
         userService.currentRole == UserRole.chauffeur || userService.currentRole == UserRole.livreur;
@@ -386,7 +390,7 @@ class _CarsinfoState extends State<CarsInfo> {
                                   Container(
                                 color: Colors.grey[300],
                                 child: const Center(
-                                  child: Text('Image non disponible'),
+                                  child: Text(l10n.imageNotAvailable),
                                 ),
                               ),
                             ),
@@ -521,7 +525,7 @@ class _CarsinfoState extends State<CarsInfo> {
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Aucune vidéo disponible')),
+                      SnackBar(content: Text(l10n.noVideoAvailable)),
                     );
                   }
                 },
@@ -548,8 +552,7 @@ class _CarsinfoState extends State<CarsInfo> {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Impossible d\'ouvrir WhatsApp')),
+                      SnackBar(content: Text(l10n.cannotOpenWhatsApp)),
                     );
                   }
                 },
@@ -578,8 +581,7 @@ class _CarsinfoState extends State<CarsInfo> {
                     await launchUrl(uri);
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Impossible de passer un appel')),
+                      SnackBar(content: Text(l10n.cannotMakeCall)),
                     );
                   }
                 },
@@ -984,7 +986,7 @@ class _CarsinfoState extends State<CarsInfo> {
               },
               activeColor: Colors.black,
             ),
-            const Text('En Consommation'),
+            Text(l10n.inConsumption),
             const SizedBox(width: 16),
             Checkbox(
               value: _isEnTransitChecked,
@@ -996,11 +998,11 @@ class _CarsinfoState extends State<CarsInfo> {
               },
               activeColor: Colors.black,
             ),
-            const Text('En Transit'),
+            Text(l10n.inTransit),
           ],
         ),
         const SizedBox(height: 12),
-        const Text('Lieu', style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(l10n.placeLabel, style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
@@ -1033,7 +1035,7 @@ class _CarsinfoState extends State<CarsInfo> {
         TextField(
           controller: _detailsController,
           decoration: InputDecoration(
-            hintText: 'Entrez vos détails concernant la destination ici...',
+            hintText: l10n.enterDestinationDetails,
             filled: true,
             fillColor: const Color(0xFFF2F2F2),
             border: OutlineInputBorder(
@@ -1075,8 +1077,7 @@ class _CarsinfoState extends State<CarsInfo> {
                 }
                 if (_selectedCountry == null || _selectedCountry!.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Veuillez sélectionner un lieu.'),
+                    SnackBar(content: Text(l10n.selectLocationPlease),
                     ),
                   );
                   return;
@@ -1205,7 +1206,7 @@ class _CarsinfoState extends State<CarsInfo> {
                                 ),
                               ),
                               child:
-                                  const Text('Payer les frais de vérification'),
+                                  Text(l10n.payVerificationFees),
                             ),
                           ),
                         ],
@@ -1243,8 +1244,7 @@ class _CarsinfoState extends State<CarsInfo> {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Impossible d\'ouvrir WhatsApp'),
+                    SnackBar(content: Text(l10n.cannotOpenWhatsApp),
                     ),
                   );
                 }
@@ -1288,7 +1288,7 @@ class _CarsinfoState extends State<CarsInfo> {
             }
             if (_selectedCountry == null || _selectedCountry!.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Veuillez sélectionner un lieu.')),
+                SnackBar(content: Text(l10n.selectLocationPlease)),
               );
               return;
             }
@@ -1412,7 +1412,7 @@ class _CarsinfoState extends State<CarsInfo> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: const Text('Payer les frais de vérification'),
+                          child: Text(l10n.payVerificationFees),
                         ),
                       ),
                     ],
@@ -1457,7 +1457,7 @@ class _CarsinfoState extends State<CarsInfo> {
             }
             if (_selectedCountry == null || _selectedCountry!.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Veuillez sélectionner un lieu.')),
+                SnackBar(content: Text(l10n.selectLocationPlease)),
               );
               return;
             }
@@ -1583,7 +1583,7 @@ class _CarsinfoState extends State<CarsInfo> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: const Text('Payer les frais de vérification'),
+                          child: Text(l10n.payVerificationFees),
                         ),
                       ),
                     ],
@@ -1694,7 +1694,7 @@ class _CarsinfoState extends State<CarsInfo> {
                       } catch (e) {
                         log('[DEBUG] Exception lors de l\'appel API : $e');
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erreur réseau ou serveur')),
+                          SnackBar(content: Text(l10n.networkOrServerError)),
                         );
                       } finally {
                         if (mounted) {
@@ -1719,8 +1719,7 @@ class _CarsinfoState extends State<CarsInfo> {
                         color: Colors.black,
                       ),
                     )
-                  : const Text(
-                      'Vendre ma voiture',
+                  : Text(l10n.sellMyCar,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,

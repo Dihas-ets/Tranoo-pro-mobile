@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'formulaire_transit.dart'; // Importez la page formulaire_transit.dart
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class HistoriqueTransitPage extends StatelessWidget {
   const HistoriqueTransitPage({super.key});

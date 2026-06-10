@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/data/screens/paymentscreen.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SuccesScreen5 extends StatelessWidget {
   const SuccesScreen5({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
@@ -44,8 +46,7 @@ class SuccesScreen5 extends StatelessWidget {
                           width: 120,
                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          'Vous y êtes presque',
+                        Text(l10n.almostThere,
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -99,8 +100,7 @@ class SuccesScreen5 extends StatelessWidget {
                               ),
                               elevation: 2,
                             ),
-                            child: const Text(
-                              'Finaliser le paiement',
+                            child: Text(l10n.finalizePayment,
                               style: TextStyle(
                                 fontWeight: FontWeight.w500,
                                 fontSize: 16,

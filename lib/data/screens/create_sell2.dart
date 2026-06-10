@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -434,7 +435,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          content: Text(l10n.selectionError(e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -490,7 +491,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
           _cloudinaryVideoUrl = url;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vidéo uploadée avec succès !'), backgroundColor: Colors.green),
+          SnackBar(content: Text(l10n.videoUploadedSuccess), backgroundColor: Colors.green),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -556,7 +557,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     children: [
                       Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
                       SizedBox(height: 8),
-                      Text('Vidéo prête', style: TextStyle(color: Colors.white)),
+                      Text(l10n.videoReady, style: TextStyle(color: Colors.white)),
                     ],
                   ),
                 )
@@ -568,7 +569,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     const SizedBox(height: 6),
                     const Text('Ajouter une vidéo', style: TextStyle(color: Colors.grey)),
                     const SizedBox(height: 4),
-                    const Text('Appuyer pour ajouter', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    Text(l10n.tapToAddVideo, style: const TextStyle(color: Colors.grey, fontSize: 11)),
                   ],
                 ),
               if (_isUploadingVideo)
@@ -730,7 +731,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         prix.isEmpty ||
         phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires.')),
+        SnackBar(content: Text(l10n.fillRequiredFields)),
       );
       return;
     }
@@ -741,7 +742,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     
     if (!hasImages && !hasVideo) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez ajouter au moins une image ou une vidéo.')),
+        SnackBar(content: Text(l10n.addAtLeastOneMedia)),
       );
       return;
     }
@@ -844,18 +845,18 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       if (!mounted) return;
       if ((resp.statusCode ?? 500) >= 200 && (resp.statusCode ?? 500) < 300) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Modifications enregistrées.')),
+          SnackBar(content: Text(l10n.changesSaved)),
         );
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur sauvegarde: ${resp.statusCode}')),
+          SnackBar(content: Text(l10n.saveErrorStatus(resp.statusCode.toString()))),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur sauvegarde: $e')),
+        SnackBar(content: Text(l10n.saveErrorGeneric(e.toString()))),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -864,6 +865,7 @@ class CreateSellPage2State extends State<CreateSellPage2> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SafeArea(

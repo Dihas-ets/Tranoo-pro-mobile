@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:typed_data'; // Added for Uint8List
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -62,6 +63,8 @@ class Une extends StatefulWidget {
 }
 
 class _UneState extends State<Une> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   final _formKey = GlobalKey<FormState>();
   String? _selectedVoiture;
   String? _selectedPaiement;
@@ -281,7 +284,7 @@ class _UneState extends State<Une> {
           '[DEBUG] Erreur création article: ${response.statusCode} - ${response.body}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la création de l\'article.')),
+          SnackBar(content: Text(l10n.articleCreateError)),
         );
         return null;
       }
@@ -289,7 +292,7 @@ class _UneState extends State<Une> {
       log('[DEBUG] Exception création article: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur réseau lors de la création de l\'article: $e'),
+          content: Text(l10n.articleNetworkCreateError(e.toString())),
         ),
       );
       return null;
@@ -388,14 +391,14 @@ class _UneState extends State<Une> {
       } else {
         log('[DEBUG] Erreur chargement article: ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors du chargement de l\'article')),
+          SnackBar(content: Text(l10n.articleLoadError)),
         );
       }
     } catch (e) {
       log('[DEBUG] Exception chargement article: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur réseau lors du chargement de l\'article'),
+          content: Text(l10n.articleLoadNetworkError),
         ),
       );
     } finally {
@@ -482,7 +485,7 @@ class _UneState extends State<Une> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          content: Text(l10n.selectionError(e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -508,7 +511,7 @@ class _UneState extends State<Une> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Maximum d\'images atteint (10 images)'),
+              content: Text(l10n.maxImages10),
               backgroundColor: Colors.orange,
             ),
           );
@@ -517,7 +520,7 @@ class _UneState extends State<Une> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          content: Text(l10n.selectionError(e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -549,7 +552,7 @@ class _UneState extends State<Une> {
     if (!allowedFormats.contains(extension)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Format non supporté: $extension. Formats: ${allowedFormats.join(', ')}'),
+          content: Text(l10n.formatNotSupportedExt(extension, allowedFormats.join(', '))),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 3),
         ),
@@ -576,7 +579,7 @@ class _UneState extends State<Une> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Image ajoutée: ${image.name}'),
+            content: Text(l10n.imageAdded(image.name)),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
@@ -587,7 +590,7 @@ class _UneState extends State<Une> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur upload: ${e.toString()}'),
+            content: Text(l10n.uploadError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -618,7 +621,7 @@ class _UneState extends State<Une> {
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Image uploadée: ${image.name}'),
+              content: Text(l10n.imageUploaded(image.name)),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),
@@ -632,7 +635,7 @@ class _UneState extends State<Une> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur upload: ${e.toString()}'),
+            content: Text(l10n.uploadError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -744,7 +747,7 @@ class _UneState extends State<Une> {
           !e.toString().contains('timeout') &&
           !e.toString().contains('network')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de l\'upload des médias: $e')),
+          SnackBar(content: Text(l10n.mediaUploadError(e.toString())),
         );
       }
     } finally {
@@ -1030,7 +1033,7 @@ class _UneState extends State<Une> {
         currentType == null ||
         _selectedDuree == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs.')),
+        SnackBar(content: Text(l10n.fillAllFields)),
       );
       return;
     }
@@ -1043,8 +1046,7 @@ class _UneState extends State<Une> {
     final lien = lienValue.isEmpty ? null : lienValue;
     if (pubImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner au moins une image.'),
+        SnackBar(content: Text(l10n.selectAtLeastOneImage),
         ),
       );
       return;
@@ -1073,8 +1075,7 @@ class _UneState extends State<Une> {
           (_selectedCarModel == null || _selectedCarModel!.isEmpty) ||
           _selectedCarType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veuillez remplir tous les champs de la voiture.'),
+          SnackBar(content: Text(l10n.fillCarFields),
           ),
         );
         return;
@@ -1172,7 +1173,7 @@ class _UneState extends State<Une> {
           );
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erreur lors de la création de la demande.'),
+              content: Text(l10n.requestCreationError),
             ),
           );
         }
@@ -1270,14 +1271,14 @@ class _UneState extends State<Une> {
           '[DEBUG] Erreur création publicité: ${response.statusCode} - ${response.body}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la création de la demande.')),
+          SnackBar(content: Text(l10n.requestCreationError)),
         );
       }
     } catch (e) {
       log('[DEBUG] Exception lors de la création de la pub: $e');
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur réseau ou serveur: $e')));
+      ).showSnackBar(SnackBar(content: Text(l10n.errorNetwork(e.toString())));
     } finally {
       setState(() {
         _isLoading = false;
@@ -1339,13 +1340,13 @@ class _UneState extends State<Une> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la mise à jour du statut.')),
+          SnackBar(content: Text(l10n.statusUpdateError)),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur réseau ou serveur.')));
+      ).showSnackBar(SnackBar(content: Text(l10n.networkOrServerError)));
     } finally {
       setState(() {
         _isLoading = false;
@@ -1372,7 +1373,7 @@ class _UneState extends State<Une> {
           child: ElevatedButton.icon(
             onPressed: _pickMultipleImages,
             icon: const Icon(Icons.add_photo_alternate, size: 20),
-            label: const Text('Ajouter plusieurs images'),
+            label: Text(l10n.addMultipleImages),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF8BF13),
               foregroundColor: Colors.black,
@@ -1591,6 +1592,7 @@ class _UneState extends State<Une> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final screenWidth = mediaQuery.size.width;
@@ -1774,7 +1776,7 @@ class _UneState extends State<Une> {
                       controller: _descriptionController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Description',
+                        labelText: l10n.description,
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1793,7 +1795,7 @@ class _UneState extends State<Une> {
                             )
                             .toList(),
                         decoration: const InputDecoration(
-                          labelText: 'Type de publicité',
+                          labelText: l10n.adType,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -1833,7 +1835,7 @@ class _UneState extends State<Une> {
                           )
                           .toList(),
                       decoration: const InputDecoration(
-                        labelText: 'Durée de la publicité',
+                        labelText: l10n.adDuration,
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) {
@@ -1856,7 +1858,7 @@ class _UneState extends State<Une> {
                       controller: _prixController,
                       enabled: false,
                       decoration: const InputDecoration(
-                        labelText: 'Prix (FCFA)',
+                        labelText: l10n.priceFcfa,
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1878,7 +1880,7 @@ class _UneState extends State<Une> {
                       TextFormField(
                         controller: _linkController,
                         decoration: const InputDecoration(
-                          labelText: 'Lien externe (optionnel)',
+                          labelText: l10n.externalLinkOptional,
                           hintText: 'https://...',
                           border: OutlineInputBorder(),
                         ),
@@ -1902,7 +1904,7 @@ class _UneState extends State<Une> {
                       TextFormField(
                         controller: _carNameController,
                         decoration: const InputDecoration(
-                          labelText: 'Nom de la pièce/voiture',
+                          labelText: l10n.itemName,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -1918,7 +1920,7 @@ class _UneState extends State<Une> {
                       TextFormField(
                         controller: _carYearController,
                         decoration: const InputDecoration(
-                          labelText: 'Année',
+                          labelText: l10n.year,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -1934,8 +1936,7 @@ class _UneState extends State<Une> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Localisation',
+                          Text(l10n.location,
                             style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
                           ),
                           const SizedBox(height: 8),
@@ -1947,7 +1948,7 @@ class _UneState extends State<Une> {
                                 child: OutlinedButton.icon(
                                   onPressed: _getCurrentLocation ,
                                   icon: const Icon(Icons.my_location),
-                                  label: const Text('Utiliser ma position actuelle'),
+                                  label: Text(l10n.saveCurrentPosition),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -1955,7 +1956,7 @@ class _UneState extends State<Une> {
                                 child: OutlinedButton.icon(
                                   onPressed: _openMapPicker,
                                   icon: const Icon(Icons.map),
-                                  label: const Text('Choisir sur la carte'),
+                                  label: Text(l10n.chooseOnMap),
                                 ),
                               ),
                             ],
@@ -2006,7 +2007,7 @@ class _UneState extends State<Une> {
                                         child: CircularProgressIndicator(strokeWidth: 2),
                                       ),
                                       SizedBox(width: 8),
-                                      Text('Recherche de l\'adresse...'),
+                                      Text(l10n.searchingAddress),
                                     ],
                                   )
                                 else if (_userAddress.isNotEmpty)
@@ -2045,7 +2046,7 @@ class _UneState extends State<Une> {
                       TextFormField(
                         controller: _carPriceController,
                         decoration: const InputDecoration(
-                          labelText: 'Prix',
+                          labelText: l10n.price,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -2062,7 +2063,7 @@ class _UneState extends State<Une> {
                         controller: _carDescriptionController,
                         maxLines: 3,
                         decoration: const InputDecoration(
-                          labelText: 'Description de la voiture',
+                          labelText: l10n.carDescription,
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -2096,7 +2097,7 @@ class _UneState extends State<Une> {
                             )
                             .toList(),
                         decoration: const InputDecoration(
-                          labelText: 'Type de moteur',
+                          labelText: l10n.engineType,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -2125,7 +2126,7 @@ class _UneState extends State<Une> {
                             )
                             .toList(),
                         decoration: const InputDecoration(
-                          labelText: 'Modèle',
+                          labelText: l10n.model,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -2148,7 +2149,7 @@ class _UneState extends State<Une> {
                         TextFormField(
                           controller: TextEditingController(text: _customCarModel ?? ''),
                           decoration: const InputDecoration(
-                            labelText: 'Précisez le modèle',
+                            labelText: l10n.specifyModel,
                             border: OutlineInputBorder(),
                           ),
                           onChanged: (value) {
@@ -2176,7 +2177,7 @@ class _UneState extends State<Une> {
                             )
                             .toList(),
                         decoration: const InputDecoration(
-                          labelText: 'Type',
+                          labelText: l10n.typeLabel,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -2356,8 +2357,7 @@ class _UneState extends State<Une> {
                             ? const CircularProgressIndicator(
                                 color: Colors.black,
                               )
-                            : const Text(
-                                'Payer',
+                            : Text(l10n.pay,
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                       ),

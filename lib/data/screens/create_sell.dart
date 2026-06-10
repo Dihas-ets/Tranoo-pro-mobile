@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data'; // Added for Uint8List
 import 'dart:convert'; // Added for jsonDecode
 import 'dart:developer';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb; // Added for kIsWeb
@@ -45,6 +46,8 @@ class CreateSellPage extends StatefulWidget {
 }
 
 class _CreateSellPageState extends State<CreateSellPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   static const int _maxMediaSlots = 12;
   static const int _maxVideoSlots = 3;
   final TextEditingController _titleController = TextEditingController();
@@ -576,8 +579,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
           });
           print('[CreateSell] Vidéo uploadée avec succès! URL: $url');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vidéo uploadée avec succès !'),
+            SnackBar(content: Text(l10n.videoUploadedSuccess),
               backgroundColor: Colors.green,
             ),
           );
@@ -597,7 +599,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
         print('[CreateSell] Stack trace: $stackTrace');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur détaillée: $e'),
+            content: Text(l10n.errorGeneric(e.toString())),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -644,9 +646,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
     if (totalMedia > _maxMediaSlots) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Vous pouvez sélectionner au maximum $_maxMediaSlots médias.',
-          ),
+          content: Text(l10n.maxMediaSlots(_maxMediaSlots)),
         ),
       );
       return;
@@ -657,8 +657,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
     final hasVideo = videosCount > 0;
     if (!hasImages && !hasVideo) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez ajouter au moins une image ou une vidéo.'),
+        SnackBar(content: Text(l10n.addAtLeastOneMedia),
         ),
       );
       return;
@@ -666,7 +665,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
 
     if (_isAnyUploading) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez attendre la fin de l\'upload.')),
+        SnackBar(content: Text(l10n.waitUploadFinish)),
       );
       return;
     }
@@ -695,8 +694,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
         _priceController.text.isEmpty ||
         _companyController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez remplir tous les champs obligatoires.'),
+        SnackBar(content: Text(l10n.fillRequiredFields),
         ),
       );
       return;
@@ -760,7 +758,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
     // Reuse validation (same checks)
     if (_isAnyUploading) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez attendre la fin de l\'upload.')),
+        SnackBar(content: Text(l10n.waitUploadFinish)),
       );
       return;
     }
@@ -786,7 +784,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
         _priceController.text.isEmpty ||
         _companyController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires.')),
+        SnackBar(content: Text(l10n.fillRequiredFields)),
       );
       if (mounted) setState(() => _isSaving = false);
       return;
@@ -847,18 +845,18 @@ class _CreateSellPageState extends State<CreateSellPage> {
       if (!mounted) return;
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Modifications enregistrées.')),
+          SnackBar(content: Text(l10n.changesSaved)),
         );
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur sauvegarde: ${resp.statusCode}')),
+          SnackBar(content: Text(l10n.saveErrorStatus(resp.statusCode.toString()))),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur sauvegarde: $e')),
+        SnackBar(content: Text(l10n.saveErrorGeneric(e.toString()))),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -950,7 +948,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
               child: ElevatedButton.icon(
                 onPressed: () => _pickMultipleImages(),
                 icon: const Icon(Icons.add_photo_alternate, size: 20),
-                label: const Text('Ajouter des images'),
+                label: Text(l10n.addImages),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF8BF13),
                   foregroundColor: Colors.black,
@@ -1095,7 +1093,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                         children: [
                           Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
                           SizedBox(height: 8),
-                          Text('Vidéo prête', style: TextStyle(color: Colors.white)),
+                          Text(l10n.videoReady, style: TextStyle(color: Colors.white)),
                         ],
                       ),
                     )
@@ -1105,9 +1103,9 @@ class _CreateSellPageState extends State<CreateSellPage> {
                       children: [
                         const Icon(Icons.video_call, color: Colors.grey, size: 40),
                         const SizedBox(height: 6),
-                        Text('Emplacement ${index + 1}', style: const TextStyle(color: Colors.grey)),
+                        Text(l10n.mediaSlot(index + 1), style: const TextStyle(color: Colors.grey)),
                         const SizedBox(height: 4),
-                        const Text('Appuyer pour ajouter', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                        Text(l10n.tapToAddVideo, style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       ],
                     ),
                   if (isUploading)
@@ -1175,8 +1173,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       if (emptyIndex == -1) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Maximum d\'images atteint (12 images)'),
+            SnackBar(content: Text(l10n.maxImages12),
               backgroundColor: Colors.orange,
             ),
           );
@@ -1188,7 +1185,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur caméra: ${e.toString()}'),
+            content: Text(l10n.cameraError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1215,7 +1212,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la sélection: ${e.toString()}'),
+            content: Text(l10n.selectionError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1236,8 +1233,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Maximum d\'images atteint (12 images)'),
+              SnackBar(content: Text(l10n.maxImages12),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -1248,7 +1244,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la sélection: ${e.toString()}'),
+            content: Text(l10n.selectionError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1279,7 +1275,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Image ajoutée: ${image.name}'),
+            content: Text(l10n.imageAdded(image.name)),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
@@ -1290,7 +1286,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur upload: ${e.toString()}'),
+            content: Text(l10n.uploadError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1321,7 +1317,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Image uploadée: ${image.name}'),
+              content: Text(l10n.imageUploaded(image.name)),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),
@@ -1335,7 +1331,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur upload: ${e.toString()}'),
+            content: Text(l10n.uploadError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1390,6 +1386,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SafeArea(
@@ -1421,7 +1418,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                     TextField(
                       controller: _titleController,
                       decoration: InputDecoration(
-                        hintText: 'Entrer le nom du véhicule',
+                        hintText: l10n.enterVehicleName,
                         filled: true,
                         fillColor: const Color(0xFFF2F2F2),
                         border: OutlineInputBorder(
@@ -1510,7 +1507,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: TextField(
                                     decoration: const InputDecoration(
-                                      hintText: 'Entrez la marque',
+                                      hintText: l10n.enterBrand,
                                       filled: true,
                                       fillColor: Color(0xFFF2F2F2),
                                       border: OutlineInputBorder(
@@ -1538,7 +1535,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                               if (_selectedMarques == 'Autre')
                                 TextField(
                                   decoration: const InputDecoration(
-                                    hintText: 'Entrez le modèle',
+                                    hintText: l10n.enterModel,
                                     filled: true,
                                     fillColor: Color(0xFFF2F2F2),
                                     border: OutlineInputBorder(
@@ -1572,7 +1569,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                         padding: const EdgeInsets.only(top: 8.0),
                                         child: TextField(
                                           decoration: const InputDecoration(
-                                            hintText: 'Entrez le modèle personnalisé',
+                                            hintText: l10n.enterCustomModel,
                                             filled: true,
                                             fillColor: Color(0xFFF2F2F2),
                                             border: OutlineInputBorder(
@@ -1612,7 +1609,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                             LengthLimitingTextInputFormatter(12),
                           ],
                           decoration: InputDecoration(
-                            hintText: 'Ex: 1600 ou 1,6',
+                            hintText: l10n.engineDisplacementExample,
                             filled: true,
                             fillColor: const Color(0xFFF2F2F2),
                             border: OutlineInputBorder(
@@ -1793,7 +1790,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                   LengthLimitingTextInputFormatter(12),
                                 ],
                                 decoration: InputDecoration(
-                                  hintText: 'Kilométrage (km), ex: 12500 ou 12,5',
+                                  hintText: l10n.mileageHint,
                                   filled: true,
                                   fillColor: const Color(0xFFF2F2F2),
                                   border: OutlineInputBorder(
@@ -1820,7 +1817,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                   LengthLimitingTextInputFormatter(2),
                                 ],
                                 decoration: InputDecoration(
-                                  hintText: 'Nombre de places',
+                                  hintText: l10n.seatCount,
                                   filled: true,
                                   fillColor: const Color(0xFFF2F2F2),
                                   border: OutlineInputBorder(
@@ -1852,7 +1849,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                             LengthLimitingTextInputFormatter(14),
                           ],
                           decoration: InputDecoration(
-                            hintText: 'Prix en FCFA (ex: 1500000 ou 1.500.000,5)',
+                            hintText: l10n.priceFcfaExample,
                             filled: true,
                             fillColor: const Color(0xFFF2F2F2),
                             border: OutlineInputBorder(
@@ -1872,7 +1869,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                       controller: _descriptionController,
                       maxLines: 5,
                       decoration: InputDecoration(
-                        hintText: 'Entrer une description de votre voiture (optionnel)',
+                        hintText: l10n.enterCarDescriptionOptional,
                         filled: true,
                         fillColor: const Color(0xFFF2F2F2),
                         border: OutlineInputBorder(

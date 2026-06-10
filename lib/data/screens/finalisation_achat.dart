@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'succes.dart'; // Assurez-vous que ce chemin est correct
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class FinalisationAchatScreen extends StatelessWidget {
   final String? articleImage; // URL image (peut être vide)
@@ -16,6 +17,7 @@ class FinalisationAchatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Données dynamiques
     final String displayedImage =
         (articleImage != null && articleImage!.isNotEmpty)
@@ -141,8 +143,7 @@ class FinalisationAchatScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text(
-                  'Payer maintenant',
+                child: Text(l10n.payNow,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),

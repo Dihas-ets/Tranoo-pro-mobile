@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Type d'icône pour la liste style YouTube.
 enum NotificationVisualKind {
@@ -85,7 +86,10 @@ Widget buildNotificationLeadingAvatar({
   );
 }
 
-String notificationPreviewText(Map<String, dynamic> notif) {
+String notificationPreviewText(
+  Map<String, dynamic> notif, [
+  AppLocalizations? l10n,
+]) {
   final data = notif['data'] is Map
       ? Map<String, dynamic>.from(notif['data'])
       : <String, dynamic>{};
@@ -93,7 +97,9 @@ String notificationPreviewText(Map<String, dynamic> notif) {
   final articleTitle = (data['articleTitle'] ?? '').toString().trim();
   if (articleTitle.isNotEmpty) return articleTitle;
   if (message.length > 90) return '${message.substring(0, 90)}...';
-  return message.isNotEmpty ? message : 'Notification';
+  return message.isNotEmpty
+      ? message
+      : (l10n?.notificationDefault ?? 'Notification');
 }
 
 String? notificationThumbUrl(Map<String, dynamic> notif) {

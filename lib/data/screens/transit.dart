@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import '../../services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class Transit extends StatefulWidget {
   const Transit({super.key});
@@ -137,10 +138,11 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Mes Transits'),
+        title: Text(l10n.myTransits),
         backgroundColor: const Color(0xFFF8BF13),
         foregroundColor: Colors.black,
         elevation: 0,
@@ -169,7 +171,7 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
     }
 
     if (list.isEmpty) {
-      return const Center(child: Text('Aucun article dans cette catégorie'));
+      return const Center(child: Text(l10n.noArticlesInCategory));
     }
 
     return ListView.builder(

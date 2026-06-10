@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:developer';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class Movie extends StatefulWidget {
   final String? videoUrl;
@@ -13,6 +14,8 @@ class Movie extends StatefulWidget {
 }
 
 class _MovieState extends State<Movie> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   late WebViewController _webController;
   bool _initialized = false;
 

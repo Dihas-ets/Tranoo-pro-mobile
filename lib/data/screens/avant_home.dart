@@ -7,6 +7,7 @@ import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/piece.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
 import 'package:tranoo_pro/data/screens/voitures.dart';
 
@@ -200,8 +201,7 @@ class _AvantHomeState extends State<AvantHome>
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Fermer',
+                  child: Text(l10n.close,
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -246,6 +246,7 @@ class _AvantHomeState extends State<AvantHome>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
     final screenHeight = mediaQuery.size.height;
@@ -300,7 +301,7 @@ class _AvantHomeState extends State<AvantHome>
         }
 
         final vendeurItemsCount = role == 'vendeur'
-            ? _buildVendeurMenuItems(role, iconSize).length
+            ? _buildVendeurMenuItems(role, iconSize, l10n).length
             : 0;
         if (role == 'vendeur' &&
             vendeurItemsCount > 0 &&
@@ -392,7 +393,7 @@ class _AvantHomeState extends State<AvantHome>
             child: loading
                 ? const Center(child: CircularProgressIndicator())
                 : user == null
-                    ? const Center(child: Text('Non connecté'))
+                    ? Center(child: Text(l10n.userNotConnected))
                     : Column(
                         children: [
                           // Header fixe
@@ -431,7 +432,7 @@ class _AvantHomeState extends State<AvantHome>
                                 }),
                                 SizedBox(height: spacing),
                                 Text(
-                                  user['nom'] ?? "Utilisateur",
+                                  user['nom'] ?? l10n.user,
                                   style: TextStyle(
                                     color: Colors.black,
                                     fontSize: fontSize,
@@ -464,7 +465,7 @@ class _AvantHomeState extends State<AvantHome>
                               children: [
                                 _buildDrawerButton(
                                   context,
-                                  text: 'Accueil',
+                                  text: l10n.home,
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -479,7 +480,7 @@ class _AvantHomeState extends State<AvantHome>
                                 ),
                                 _buildDrawerButton(
                                   context,
-                                  text: 'Profil',
+                                  text: l10n.profile,
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -496,7 +497,7 @@ class _AvantHomeState extends State<AvantHome>
                                 if (role != 'vendeur')
                                   _buildDrawerButton(
                                     context,
-                                    text: 'Portefeuille',
+                                    text: l10n.myWallet,
                                     onTap: () => Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -513,7 +514,7 @@ class _AvantHomeState extends State<AvantHome>
                                 if (role == 'vendeur')
                                   _buildDrawerButton(
                                     context,
-                                    text: 'Type de vendeur',
+                                    text: l10n.sellerTypeLabel,
                                     onTap: () => Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -529,7 +530,7 @@ class _AvantHomeState extends State<AvantHome>
                                   ),
                                 _buildDrawerButton(
                                   context,
-                                  text: 'Déconnexion',
+                                  text: l10n.logout,
                                   onTap: () async {
                                     await Provider.of<myauth.AuthProvider>(
                                       context,
@@ -567,7 +568,7 @@ class _AvantHomeState extends State<AvantHome>
                   onTap: (i) => _onItemTapped(i, role),
                   items: (role == 'vendeur' ||
                           role?.startsWith('vendeur') == true)
-                      ? _buildVendeurMenuItems(role, iconSize)
+                      ? _buildVendeurMenuItems(role, iconSize, l10n)
                       : role == 'transitaire'
                           ? [
                               BottomNavigationBarItem(
@@ -652,7 +653,7 @@ class _AvantHomeState extends State<AvantHome>
 
   // Méthode pour construire le menu des vendeurs selon le type
   List<BottomNavigationBarItem> _buildVendeurMenuItems(
-      String? role, double iconSize) {
+      String? role, double iconSize, AppLocalizations l10n) {
     final userService = UserService();
 
     // Menu selon vendeurType (compat: null => mixte)
@@ -660,19 +661,19 @@ class _AvantHomeState extends State<AvantHome>
       return [
         BottomNavigationBarItem(
           icon: Icon(Icons.storefront_outlined, size: iconSize),
-          label: 'Boutique',
+          label: l10n.shopLabel,
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.campaign, size: iconSize),
-          label: 'Publicité',
+          label: l10n.advertisingLabel,
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.directions_car, size: iconSize),
-          label: 'Voitures',
+          label: l10n.cars,
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.build, size: iconSize),
-          label: 'Pièces',
+          label: l10n.pieces,
         ),
       ];
     }
@@ -682,15 +683,15 @@ class _AvantHomeState extends State<AvantHome>
       return [
         BottomNavigationBarItem(
           icon: Icon(Icons.storefront_outlined, size: iconSize),
-          label: 'Boutique',
+          label: l10n.shopLabel,
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.campaign, size: iconSize),
-          label: 'Publicité',
+          label: l10n.advertisingLabel,
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.directions_car, size: iconSize),
-          label: 'Voitures',
+          label: l10n.cars,
         ),
       ];
     }
@@ -700,15 +701,15 @@ class _AvantHomeState extends State<AvantHome>
       return [
         BottomNavigationBarItem(
           icon: Icon(Icons.storefront_outlined, size: iconSize),
-          label: 'Boutique',
+          label: l10n.shopLabel,
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.campaign, size: iconSize),
-          label: 'Publicité',
+          label: l10n.advertisingLabel,
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.build, size: iconSize),
-          label: 'Pièces',
+          label: l10n.pieces,
         ),
       ];
     }
@@ -717,11 +718,11 @@ class _AvantHomeState extends State<AvantHome>
     return [
       BottomNavigationBarItem(
         icon: Icon(Icons.storefront_outlined, size: iconSize),
-        label: 'Boutique',
+        label: l10n.shopLabel,
       ),
       BottomNavigationBarItem(
         icon: Icon(Icons.campaign, size: iconSize),
-        label: 'Publicité',
+        label: l10n.advertisingLabel,
       ),
     ];
   }

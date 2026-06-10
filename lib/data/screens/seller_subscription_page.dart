@@ -9,6 +9,7 @@ import 'package:tranoo_pro/services/subscription_access_service.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
 import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
 import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SellerSubscriptionPage extends StatefulWidget {
   const SellerSubscriptionPage({super.key});
@@ -18,6 +19,8 @@ class SellerSubscriptionPage extends StatefulWidget {
 }
 
 class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   final SubscriptionAccessService _subscriptionService =
       SubscriptionAccessService();
   final UserService _userService = UserService();
@@ -177,8 +180,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       await _loadStatus();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Paiement réussi : abonnement activé avec succès.'),
+        SnackBar(content: Text(l10n.subscriptionPaymentSuccess),
           backgroundColor: Colors.green,
         ),
       );
@@ -194,8 +196,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         _error = 'Erreur lors de l\'activation de l\'abonnement.';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Échec du paiement ou de l\'activation.'),
+        SnackBar(content: Text(l10n.subscriptionPaymentFailed),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -230,6 +231,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final status = _status;
     final monthlyPrice = status?.monthlyPriceFcfa ?? 0;
     final totalPrice = _selectedMonths * monthlyPrice;
@@ -597,8 +599,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Text(
-                                          'Total',
+                                        Text(l10n.total,
                                           style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w600,

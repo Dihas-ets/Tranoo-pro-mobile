@@ -13,6 +13,7 @@ import 'map_picker_screen.dart';
 import 'avant_home.dart';
 import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
 import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 enum PaymentMethod { cash, online }
 
@@ -24,6 +25,8 @@ class OrderSummaryPage extends StatefulWidget {
 }
 
 class _OrderSummaryPageState extends State<OrderSummaryPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   PaymentMethod _method = PaymentMethod.cash;
@@ -142,9 +145,10 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Résumé'),
+        title: Text(l10n.orderSummary),
         backgroundColor: Colors.amber,
         foregroundColor: Colors.black,
       ),
@@ -200,7 +204,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                     TextButton.icon(
                       onPressed: () => _selectLocationFromMap(cart),
                       icon: const Icon(Icons.map, size: 16),
-                      label: const Text('Choisir sur la carte'),
+                      label: Text(l10n.chooseOnMap),
                     ),
                   ],
                 ),
@@ -208,7 +212,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                 TextField(
                   controller: _addressController,
                   decoration: const InputDecoration(
-                    hintText: 'Adresse de livraison',
+                    hintText: l10n.deliveryAddress,
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -218,7 +222,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                   maxLength: 500,
                   maxLines: 4,
                   decoration: const InputDecoration(
-                    hintText: 'Ajouter une note de livraison',
+                    hintText: l10n.addDeliveryNote,
                     border: OutlineInputBorder(),
                     counterText: '0/500',
                   ),
@@ -280,7 +284,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         icon: const Icon(Icons.money, size: 18),
-                        label: const Text('Espèces'),
+                        label: Text(l10n.cashOnDeliveryShort),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -299,7 +303,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         icon: const Icon(Icons.credit_card, size: 18),
-                        label: const Text('En ligne'),
+                        label: Text(l10n.payOnline),
                       ),
                     ),
                   ],
@@ -342,7 +346,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                                 strokeWidth: 2,
                               ),
                             )
-                            : Text('Commander • ${total.toStringAsFixed(0)} F'),
+                            : Text(l10n.orderCommandTotal(total.toStringAsFixed(0))),
                   ),
                 ),
               ],
@@ -443,7 +447,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Annuler'),
+                    child: Text(l10n.cancel),
                   ),
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context, true),
@@ -492,7 +496,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de l\'enregistrement: $e'),
+            content: Text(l10n.registrationSaveError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -579,7 +583,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur de paiement: $e'),
+            content: Text(l10n.errorPayment(e.toString())),
             backgroundColor: Colors.red,
           ),
         );

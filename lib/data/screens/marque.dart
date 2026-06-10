@@ -19,6 +19,7 @@ import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:tranoo_pro/services/views_service.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -1532,7 +1533,7 @@ class _MarqueState extends State<Marque>
           child: TextField(
             controller: _searchPieceController,
             decoration: const InputDecoration(
-              hintText: 'Rechercher une pièce...',
+              hintText: l10n.searchPartHint,
               prefixIcon: Icon(Icons.search),
               border: OutlineInputBorder(),
             ),
@@ -1711,8 +1712,7 @@ Padding(
             ),
           );
         },
-        child: const Text(
-          "Voir tout",
+        child: Text(l10n.seeAll,
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       ),
@@ -2582,6 +2582,7 @@ Widget buildPubsALaUneCarousel() {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
     final screenHeight = mediaQuery.size.height;
@@ -3381,7 +3382,7 @@ Widget buildPubsALaUneCarousel() {
             ),
           ),
           onPressed: _openBudgetSheet,
-          child: const Text('Filtrer par budget'),
+          child: Text(l10n.filterByBudget),
         ),
       ),
     );
@@ -3445,8 +3446,7 @@ Widget buildPubsALaUneCarousel() {
                       ),
                     ),
                   ),
-                  const Text(
-                    'Prix (FCFA)',
+                  Text(l10n.priceFcfa,
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -3457,7 +3457,7 @@ Widget buildPubsALaUneCarousel() {
                           controller: minCtl,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'Min.',
+                            labelText: l10n.minLabel,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -3476,7 +3476,7 @@ Widget buildPubsALaUneCarousel() {
                           controller: maxCtl,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'Max.',
+                            labelText: l10n.maxLabel,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -3518,7 +3518,7 @@ Widget buildPubsALaUneCarousel() {
                               maxCtl.text = currentMax.toStringAsFixed(0);
                             });
                           },
-                          child: const Text('Réinitialiser'),
+                          child: Text(l10n.reset),
                         ),
                       ),
                       const SizedBox(width: 12),

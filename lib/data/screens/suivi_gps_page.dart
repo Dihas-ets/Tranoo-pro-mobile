@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 // ——— Google Maps (grisé — réactiver si clé API) ———
 // import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -18,6 +19,8 @@ class SuiviGpsPage extends StatefulWidget {
 }
 
 class _SuiviGpsPageState extends State<SuiviGpsPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   // ——— Google Maps (grisé) ———
   // GoogleMapController? _mapController;
   Position? _currentPosition;

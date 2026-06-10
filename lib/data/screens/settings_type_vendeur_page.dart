@@ -4,6 +4,7 @@ import '../../services/user_service.dart';
 import '../../utils/role_redirect.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SettingsTypeVendeurPage extends StatefulWidget {
   const SettingsTypeVendeurPage({Key? key}) : super(key: key);
@@ -13,6 +14,8 @@ class SettingsTypeVendeurPage extends StatefulWidget {
 }
 
 class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   UserRole? _currentType;
   bool _isLoading = true;
   bool _isUpdating = false;
@@ -66,6 +69,7 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         title: const Text("Type de vendeur"),
@@ -86,7 +90,7 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text("Retour aux paramètres"),
+            child: Text(l10n.backToSettings),
           ),
         ),
       ),
@@ -334,7 +338,7 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text("Annuler"),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -345,7 +349,7 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
               backgroundColor: const Color(0xFFF8BF13),
               foregroundColor: Colors.black,
             ),
-            child: const Text("Confirmer"),
+            child: Text(l10n.confirm),
           ),
         ],
       ),
@@ -386,7 +390,7 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Type de vendeur mis à jour avec succès !"),
+            content: Text(l10n.sellerTypeUpdatedSuccess),
             backgroundColor: Colors.green,
           ),
         );
@@ -394,7 +398,7 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Erreur lors de la mise à jour: ${e.toString()}"),
+          content: Text(l10n.updateError(e.toString())),
           backgroundColor: Colors.red,
         ),
       );

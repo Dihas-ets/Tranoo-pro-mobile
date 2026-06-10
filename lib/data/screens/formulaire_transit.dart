@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'historique_transit.dart'; // Importez la page HistoriqueTransitPage
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class FormulaireTransitPage extends StatefulWidget {
   const FormulaireTransitPage({super.key});
@@ -11,6 +12,8 @@ class FormulaireTransitPage extends StatefulWidget {
 }
 
 class _FormulaireTransitPageState extends State<FormulaireTransitPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   // Contrôleurs pour les champs de texte
   final TextEditingController _voitureController = TextEditingController();
   final TextEditingController _clientController = TextEditingController();
@@ -46,6 +49,7 @@ class _FormulaireTransitPageState extends State<FormulaireTransitPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -111,7 +115,7 @@ class _FormulaireTransitPageState extends State<FormulaireTransitPage> {
             _buildTextField(
               controller: _statutController,
               label: "Statut",
-              hintText: "En transit",
+              hintText: l10n.inTransit,
             ),
             const SizedBox(height: 24),
 
@@ -165,8 +169,7 @@ class _FormulaireTransitPageState extends State<FormulaireTransitPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    "Soumettre",
+                  child: Text(l10n.submit,
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'avant_home.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
   const PaymentSuccessPage({super.key});
@@ -9,6 +10,8 @@ class PaymentSuccessPage extends StatefulWidget {
 }
 
 class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +32,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -70,8 +74,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
                     const SizedBox(height: 20),
 
                     // Titre
-                    const Text(
-                      'Paiement Réussi !',
+                    Text(l10n.paymentSuccessful,
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -82,8 +85,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
                     const SizedBox(height: 20),
 
                     // Messages
-                    const Text(
-                      'Votre transaction a été effectuée avec succès.',
+                    Text(l10n.transactionSuccessMessage,
                       style: TextStyle(
                         fontSize: 18,
                         color: Colors.white,

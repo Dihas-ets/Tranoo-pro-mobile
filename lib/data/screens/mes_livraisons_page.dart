@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:intl/intl.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class MesLivraisonsPage extends StatefulWidget {
   const MesLivraisonsPage({super.key});
@@ -152,8 +153,7 @@ class _MesLivraisonsPageState extends State<MesLivraisonsPage>
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Livraison acceptée avec succès !'),
+          SnackBar(content: Text(l10n.deliveryAcceptedSuccess),
             backgroundColor: Colors.green,
           ),
         );

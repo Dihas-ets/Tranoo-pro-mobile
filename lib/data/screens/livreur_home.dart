@@ -16,6 +16,7 @@ import 'package:tranoo_pro/data/screens/suivi_gps_page.dart';
 import 'package:tranoo_pro/data/screens/delivery_notification_banner.dart';
 import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
 import 'dart:async';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class LivreurHomePage extends StatefulWidget {
   const LivreurHomePage({super.key});
@@ -25,6 +26,8 @@ class LivreurHomePage extends StatefulWidget {
 }
 
 class _LivreurHomePageState extends State<LivreurHomePage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   double? _balance;
   String _currency = 'XOF';
   List<Map<String, dynamic>> _pendingDeliveries = [];
@@ -415,7 +418,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
       final idToken = await user?.getIdToken();
       if (idToken == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur: Utilisateur non connecté')),
+          SnackBar(content: Text(l10n.errorUserNotConnected)),
         );
         return;
       }
@@ -532,6 +535,7 @@ class _LivreurHomePageState extends State<LivreurHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final size = MediaQuery.of(context).size;
     final isPortrait =
         MediaQuery.of(context).orientation == Orientation.portrait;

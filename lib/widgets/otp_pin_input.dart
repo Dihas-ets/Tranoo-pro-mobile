@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Saisie OTP : 6 cases individuelles + collage / saisie continue.
 class OtpPinInput extends StatefulWidget {

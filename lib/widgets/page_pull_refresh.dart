@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class PagePullRefresh extends StatefulWidget {
   final Future<void> Function() onRefresh;
@@ -40,6 +41,8 @@ class PagePullRefresh extends StatefulWidget {
 }
 
 class _PagePullRefreshState extends State<PagePullRefresh> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _refreshing = false;
 
   Future<void> _handleRefresh() async {

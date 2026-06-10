@@ -10,6 +10,7 @@ import 'package:tranoo_pro/data/screens/osm_map_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_ride_completed.dart';
 import 'dart:convert';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ChauffeurWithBuyerScreen extends StatefulWidget {
   final Map<String, dynamic> ride;
@@ -22,6 +23,8 @@ class ChauffeurWithBuyerScreen extends StatefulWidget {
 }
 
 class _ChauffeurWithBuyerScreenState extends State<ChauffeurWithBuyerScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   Position? _currentPosition;
   List<OsmMarkerData> _osmMarkers = [];
   Timer? _timer;
@@ -339,6 +342,7 @@ class _ChauffeurWithBuyerScreenState extends State<ChauffeurWithBuyerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
@@ -616,7 +620,7 @@ class _ChauffeurWithBuyerScreenState extends State<ChauffeurWithBuyerScreen> {
                       TextField(
                         controller: _destinationController,
                         decoration: InputDecoration(
-                          hintText: 'Entrez la destination du client',
+                          hintText: l10n.enterClientDestination,
                           filled: true,
                           fillColor: Colors.grey.shade50,
                           border: OutlineInputBorder(

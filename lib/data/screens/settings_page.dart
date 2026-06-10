@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/languesentreprise.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
+import 'package:tranoo_pro/providers/locale_provider.dart';
+import 'package:tranoo_pro/utils/locale_helper.dart';
 import 'package:tranoo_pro/data/screens/connexion_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -16,7 +20,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _selectedLanguage = 'Français';
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   String _selectedCurrency = 'XOF';
   bool _notificationsEnabled = true;
   bool _locationTrackingEnabled = true;
@@ -36,7 +41,6 @@ class _SettingsPageState extends State<SettingsPage> {
         // Charger depuis les préférences locales si pas de token
         final prefs = await SharedPreferences.getInstance();
         setState(() {
-          _selectedLanguage = prefs.getString('language') ?? 'Français';
           _selectedCurrency = prefs.getString('currency') ?? 'XOF';
           _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
           _locationTrackingEnabled = prefs.getBool('location_tracking_enabled') ?? true;
@@ -52,8 +56,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
+        final languageCode = data['language'] ?? 'fr';
+        if (LocaleHelper.supportedLanguageCodes.contains(languageCode)) {
+          await context.read<LocaleProvider>().setLocale(Locale(languageCode));
+        }
         setState(() {
-          _selectedLanguage = _mapLanguageCode(data['language'] ?? 'fr');
           _selectedCurrency = data['currency'] ?? 'XOF';
           _notificationsEnabled = data['notificationsEnabled'] ?? true;
           _locationTrackingEnabled = data['locationTrackingEnabled'] ?? true;
@@ -62,7 +69,6 @@ class _SettingsPageState extends State<SettingsPage> {
         // Fallback sur les préférences locales
         final prefs = await SharedPreferences.getInstance();
         setState(() {
-          _selectedLanguage = prefs.getString('language') ?? 'Français';
           _selectedCurrency = prefs.getString('currency') ?? 'XOF';
           _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
           _locationTrackingEnabled = prefs.getBool('location_tracking_enabled') ?? true;
@@ -73,39 +79,10 @@ class _SettingsPageState extends State<SettingsPage> {
       // Fallback sur les préférences locales
       final prefs = await SharedPreferences.getInstance();
       setState(() {
-        _selectedLanguage = prefs.getString('language') ?? 'Français';
         _selectedCurrency = prefs.getString('currency') ?? 'XOF';
         _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
         _locationTrackingEnabled = prefs.getBool('location_tracking_enabled') ?? true;
       });
-    }
-  }
-
-  Future<void> _saveLanguage(String language) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      final idToken = await user?.getIdToken();
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('language', language);
-      
-      if (idToken != null) {
-        final baseUrl = config.getBackendBaseUrl();
-        await http.patch(
-          Uri.parse('$baseUrl/api/settings/language'),
-          headers: {
-            'Authorization': 'Bearer $idToken',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({'language': _mapLanguageToCode(language)}),
-        );
-      }
-      
-      setState(() {
-        _selectedLanguage = language;
-      });
-    } catch (e) {
-      print('Erreur sauvegarde langue: $e');
     }
   }
 
@@ -153,38 +130,13 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  String _mapLanguageCode(String code) {
-    switch (code) {
-      case 'fr':
-        return 'Français';
-      case 'en':
-        return 'English';
-      case 'es':
-        return 'Español';
-      default:
-        return 'Français';
-    }
-  }
-
-  String _mapLanguageToCode(String language) {
-    switch (language) {
-      case 'Français':
-        return 'fr';
-      case 'English':
-        return 'en';
-      case 'Español':
-        return 'es';
-      default:
-        return 'fr';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Paramètres',
+        title: Text(
+          l10n.settings,
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -197,15 +149,15 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: const Color(0xFFF5F5F5),
       body: ListView(
         children: [
-          _buildSectionHeader('Préférences'),
+          _buildSectionHeader(l10n.preferences),
           _buildLanguageSetting(),
-          _buildCurrencySetting(),
-          _buildSectionHeader('Notifications'),
-          _buildNotificationSetting(),
-          _buildSectionHeader('Géolocalisation'),
-          _buildLocationTrackingSetting(),
-          _buildSectionHeader('Compte'),
-          _buildLogoutButton(),
+          _buildCurrencySetting(l10n),
+          _buildSectionHeader(l10n.notifications),
+          _buildNotificationSetting(l10n),
+          _buildSectionHeader(l10n.geolocation),
+          _buildLocationTrackingSetting(l10n),
+          _buildSectionHeader(l10n.account),
+          _buildLogoutButton(l10n),
         ],
       ),
     );
@@ -226,38 +178,52 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildLanguageSetting() {
-    return Container(
-      color: Colors.white,
-      child: ListTile(
-        leading: const Icon(Icons.language, color: Color(0xFFF8BF13)),
-        title: const Text('Langue'),
-        subtitle: Text(_selectedLanguage),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => _showLanguageDialog(),
-      ),
+    return Consumer<LocaleProvider>(
+      builder: (context, localeProvider, _) {
+        final l10n = AppLocalizations.of(context)!;
+        return Container(
+          color: Colors.white,
+          child: ListTile(
+            leading: const Icon(Icons.language, color: Color(0xFFF8BF13)),
+            title: Text(l10n.language),
+            subtitle: Text(
+              LocaleHelper.languageLabel(localeProvider.languageCode, l10n),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LanguesEntreprise(),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCurrencySetting() {
+  Widget _buildCurrencySetting(AppLocalizations l10n) {
     return Container(
       color: Colors.white,
       child: ListTile(
         leading: const Icon(Icons.monetization_on, color: Color(0xFFF8BF13)),
-        title: const Text('Devise'),
+        title: Text(l10n.currency),
         subtitle: Text(_selectedCurrency),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => _showCurrencyDialog(),
+        onTap: () => _showCurrencyDialog(l10n),
       ),
     );
   }
 
-  Widget _buildNotificationSetting() {
+  Widget _buildNotificationSetting(AppLocalizations l10n) {
     return Container(
       color: Colors.white,
       child: SwitchListTile(
         secondary: const Icon(Icons.notifications, color: Color(0xFFF8BF13)),
-        title: const Text('Activer les notifications'),
-        subtitle: const Text('Recevoir des notifications push'),
+        title: Text(l10n.enableNotifications),
+        subtitle: Text(l10n.pushNotificationsSubtitle),
         value: _notificationsEnabled,
         onChanged: _saveNotificationSetting,
         activeColor: const Color(0xFFF8BF13),
@@ -265,13 +231,13 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildLocationTrackingSetting() {
+  Widget _buildLocationTrackingSetting(AppLocalizations l10n) {
     return Container(
       color: Colors.white,
       child: SwitchListTile(
         secondary: const Icon(Icons.location_on, color: Color(0xFFF8BF13)),
-        title: const Text('Suivi de localisation'),
-        subtitle: const Text('Partager votre position en temps réel'),
+        title: Text(l10n.locationTracking),
+        subtitle: Text(l10n.shareRealtimeLocation),
         value: _locationTrackingEnabled,
         onChanged: _saveLocationTrackingSetting,
         activeColor: const Color(0xFFF8BF13),
@@ -279,7 +245,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildLogoutButton() {
+  Widget _buildLogoutButton(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       child: Consumer<myauth.AuthProvider>(
@@ -303,8 +269,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
-              'Déconnexion',
+            child: Text(
+              l10n.logout,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -316,47 +282,17 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showLanguageDialog() {
+  void _showCurrencyDialog(AppLocalizations l10n) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Choisir une langue'),
+        title: Text(l10n.chooseCurrency),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildLanguageOption('Français'),
-            _buildLanguageOption('English'),
-            _buildLanguageOption('Español'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageOption(String language) {
-    return ListTile(
-      title: Text(language),
-      trailing: _selectedLanguage == language
-          ? const Icon(Icons.check, color: Color(0xFFF8BF13))
-          : null,
-      onTap: () {
-        _saveLanguage(language);
-        Navigator.pop(context);
-      },
-    );
-  }
-
-  void _showCurrencyDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choisir une devise'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildCurrencyOption('XOF', 'Franc CFA'),
-            _buildCurrencyOption('EUR', 'Euro'),
-            _buildCurrencyOption('USD', 'Dollar US'),
+            _buildCurrencyOption('XOF', l10n.cfaFranc),
+            _buildCurrencyOption('EUR', l10n.currencyEuro),
+            _buildCurrencyOption('USD', l10n.usDollar),
           ],
         ),
       ),

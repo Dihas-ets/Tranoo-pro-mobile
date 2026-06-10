@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import '../../services/user_service.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class MesCommandesPage extends StatefulWidget {
   const MesCommandesPage({super.key});
@@ -11,6 +12,8 @@ class MesCommandesPage extends StatefulWidget {
 }
 
 class _MesCommandesPageState extends State<MesCommandesPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
   String? _error;
@@ -128,9 +131,10 @@ class _MesCommandesPageState extends State<MesCommandesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mes commandes'),
+        title: Text(l10n.myOrders),
         backgroundColor: Colors.amber,
         foregroundColor: Colors.black,
         actions: [
@@ -169,7 +173,7 @@ class _MesCommandesPageState extends State<MesCommandesPage> {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _loadOrders,
-            child: const Text('Réessayer'),
+            child: Text(l10n.retry),
           ),
         ],
       ),
@@ -187,8 +191,7 @@ class _MesCommandesPageState extends State<MesCommandesPage> {
             color: Colors.grey,
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Aucune commande',
+          Text(l10n.noOrders,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),

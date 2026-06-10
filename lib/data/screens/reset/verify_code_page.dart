@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tranoo_pro/services/push_otp_service.dart';
+import 'package:tranoo_pro/utils/api_error_message.dart';
 import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:tranoo_pro/widgets/auth_message_popup.dart';
 import 'package:tranoo_pro/widgets/otp_pin_input.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class VerifyResetCodePage extends StatefulWidget {
   const VerifyResetCodePage({super.key});
@@ -61,7 +63,7 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage>
           context,
           title: 'Informations manquantes.',
           subtitle: 'Veuillez recommencer depuis la page mot de passe oublié.',
-          buttonText: 'OK',
+          buttonText: l10n.ok,
         ).then((_) {
           if (mounted) Navigator.of(context).pop();
         });
@@ -125,7 +127,7 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage>
     _code = _effectiveCode;
     final err = _validateCode();
     if (err != null) {
-      AuthMessagePopup.showError(context, title: err, buttonText: 'OK');
+      AuthMessagePopup.showError(context, title: err, buttonText: l10n.ok);
       return;
     }
 
@@ -134,7 +136,7 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage>
         context,
         title: 'Informations manquantes.',
         subtitle: 'Veuillez recommencer depuis la page mot de passe oublié.',
-        buttonText: 'OK',
+        buttonText: l10n.ok,
       ).then((_) {
         if (mounted) Navigator.of(context).pop();
       });
@@ -161,20 +163,19 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage>
           },
         );
       } else {
-        final msg = result['message'] as String? ?? 'Code invalide.';
         AuthMessagePopup.showError(
           context,
-          title: msg,
-          buttonText: 'Réessayer',
+          title: ApiErrorMessage.fromMap(l10n, result),
+          buttonText: l10n.retry,
         );
       }
     } catch (e) {
       if (!mounted) return;
       AuthMessagePopup.showError(
         context,
-        title: 'Une erreur est survenue.',
+        title: l10n.errorOccurredTitle,
         subtitle: 'Vérifiez votre connexion et réessayez.',
-        buttonText: 'Réessayer',
+        buttonText: l10n.retry,
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -188,9 +189,10 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vérifier le code'),
+        title: Text(l10n.verifyCodeTitle),
         centerTitle: true,
         backgroundColor: const Color(0xFFF9FAFB),
         foregroundColor: Colors.black,
@@ -255,8 +257,7 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage>
                               color: Colors.black,
                             ),
                           )
-                        : const Text(
-                            'Vérifier le code',
+                        : Text(l10n.verifyCodeTitle,
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                   ),

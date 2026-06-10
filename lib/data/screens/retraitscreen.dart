@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'mesretraitspage.dart'; // Vérifie si ce chemin est correct et que MesRetraitsPage existe
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class RetraitScreen extends StatelessWidget {
   const RetraitScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Effectuer un retrait",
+        title: Text(l10n.makeWithdrawal,
           style: TextStyle(color: Colors.black),
         ),
         backgroundColor: Colors.white,
@@ -58,12 +59,11 @@ class RetraitScreen extends StatelessWidget {
                   CrossAxisAlignment
                       .center, // Centrer les éléments horizontalement
               children: [
-                const Text(
-                  "Retrait",
+                Text(l10n.withdrawal,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-                const Text("Compte de virement"),
+                Text(l10n.transferAccount),
                 // Regrouper les images avec un espacement réduit
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -136,8 +136,7 @@ class RetraitScreen extends StatelessWidget {
                         ), // Navigation vers la page MesRetraitsPage
                       );
                     },
-                    child: const Text(
-                      "Demander un Retrait",
+                    child: Text(l10n.requestWithdrawal,
                       style: TextStyle(color: Colors.white),
                     ),
                   ),

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/widgets/registration_location_section.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Met à jour la position du vendeur / transitaire sur le profil.
 class ProfileLocationTile extends StatefulWidget {
@@ -15,6 +16,8 @@ class ProfileLocationTile extends StatefulWidget {
 }
 
 class _ProfileLocationTileState extends State<ProfileLocationTile> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _saving = false;
 
   Future<void> _save(CapturedProfileLocation loc) async {
@@ -53,7 +56,7 @@ class _ProfileLocationTileState extends State<ProfileLocationTile> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Position du profil mise à jour')),
+          SnackBar(content: Text(l10n.profilePositionUpdated)),
         );
         widget.onUpdated?.call();
       }
@@ -70,6 +73,7 @@ class _ProfileLocationTileState extends State<ProfileLocationTile> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(

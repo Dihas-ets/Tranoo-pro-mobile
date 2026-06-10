@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SuccesVenteScreen extends StatefulWidget {
   const SuccesVenteScreen({super.key});
@@ -43,6 +44,7 @@ class _SuccesVenteScreenState extends State<SuccesVenteScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -77,8 +79,7 @@ class _SuccesVenteScreenState extends State<SuccesVenteScreen>
                     ),
                   ),
                   const SizedBox(height: 32),
-                  const Text(
-                    'Publication en ligne !',
+                  Text(l10n.publishedOnline,
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -148,8 +149,7 @@ class _SuccesVenteScreenState extends State<SuccesVenteScreen>
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            'Votre annonce est déjà en ligne.',
+                          child: Text(l10n.listingAlreadyOnline,
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[700],

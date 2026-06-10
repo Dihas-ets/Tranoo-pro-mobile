@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tranoo_pro/data/screens/inscription_page.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ThirdPage extends StatelessWidget {
   const ThirdPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Stack(
         children: [
@@ -46,8 +48,7 @@ class ThirdPage extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      'Découvrez votre\nvéhicule idéal en\nquelques clics',
+                    Text(l10n.onboardingTagline2,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 28,

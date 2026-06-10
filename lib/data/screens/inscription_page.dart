@@ -8,6 +8,7 @@ import 'package:tranoo_pro/utils/phone_country_config.dart';
 import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:tranoo_pro/widgets/registration_location_section.dart';
 import 'avant_home.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'connexion_page.dart'; // Assurez-vous que ce fichier existe
 
@@ -19,6 +20,8 @@ class InscriptionPage extends StatefulWidget {
 }
 
 class _InscriptionPageState extends State<InscriptionPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   // Contrôleurs pour les champs du formulaire
   final TextEditingController _nomController = TextEditingController();
   final TextEditingController _prenomController = TextEditingController();
@@ -198,7 +201,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                       child: TextField(
                         controller: controller,
                         decoration: InputDecoration(
-                          hintText: 'Rechercher un indicatif (pays ou +code)',
+                          hintText: l10n.searchCountryCode,
                           prefixIcon: const Icon(Icons.search),
                           filled: true,
                           fillColor: Colors.grey.shade100,
@@ -262,6 +265,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Récupération des dimensions de l'écran
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
@@ -293,8 +297,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
               ),
               _buildStepBar(),
               SizedBox(height: screenHeight * 0.02),
-              Text(
-                "Trouvez votre voiture de rêve!",
+              Text(l10n.findDreamCar,
                 style: TextStyle(
                   fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
                 ),
@@ -376,7 +379,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                         keyboardType: TextInputType.number,
                         maxLength: _phoneCountry.maxDigits,
                         decoration: InputDecoration(
-                          labelText: 'Numéro WhatsApp',
+                          labelText: l10n.whatsappNumber,
                           hintText:
                               'WhatsApp · ${_phoneCountry.digitHint}',
                           prefixIcon: AuthConfig.whatsAppPhonePrefixIcon(),
@@ -455,8 +458,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Suivant',
+                    child: Text(l10n.nextStep,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -476,7 +478,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
                       return DropdownButtonFormField<String>(
                         decoration: InputDecoration(
-                          labelText: 'Rôle',
+                          labelText: l10n.roleLabel,
                           labelStyle: TextStyle(
                             color: Colors.grey,
                             fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
@@ -680,7 +682,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Retour'),
+                        child: Text(l10n.back),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -744,8 +746,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'Suivant',
+                        child: Text(l10n.nextStep,
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -765,8 +766,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     onChanged: _updatePasswordStrength,
                     obscureText: _obscurePasswordReg,
                     decoration: InputDecoration(
-                      labelText: 'Mot de passe',
-                      hintText: 'Min. 8 caractères',
+                      labelText: l10n.password,
+                      hintText: l10n.passwordMin8,
                       labelStyle: TextStyle(
                         color: Colors.grey,
                         fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
@@ -841,8 +842,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmReg,
                     decoration: InputDecoration(
-                      labelText: 'Confirmer le mot de passe',
-                      hintText: 'Retapez le mot de passe',
+                      labelText: l10n.confirmPassword,
+                      hintText: l10n.retypePassword,
                       labelStyle: TextStyle(
                         color: Colors.grey,
                         fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
@@ -898,7 +899,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Retour'),
+                        child: Text(l10n.back),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -1191,7 +1192,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     context,
                                     title: title,
                                     subtitle: subtitle,
-                                    buttonText: 'Réessayer',
+                                    buttonText: l10n.retry,
                                   );
                                 } finally {
                                   if (mounted) {
@@ -1230,8 +1231,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    "Vous avez déjà un compte ? ",
+                  Text(l10n.alreadyHaveAccount,
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),
@@ -1246,8 +1246,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                         ),
                       );
                     },
-                    child: Text(
-                      "Se connecter",
+                    child: Text(l10n.signInTitle,
                       style: TextStyle(
                         color: const Color(0xFF0461B6),
                         fontWeight: FontWeight.bold,

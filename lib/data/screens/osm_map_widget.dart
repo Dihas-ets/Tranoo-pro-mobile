@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Carte gratuite OpenStreetMap (Flutter Map) pour affichage + bouton "Naviguer"
 /// vers Google Maps / Waze pour la navigation voix.
@@ -56,6 +57,7 @@ class OsmMapWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -136,7 +138,7 @@ class OsmMapWidget extends StatelessWidget {
                     children: [
                       Icon(Icons.directions, color: Colors.blue),
                       SizedBox(width: 8),
-                      Text('Naviguer',
+                      Text(l10n.navigate,
                           style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),

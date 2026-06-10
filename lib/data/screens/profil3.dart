@@ -8,7 +8,11 @@ import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/parrainage_page.dart';
 import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 import 'package:provider/provider.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/languesentreprise.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
+import 'package:tranoo_pro/providers/locale_provider.dart';
+import 'package:tranoo_pro/utils/locale_helper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
@@ -40,7 +44,6 @@ class Profil3 extends StatefulWidget {
 
 class Profil3State extends State<Profil3> {
   File? _image;
-  String selectedLanguage = "Français";
   String selectedCurrencyValue = "XOF";
   double? _walletBalance;
   String _walletCurrency = "XOF";
@@ -147,8 +150,7 @@ class Profil3State extends State<Profil3> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Cette action est irreversible.',
+            Text(l10n.accountDeletionIrreversible,
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 12),
@@ -156,8 +158,7 @@ class Profil3State extends State<Profil3> {
               'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
             ),
             SizedBox(height: 12),
-            Text(
-              'Assurez-vous de ne plus avoir besoin de ce compte avant de confirmer.',
+            Text(l10n.accountDeletionConfirmWarning,
               style: TextStyle(color: Colors.black54),
             ),
           ],
@@ -165,7 +166,7 @@ class Profil3State extends State<Profil3> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -173,7 +174,7 @@ class Profil3State extends State<Profil3> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Supprimer'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -202,8 +203,7 @@ class Profil3State extends State<Profil3> {
         if (context.mounted) Navigator.of(context).pop(); // close progress
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Session invalide. Reconnectez-vous.'),
+            SnackBar(content: Text(l10n.invalidSessionReconnect),
             ),
           );
         }
@@ -256,8 +256,7 @@ class Profil3State extends State<Profil3> {
       debugPrint('[delete-account][profil3] unexpected error=$e');
       if (context.mounted) Navigator.of(context).pop(); // close progress
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Une erreur inattendue est survenue pendant la suppression.'),
+        SnackBar(content: Text(l10n.unexpectedDeletionError),
         ),
       );
     }
@@ -274,7 +273,7 @@ class Profil3State extends State<Profil3> {
     if (loading) return Center(child: CircularProgressIndicator());
     if (errorMsg != null) return Center(child: Text(errorMsg));
     if (userData == null) {
-      return Center(child: Text("Aucune donnée utilisateur"));
+      return Center(child: Text(l10n.noUserData));
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -282,8 +281,7 @@ class Profil3State extends State<Profil3> {
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
-        title: const Text(
-          "Compte",
+        title: Text(l10n.account,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
@@ -305,8 +303,7 @@ class Profil3State extends State<Profil3> {
               _buildSubscriptionSection(),
             if ((userData["role"] ?? "").toString().toLowerCase() == "vendeur")
               const SizedBox(height: 20),
-            const Text(
-              "Plus",
+            Text(l10n.more,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -480,8 +477,8 @@ class Profil3State extends State<Profil3> {
       child: Column(
         children: [
           _buildListTile(
-            title: "Mon compte",
-            subtitle: "Apporter des modifications à votre compte",
+            title: l10n.myAccount,
+            subtitle: l10n.editAccountSubtitle,
             icon: Icons.person,
             onTap: () async {
               await Navigator.push(
@@ -538,13 +535,13 @@ class Profil3State extends State<Profil3> {
             },
           ),
           _buildListTile(
-            title: "Suppression de compte",
+            title: l10n.accountDeletion,
             icon: Icons.delete_forever,
             color: Colors.red,
             onTap: () => _deleteAccount(),
           ),
           _buildListTile(
-            title: "Déconnexion",
+            title: l10n.logout,
             icon: Icons.logout,
             color: Color(0xFFFFCE31),
             onTap: () async {
@@ -571,7 +568,7 @@ class Profil3State extends State<Profil3> {
       child: Column(
         children: [
           _buildOption(
-            "Notifications",
+            l10n.notifications,
             "",
             Icons.notifications,
             badge: true,
@@ -582,17 +579,32 @@ class Profil3State extends State<Profil3> {
               );
             },
           ),
-          _buildOption(
-            "Langue",
-            selectedLanguage,
-            Icons.language,
-            trailing: IconButton(
-              icon: const Icon(Icons.arrow_forward_ios),
-              onPressed: () => _showLanguageDialog(context),
-            ),
+          Consumer<LocaleProvider>(
+            builder: (context, localeProvider, _) {
+              final l10n = AppLocalizations.of(context)!;
+              return _buildOption(
+                l10n.language,
+                LocaleHelper.languageLabel(
+                  localeProvider.languageCode,
+                  l10n,
+                ),
+                Icons.language,
+                trailing: IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LanguesEntreprise(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
           _buildOption(
-            "Devise",
+            l10n.currency,
             selectedCurrencyValue,
             Icons.monetization_on,
             trailing: IconButton(
@@ -624,8 +636,7 @@ class Profil3State extends State<Profil3> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Abonnement vendeur',
+          Text(l10n.sellerSubscription,
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
@@ -667,12 +678,11 @@ class Profil3State extends State<Profil3> {
                   ),
                 ).then((_) => _loadSubscriptionData());
               },
-              child: const Text('Gerer mon abonnement'),
+              child: Text(l10n.manageSubscription),
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Historique (10 derniers)',
+          Text(l10n.historyLast10,
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
@@ -754,61 +764,29 @@ class Profil3State extends State<Profil3> {
     );
   }
 
-  void _showLanguageDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Choisir une langue'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var lang in [
-                "Français",
-                "Anglais",
-                "Espagnol",
-                "Allemand",
-                "Italien",
-              ])
-                ListTile(
-                  title: Text(lang),
-                  onTap: () {
-                    setState(() {
-                      selectedLanguage = lang;
-                    });
-                    Navigator.pop(context);
-                  },
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _showCurrencyDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Choisir une devise'),
+          title: Text(l10n.chooseCurrency),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: const Text('XOF'),
+                title: Text(l10n.currencyXof),
                 onTap: () {
                   Navigator.pop(context, 'XOF');
                 },
               ),
               ListTile(
-                title: const Text('Euro'),
+                title: Text(l10n.currencyEuro),
                 onTap: () {
                   Navigator.pop(context, 'Euro');
                 },
               ),
               ListTile(
-                title: const Text('Dollars'),
+                title: Text(l10n.currencyDollars),
                 onTap: () {
                   Navigator.pop(context, 'Dollars');
                 },

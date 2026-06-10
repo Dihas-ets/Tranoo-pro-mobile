@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 void main() {
   runApp(const MyApp());
@@ -9,6 +10,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: const MesRetraitsPage(),
@@ -21,6 +23,7 @@ class MesRetraitsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -30,8 +33,7 @@ class MesRetraitsPage extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {},
         ),
-        title: const Text(
-          "Mes retraits",
+        title: Text(l10n.myWithdrawals,
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -85,8 +87,7 @@ class MesRetraitsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    "Demande de Retrait",
+                  Text(l10n.withdrawalRequest,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -105,8 +106,7 @@ class MesRetraitsPage extends StatelessWidget {
             style: TextStyle(color: Colors.black87, fontSize: 14),
           ),
           const SizedBox(height: 10),
-          const Text(
-            "En cours",
+          Text(l10n.filterInProgress,
             style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
           ),
         ],

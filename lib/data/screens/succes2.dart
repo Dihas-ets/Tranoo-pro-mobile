@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SuccesScreen2 extends StatelessWidget {
   const SuccesScreen2({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Définir la barre d'état en noir avec des icônes blanches
     return Scaffold(
       backgroundColor: Colors.white,
@@ -45,8 +47,7 @@ class SuccesScreen2 extends StatelessWidget {
                           width: 120,
                         ),
                         const SizedBox(height: 24), // Espacement augmenté
-                        const Text(
-                          'Woo hoo !!',
+                        Text(l10n.wooHoo,
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,

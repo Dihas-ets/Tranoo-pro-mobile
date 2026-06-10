@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 import '../services/auth_service_pro.dart';
 import '../services/user_role_service_pro.dart';
 import '../widgets/role_restriction_dialog_pro.dart';
@@ -84,22 +85,22 @@ class RoleMiddlewarePro {
           return child;
         }
 
-        // Si l'accès est refusé, afficher un écran de chargement ou d'erreur
-        return const Scaffold(
+        final l10n = AppLocalizations.of(context)!;
+        return Scaffold(
           body: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.business_center, size: 64, color: Colors.blue),
-                SizedBox(height: 16),
+                const Icon(Icons.business_center, size: 64, color: Colors.blue),
+                const SizedBox(height: 16),
                 Text(
-                  'Vérification des autorisations professionnelles...',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  l10n.verifyProPermissions,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Redirection en cours si nécessaire',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                  l10n.redirectingIfNeeded,
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
@@ -116,17 +117,18 @@ class _LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Connexion')),
-      body: const Center(
+      appBar: AppBar(title: Text(l10n.login)),
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.login, size: 64),
-            SizedBox(height: 16),
-            Text('Veuillez vous connecter'),
-            SizedBox(height: 8),
-            Text('Redirection en cours...', style: TextStyle(color: Colors.grey)),
+            const Icon(Icons.login, size: 64),
+            const SizedBox(height: 16),
+            Text(l10n.pleaseSignIn),
+            const SizedBox(height: 8),
+            Text(l10n.redirecting, style: const TextStyle(color: Colors.grey)),
           ],
         ),
       ),

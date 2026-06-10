@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class DetailsNotifications extends StatelessWidget {
   final String title;

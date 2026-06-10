@@ -16,6 +16,7 @@ import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/utils/catalog_display.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -221,16 +222,16 @@ class _PieceState extends State<Piece>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text('Voulez-vous vraiment supprimer cette pièce ?'),
+        title: Text(l10n.confirmDeletion),
+        content: Text(l10n.confirmDeletePart),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -252,17 +253,17 @@ class _PieceState extends State<Piece>
       );
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pièce supprimée avec succès !')),
+          SnackBar(content: Text(l10n.partDeletedSuccess)),
         );
         fetchPieces();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de la suppression.')),
+          SnackBar(content: Text(l10n.deletionError)),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur réseau ou serveur.')),
+        SnackBar(content: Text(l10n.networkOrServerError)),
       );
     }
   }
@@ -374,7 +375,7 @@ class _PieceState extends State<Piece>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Fermer'),
+              child: Text(l10n.close),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -736,7 +737,7 @@ class _PieceState extends State<Piece>
             ),
           ),
           onPressed: _openBudgetSheet,
-          child: const Text('Filtrer par budget'),
+          child: Text(l10n.filterByBudget),
         ),
       ),
     );
@@ -799,8 +800,7 @@ class _PieceState extends State<Piece>
                       ),
                     ),
                   ),
-                  const Text(
-                    'Prix (FCFA)',
+                  Text(l10n.priceFcfa,
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -811,7 +811,7 @@ class _PieceState extends State<Piece>
                           controller: minCtl,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'Min.',
+                            labelText: l10n.minLabel,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -830,7 +830,7 @@ class _PieceState extends State<Piece>
                           controller: maxCtl,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'Max.',
+                            labelText: l10n.maxLabel,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -846,7 +846,7 @@ class _PieceState extends State<Piece>
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('$disponibles pièce(s) disponible(s)'),
+                  Text(l10n.partsAvailableCount(disponibles)),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -859,7 +859,7 @@ class _PieceState extends State<Piece>
                             });
                             Navigator.pop(context);
                           },
-                          child: const Text('Réinitialiser'),
+                          child: Text(l10n.reset),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -876,7 +876,7 @@ class _PieceState extends State<Piece>
                             });
                             Navigator.pop(context);
                           },
-                          child: const Text('Appliquer'),
+                          child: Text(l10n.apply),
                         ),
                       ),
                     ],
@@ -892,6 +892,7 @@ class _PieceState extends State<Piece>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final userService = UserService();
     final isVendeur = userService.currentRole == UserRole.vendeur;
     final isChauffeur = userService.currentRole == UserRole.chauffeur ||
@@ -1007,7 +1008,7 @@ class _PieceState extends State<Piece>
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'Rechercher une pièce...',
+                          hintText: l10n.searchPartHint,
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.refresh,

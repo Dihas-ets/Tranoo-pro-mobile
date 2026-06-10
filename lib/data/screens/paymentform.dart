@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class PaymentForm extends StatelessWidget {
   final String pieceName;
@@ -13,6 +14,7 @@ class PaymentForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(title: Text('Formulaire de Paiement pour $pieceName')),
       body: Padding(
@@ -23,12 +25,12 @@ class PaymentForm extends StatelessWidget {
             // Affichage de l'image de la pièce
             Image.asset(pieceImage),
             const SizedBox(height: 20),
-            Text('Nom de la pièce: $pieceName', style: TextStyle(fontSize: 18)),
+            Text(l10n.partNameLabelShort(pieceName), style: TextStyle(fontSize: 18)),
             // Formulaire de paiement
             // (Tu peux ajouter des champs de saisie pour le paiement ici)
             TextField(
               decoration: InputDecoration(
-                labelText: 'Nom sur la carte',
+                labelText: l10n.nameOnCard,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -37,7 +39,7 @@ class PaymentForm extends StatelessWidget {
               onPressed: () {
                 // Logique de traitement du paiement ici
               },
-              child: Text('Payer'),
+              child: Text(l10n.pay),
             ),
           ],
         ),

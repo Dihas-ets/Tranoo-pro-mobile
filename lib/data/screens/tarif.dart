@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class Tarif extends StatefulWidget {
   const Tarif({super.key});
@@ -11,6 +12,8 @@ class Tarif extends StatefulWidget {
 }
 
 class _TarifState extends State<Tarif> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool loading = false;
   String? errorMsg;
   final UserService _userService = UserService();
@@ -84,7 +87,7 @@ class _TarifState extends State<Tarif> {
           ? const Center(child: CircularProgressIndicator())
           : (_userService.isChauffeur || _userService.isLivreur)
               ? _buildChauffeurView()
-              : const Center(child: Text('Page non disponible pour ce rôle')),
+              : Center(child: Text(l10n.pageNotAvailableForRole)),
     );
   }
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -38,6 +39,8 @@ class VerificationPaymentScreen extends StatefulWidget {
 }
 
 class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool isLoading = false;
   String? errorMessage;
   late final String transKey;

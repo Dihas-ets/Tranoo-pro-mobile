@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/utils/auth_config.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Champs mot de passe + confirmation avec jauge (étape « Sécurité » de l'inscription).
 class PasswordStrengthFields extends StatefulWidget {
@@ -17,6 +18,8 @@ class PasswordStrengthFields extends StatefulWidget {
 }
 
 class _PasswordStrengthFieldsState extends State<PasswordStrengthFields> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   double _passwordStrength = 0.0;
@@ -47,6 +50,7 @@ class _PasswordStrengthFieldsState extends State<PasswordStrengthFields> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final screenWidth = MediaQuery.of(context).size.width;
     final isPortrait =
         MediaQuery.of(context).orientation == Orientation.portrait;
@@ -61,7 +65,7 @@ class _PasswordStrengthFieldsState extends State<PasswordStrengthFields> {
             onChanged: (_) => _onPasswordChanged(),
             obscureText: _obscurePassword,
             decoration: InputDecoration(
-              labelText: 'Mot de passe',
+              labelText: l10n.password,
               hintText: 'Min. ${AuthConfig.passwordMinLength} caractères',
               labelStyle: TextStyle(
                 color: Colors.grey,
@@ -130,8 +134,8 @@ class _PasswordStrengthFieldsState extends State<PasswordStrengthFields> {
             controller: widget.confirmController,
             obscureText: _obscureConfirm,
             decoration: InputDecoration(
-              labelText: 'Confirmer le mot de passe',
-              hintText: 'Retapez le mot de passe',
+              labelText: l10n.confirmPassword,
+              hintText: l10n.retypePassword,
               labelStyle: TextStyle(
                 color: Colors.grey,
                 fontSize: screenWidth * (isPortrait ? 0.04 : 0.03),

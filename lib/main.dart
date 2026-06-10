@@ -441,6 +441,8 @@ class VerificationSuccessPage extends StatefulWidget {
 }
 
 class _VerificationSuccessPageState extends State<VerificationSuccessPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   String? htmlContent;
 
   @override
@@ -496,6 +498,8 @@ class VerificationErrorPage extends StatefulWidget {
 }
 
 class _VerificationErrorPageState extends State<VerificationErrorPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   String? htmlContent;
 
   @override

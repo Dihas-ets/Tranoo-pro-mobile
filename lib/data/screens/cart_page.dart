@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/cart_service.dart';
 import 'order_summary.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -11,6 +12,8 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   @override
   void initState() {
     super.initState();
@@ -20,9 +23,10 @@ class _CartPageState extends State<CartPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mon Panier'),
+        title: Text(l10n.myCart),
         backgroundColor: Colors.amber,
         foregroundColor: Colors.black,
         actions: [
@@ -53,8 +57,7 @@ class _CartPageState extends State<CartPage> {
                     color: Colors.grey,
                   ),
                   SizedBox(height: 16),
-                  Text(
-                    'Votre panier est vide',
+                  Text(l10n.cartEmpty,
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.grey,
@@ -62,8 +65,7 @@ class _CartPageState extends State<CartPage> {
                     ),
                   ),
                   SizedBox(height: 8),
-                  Text(
-                    'Ajoutez des articles pour commencer vos achats',
+                  Text(l10n.cartEmptyHint,
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ],
@@ -277,8 +279,7 @@ class _CartPageState extends State<CartPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'Passer la commande',
+                        child: Text(l10n.checkout,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

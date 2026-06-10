@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class FirstLaunchLocationDialog extends StatelessWidget {
   final VoidCallback onDismissed;
@@ -12,6 +13,7 @@ class FirstLaunchLocationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Use MediaQuery to compute sensible max dimensions for the dialog
     final media = MediaQuery.of(context);
     final maxHeight = media.size.height * 0.8; // allow up to 80% of screen height
@@ -54,16 +56,14 @@ class FirstLaunchLocationDialog extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Bienvenue sur Tranoo Pro !',
+                          Text(l10n.welcomeTranooProExclaim,
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.black87,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            'Autorisation de localisation',
+                          Text(l10n.locationAuthorization,
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Colors.grey[600],
                             ),
@@ -86,8 +86,7 @@ class FirstLaunchLocationDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Pour fonctionner correctement, Tranoo Pro utilise votre localisation pour :',
+                      Text(l10n.locationUsageIntro,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
@@ -189,7 +188,7 @@ class FirstLaunchLocationDialog extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                              child: const Text('Continuer'),
+                              child: Text(l10n.continueAction),
                             ),
                           ),
                         ),
@@ -201,8 +200,7 @@ class FirstLaunchLocationDialog extends StatelessWidget {
 
                 // Texte informatif
                 Center(
-                  child: Text(
-                    'Vous pourrez modifier cette décision plus tard dans les paramètres',
+                  child: Text(l10n.changeDecisionLaterInSettings,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.grey[600],
                       fontSize: 12,

@@ -1,6 +1,7 @@
 // ignore_for_file: unused_local_variable
 
 import 'dart:io'; // Pour manipuler les fichiers images
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; // Importer la bibliothèque pour la sélection d'image
@@ -185,7 +186,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
 
     if (nom.isEmpty || prenoms.isEmpty || email.isEmpty || telephone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs.')),
+        SnackBar(content: Text(l10n.fillAllFields)),
       );
       return;
     }
@@ -224,7 +225,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
           isEditingName = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil mis à jour.')),
+          SnackBar(content: Text(l10n.profileUpdated)),
         );
       }
     } on DioException catch (e) {
@@ -241,7 +242,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de la mise à jour.')),
+          SnackBar(content: Text(l10n.saveProfileError)),
         );
       }
     } finally {
@@ -289,12 +290,13 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
       newPassword = null;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mot de passe modifié avec succès.')),
+      SnackBar(content: Text(l10n.passwordChangedSuccess)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final isPortrait = mediaQuery.orientation == Orientation.portrait;
@@ -303,8 +305,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text(
-          "Compte",
+        title: Text(l10n.account,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
@@ -321,7 +322,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
               : errorMsg != null
               ? Center(child: Text(errorMsg!))
               : userData == null
-              ? Center(child: Text("Aucune donnée utilisateur"))
+              ? Center(child: Text(l10n.noUserData))
               : SingleChildScrollView(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -462,14 +463,14 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                             controller: _prenomsController,
                                             autofocus: true,
                                             decoration: const InputDecoration(
-                                              labelText: "Prénom(s)",
+                                              labelText: l10n.firstName,
                                             ),
                                           ),
                                           const SizedBox(height: 8),
                                           TextField(
                                             controller: _nomController,
                                             decoration: const InputDecoration(
-                                              labelText: "Nom",
+                                              labelText: l10n.lastName,
                                             ),
                                           ),
                                         ],
@@ -489,7 +490,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                         controller: _emailController,
                                         keyboardType: TextInputType.emailAddress,
                                         decoration: const InputDecoration(
-                                          labelText: "Email",
+                                          labelText: l10n.email,
                                         ),
                                       )
                                     : Text(
@@ -506,7 +507,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                         controller: _telephoneController,
                                         keyboardType: TextInputType.phone,
                                         decoration: const InputDecoration(
-                                          labelText: "Téléphone",
+                                          labelText: l10n.phone,
                                         ),
                                       )
                                     : Text(
@@ -559,7 +560,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                       // Section informations personnelles (readonly)
                       _buildProfileSection(
                         context,
-                        title: "Informations personnelles",
+                        title: l10n.personalInfo,
                         items: [
                           _buildProfileItem(
                             context,
@@ -590,7 +591,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                       SizedBox(height: spacing * 2),
                       _buildProfileSection(
                         context,
-                        title: "Sécurité",
+                        title: l10n.security,
                         items: [
                           _buildProfileItem(
                             context,

@@ -11,7 +11,11 @@ import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'package:provider/provider.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/languesentreprise.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
+import 'package:tranoo_pro/providers/locale_provider.dart';
+import 'package:tranoo_pro/utils/locale_helper.dart';
 
 class ProfilUtilisateur2 extends StatefulWidget {
   const ProfilUtilisateur2({super.key});
@@ -21,8 +25,9 @@ class ProfilUtilisateur2 extends StatefulWidget {
 }
 
 class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   File? _image;
-  String selectedLanguage = "Français";
   String selectedCurrencyValue = "XOF";
   Map<String, dynamic>? userData;
   bool loading = true;
@@ -90,8 +95,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Cette action est irreversible.',
+            Text(l10n.accountDeletionIrreversible,
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 12),
@@ -99,8 +103,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
               'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
             ),
             SizedBox(height: 12),
-            Text(
-              'Assurez-vous de ne plus avoir besoin de ce compte avant de confirmer.',
+            Text(l10n.accountDeletionConfirmWarning,
               style: TextStyle(color: Colors.black54),
             ),
           ],
@@ -108,7 +111,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -116,7 +119,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Supprimer'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -145,8 +148,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
         if (context.mounted) Navigator.of(context).pop(); // close progress
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Session invalide. Reconnectez-vous.'),
+            SnackBar(content: Text(l10n.invalidSessionReconnect),
             ),
           );
         }
@@ -202,8 +204,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
       debugPrint('[delete-account][profil-transitaire] unexpected error=$e');
       if (context.mounted) Navigator.of(context).pop(); // close progress
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Une erreur inattendue est survenue pendant la suppression.'),
+        SnackBar(content: Text(l10n.unexpectedDeletionError),
         ),
       );
     }
@@ -295,9 +296,9 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
     if (loading) return Center(child: CircularProgressIndicator());
     if (errorMsg != null) return Center(child: Text(errorMsg!));
     if (userData == null)
-      return Center(child: Text("Aucune donnée utilisateur"));
+      return Center(child: Text(l10n.noUserData));
     if (userData != null && userData?['role'] != 'transitaire') {
-      return Center(child: Text("Accès réservé aux transitaires."));
+      return Center(child: Text(l10n.transitaireAccessOnly));
     }
     return Scaffold(
       appBar: AppBar(
@@ -318,8 +319,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
             const SizedBox(height: 50),
             _buildAccountOptions(),
             const SizedBox(height: 20),
-            const Text(
-              "Plus",
+            Text(l10n.more,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -434,8 +434,8 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
       child: Column(
         children: [
           _buildListTile(
-            title: "Mon compte",
-            subtitle: "Apporter des modifications à votre compte",
+            title: l10n.myAccount,
+            subtitle: l10n.editAccountSubtitle,
             icon: Icons.person,
             onTap: () async {
               await Navigator.push(
@@ -446,8 +446,8 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
             },
           ),
           _buildListTile(
-            title: "Historique des transits",
-            //subtitle: "Devenir titulaire et vendez avec nous",
+            title: l10n.transitHistory,
+            //subtitle: l10n.becomeSellerSubtitle,
             icon: Icons.history,
             onTap: () {
               Navigator.push(
@@ -470,13 +470,13 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
           //   },
           // ),
           _buildListTile(
-            title: "Suppression de compte",
+            title: l10n.accountDeletion,
             icon: Icons.delete_forever,
             color: Colors.red,
             onTap: () => _deleteAccount(),
           ),
           _buildListTile(
-            title: "Déconnexion",
+            title: l10n.logout,
             icon: Icons.logout,
             color: Color(0xFFFFCE31),
             onTap: () {
@@ -498,7 +498,7 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
       child: Column(
         children: [
           _buildOption(
-            "Notifications",
+            l10n.notifications,
             "",
             Icons.notifications,
             badge: true,
@@ -509,17 +509,32 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
               );
             },
           ),
-          _buildOption(
-            "Langue",
-            selectedLanguage,
-            Icons.language,
-            trailing: IconButton(
-              icon: const Icon(Icons.arrow_forward_ios),
-              onPressed: () => _showLanguageDialog(context),
-            ),
+          Consumer<LocaleProvider>(
+            builder: (context, localeProvider, _) {
+              final l10n = AppLocalizations.of(context)!;
+              return _buildOption(
+                l10n.language,
+                LocaleHelper.languageLabel(
+                  localeProvider.languageCode,
+                  l10n,
+                ),
+                Icons.language,
+                trailing: IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LanguesEntreprise(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
           _buildOption(
-            "Devise",
+            l10n.currency,
             selectedCurrencyValue,
             Icons.monetization_on,
             trailing: IconButton(
@@ -569,61 +584,29 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
     );
   }
 
-  void _showLanguageDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Choisir une langue'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var lang in [
-                "Français",
-                "Anglais",
-                "Espagnol",
-                "Allemand",
-                "Italien",
-              ])
-                ListTile(
-                  title: Text(lang),
-                  onTap: () {
-                    setState(() {
-                      selectedLanguage = lang;
-                    });
-                    Navigator.pop(context);
-                  },
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _showCurrencyDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Choisir une devise'),
+          title: Text(l10n.chooseCurrency),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: const Text('XOF'),
+                title: Text(l10n.currencyXof),
                 onTap: () {
                   Navigator.pop(context, 'XOF');
                 },
               ),
               ListTile(
-                title: const Text('Euro'),
+                title: Text(l10n.currencyEuro),
                 onTap: () {
                   Navigator.pop(context, 'Euro');
                 },
               ),
               ListTile(
-                title: const Text('Dollars'),
+                title: Text(l10n.currencyDollars),
                 onTap: () {
                   Navigator.pop(context, 'Dollars');
                 },

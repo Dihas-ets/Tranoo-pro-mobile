@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/data/screens/settings_type_vendeur_page.dart';
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class TypeVendeurMigrationDialog extends StatelessWidget {
   final Function(String) onTypeSelected;
@@ -12,6 +13,7 @@ class TypeVendeurMigrationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -36,8 +38,7 @@ class TypeVendeurMigrationDialog extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    "Mise a jour vendeur",
+                  child: Text(l10n.sellerUpdateTitle,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
@@ -52,16 +53,14 @@ class TypeVendeurMigrationDialog extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Text(
-              "Tranoo Pro vous permet maintenant de choisir votre type de vendeur: vehicules, pieces detachees ou mixte.",
+            Text(l10n.sellerTypeChoiceIntro,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[800],
                     height: 1.4,
                   ),
             ),
             const SizedBox(height: 8),
-            Text(
-              "Faites votre choix dans la page dediee pour adapter vos menus et vos publications.",
+            Text(l10n.sellerTypeChoiceHint,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[700],
                     height: 1.4,
@@ -92,7 +91,7 @@ class TypeVendeurMigrationDialog extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text("Faire un choix"),
+                child: Text(l10n.makeChoice),
               ),
             ),
           ],

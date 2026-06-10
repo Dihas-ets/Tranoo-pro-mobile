@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/discussion.dart';
@@ -24,6 +25,8 @@ class ChauffeurTricycleHomePage extends StatefulWidget {
 
 class _ChauffeurTricycleHomePageState
     extends State<ChauffeurTricycleHomePage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _loading = true;
   Position? _currentPosition;
   List<Map<String, dynamic>> _incomingContacts = [];
@@ -192,8 +195,7 @@ class _ChauffeurTricycleHomePageState
         await _loadIncomingContacts();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Demande acceptée. Vous pouvez maintenant échanger.'),
+            SnackBar(content: Text(l10n.tricycleRequestAcceptedChat),
             ),
           );
         }
@@ -347,8 +349,7 @@ class _ChauffeurTricycleHomePageState
         await _loadIncomingContacts();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Demande rejetée.'),
+            SnackBar(content: Text(l10n.tricycleRequestRejected),
             ),
           );
         }
@@ -360,6 +361,7 @@ class _ChauffeurTricycleHomePageState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<myauth.AuthProvider>(
       builder: (context, auth, _) {
         return Scaffold(
@@ -524,7 +526,7 @@ class _ChauffeurTricycleHomePageState
                       _callUser(contact);
                     },
                     icon: const Icon(Icons.call, size: 22),
-                    label: const Text('Appeler'),
+                    label: Text(l10n.call),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,

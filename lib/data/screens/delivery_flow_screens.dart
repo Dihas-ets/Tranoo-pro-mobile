@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:tranoo_pro/config/backend_config.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 List<dynamic> _piecesForPickup(Map<String, dynamic> delivery, int? pickupIndex) {
   final pickups = delivery['pickups'];
@@ -44,6 +45,8 @@ class PackageValidationScreen extends StatefulWidget {
 }
 
 class _PackageValidationScreenState extends State<PackageValidationScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _submitting = false;
 
   Map<String, dynamic> get delivery => widget.delivery;
@@ -114,6 +117,7 @@ class _PackageValidationScreenState extends State<PackageValidationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         title: Text('Prendre en charge $_colisCount colis'),
@@ -152,8 +156,7 @@ class _PackageValidationScreenState extends State<PackageValidationScreen> {
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
-                    child: Text(
-                      'Colis',
+                    child: Text(l10n.packageLabel,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -211,6 +214,7 @@ class PickupFinishedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         title: Text('Prise en charge de $colisCount colis'),
@@ -242,7 +246,7 @@ class PickupFinishedScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Retour', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: Text(l10n.back, style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -256,7 +260,7 @@ class PickupFinishedScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Terminé', style: TextStyle(fontWeight: FontWeight.w800)),
+                    child: Text(l10n.finishedLabel, style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ),
               ],
@@ -284,6 +288,8 @@ class DeliveryQrScannerScreen extends StatefulWidget {
 }
 
 class _DeliveryQrScannerScreenState extends State<DeliveryQrScannerScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _handled = false;
   final TextEditingController _qrController = TextEditingController();
 
@@ -313,6 +319,7 @@ class _DeliveryQrScannerScreenState extends State<DeliveryQrScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(title: const Text('Valider livraison')),
       body: Padding(
@@ -330,14 +337,14 @@ class _DeliveryQrScannerScreenState extends State<DeliveryQrScannerScreen> {
               minLines: 2,
               maxLines: 4,
               decoration: const InputDecoration(
-                labelText: 'Contenu QR',
+                labelText: l10n.qrContent,
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () => _handleValue(_qrController.text.trim()),
-              child: const Text('Valider'),
+              child: Text(l10n.validate),
             ),
             const SizedBox(height: 8),
             Text(

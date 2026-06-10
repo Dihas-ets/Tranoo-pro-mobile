@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ProductCard extends StatelessWidget {
   final String imagePath;
@@ -16,6 +17,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Container(
         width: 300,
@@ -112,7 +114,7 @@ class ProductCard extends StatelessWidget {
                       children: [
                         Icon(Icons.precision_manufacturing),
                         SizedBox(height: 4),
-                        Text("Modèle"),
+                        Text(l10n.model),
                         Text(
                           "124-CFDS",
                           style: TextStyle(fontWeight: FontWeight.bold),
@@ -134,7 +136,7 @@ class ProductCard extends StatelessWidget {
                       children: [
                         Icon(Icons.label_important),
                         SizedBox(height: 4),
-                        Text("Type"),
+                        Text(l10n.typeLabel),
                         Text(
                           "Rare",
                           style: TextStyle(fontWeight: FontWeight.bold),
@@ -172,7 +174,7 @@ class ProductCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text("Vendez votre pièce"),
+                child: Text(l10n.sellYourPart),
               ),
             ),
           ],
@@ -189,6 +191,7 @@ class Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Couleurs et animation shimmer partagées (Tranoo Pro).
 abstract final class AppSkeletonTheme {

@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class MapPickerScreen extends StatefulWidget {
   final double? initialLatitude;
@@ -19,6 +20,8 @@ class MapPickerScreen extends StatefulWidget {
 }
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   late MapController _mapController;
   LatLng? _selectedPosition;
   bool _isLoading = false;
@@ -87,8 +90,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       if (!serviceEnabled) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Les services de localisation sont désactivés'),
+          SnackBar(content: Text(l10n.locationServicesDisabled),
           ),
         );
         setState(() => _isLoading = false);
@@ -101,8 +103,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         if (permission == LocationPermission.denied) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Permission de localisation refusée'),
+            SnackBar(content: Text(l10n.locationPermissionDenied),
             ),
           );
           setState(() => _isLoading = false);
@@ -113,8 +114,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       if (permission == LocationPermission.deniedForever) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Permission de localisation refusée définitivement'),
+          SnackBar(content: Text(l10n.locationPermissionDeniedForever),
           ),
         );
         setState(() => _isLoading = false);
@@ -143,9 +143,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choisir la localisation'),
+        title: Text(l10n.chooseLocation),
         backgroundColor: const Color(0xFFFFCC00),
         foregroundColor: Colors.black,
         actions: [
@@ -158,8 +159,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       'longitude': _selectedPosition!.longitude,
                     });
                   },
-            child: const Text(
-              'Valider',
+            child: Text(l10n.validate,
               style: TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,

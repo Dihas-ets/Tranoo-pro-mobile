@@ -14,6 +14,7 @@ import 'create_sell2.dart';
 import 'cars_info.dart';
 import 'mastervacpage.dart';
 import 'package:tranoo_pro/widgets/notification_list_ui.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 // --------- HELPERS SÉCURISÉS ----------
 List<String> getNotifImages(Map notif) {
@@ -133,6 +134,7 @@ class VerificationDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final images = getNotifImages(notification);
     final documents = getNotifDocuments(notification);
     final stampUrl = getStampUrl(notification);
@@ -318,14 +320,14 @@ class VerificationDetailPage extends StatelessWidget {
                     },
                     style:
                         ElevatedButton.styleFrom(backgroundColor: Colors.amber),
-                    child: const Text('Valider',
+                    child: Text(l10n.validate,
                         style: TextStyle(color: Colors.black)),
                   ),
                   ElevatedButton(
                     onPressed: () async {
                       await _postVerificationAction(context, 'reject');
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Demande rejetée')),
+                        SnackBar(content: Text(l10n.requestRejected)),
                       );
                       Navigator.pop(context);
                     },
@@ -532,6 +534,7 @@ class Notifications extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ChangeNotifierProvider(
       create: (_) => NotificationProvider(),
       child: NotificationsBody(openNotificationId: openNotificationId),
@@ -549,6 +552,8 @@ class NotificationsBody extends StatefulWidget {
 }
 
 class _NotificationsBodyState extends State<NotificationsBody> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   final Set<String> _selectedNotificationIds = <String>{};
 
   bool get _selectionMode => _selectedNotificationIds.isNotEmpty;
@@ -651,7 +656,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       if (ok) {
         _syncUnreadCountWithHeader(provider);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notification supprimée')),
+          SnackBar(content: Text(l10n.notificationDeleted)),
         );
       }
       return;
@@ -662,7 +667,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       if (!mounted) return;
       _syncUnreadCountWithHeader(provider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Marquée comme non lue')),
+        SnackBar(content: Text(l10n.markedAsUnread)),
       );
     }
   }
@@ -698,6 +703,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final provider = Provider.of<NotificationProvider>(context);
     final user = FirebaseAuth.instance.currentUser;
 
@@ -727,14 +733,14 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                 final ok = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Supprimer'),
+                    title: Text(l10n.delete),
                     content: Text(
                       'Supprimer ${_selectedNotificationIds.length} notification(s) ?',
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Annuler'),
+                        child: Text(l10n.cancel),
                       ),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(ctx, true),
@@ -742,7 +748,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                           backgroundColor: const Color(0xFFE57373),
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Supprimer'),
+                        child: Text(l10n.delete),
                       ),
                     ],
                   ),
@@ -758,8 +764,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           ? const Center(child: CircularProgressIndicator())
           : provider.notifications.isEmpty
               ? const Center(
-                  child: Text(
-                    'Aucune notification',
+                  child: Text(l10n.noNotifications,
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 )
@@ -862,7 +867,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     } catch (e) {
       print('Erreur _buildNotificationsList: $e');
       return const Center(
-        child: Text('Erreur lors du chargement des notifications'),
+        child: Text(l10n.notificationsLoadError),
       );
     }
   }
@@ -1054,11 +1059,11 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               itemBuilder: (_) => const [
                 PopupMenuItem(
                   value: 'unread',
-                  child: Text('Marquer comme non lue'),
+                  child: Text(l10n.markAsUnread),
                 ),
                 PopupMenuItem(
                   value: 'delete',
-                  child: Text('Supprimer'),
+                  child: Text(l10n.delete),
                 ),
               ],
             ),
@@ -1093,7 +1098,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       if (token == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session expirée. Reconnectez-vous.')),
+          SnackBar(content: Text(l10n.sessionExpiredReconnect)),
         );
         return;
       }
@@ -1386,8 +1391,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber,
                 ),
-                child: const Text(
-                  "Valider",
+                child: Text(l10n.validate,
                   style: TextStyle(color: Colors.black),
                 ),
               ),

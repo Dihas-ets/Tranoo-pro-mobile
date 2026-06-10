@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class CallPreviewPage extends StatefulWidget {
   final String name;
@@ -16,6 +17,8 @@ class CallPreviewPage extends StatefulWidget {
 }
 
 class _CallPreviewPageState extends State<CallPreviewPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _calling = false;
 
   Future<void> _startCall() async {
@@ -30,6 +33,7 @@ class _CallPreviewPageState extends State<CallPreviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
@@ -95,7 +99,7 @@ class _CallPreviewPageState extends State<CallPreviewPage> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('Annuler'),
+                      child: Text(l10n.cancel),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -110,7 +114,7 @@ class _CallPreviewPageState extends State<CallPreviewPage> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('Appeler'),
+                      child: Text(l10n.call),
                     ),
                   ),
                 ],

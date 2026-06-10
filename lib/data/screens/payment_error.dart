@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'avant_home.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class PaymentErrorPage extends StatefulWidget {
   /// Retour arrière / fermeture sans callback de succès FeexPay.
@@ -12,6 +13,8 @@ class PaymentErrorPage extends StatefulWidget {
 }
 
 class _PaymentErrorPageState extends State<PaymentErrorPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   @override
   void initState() {
     super.initState();

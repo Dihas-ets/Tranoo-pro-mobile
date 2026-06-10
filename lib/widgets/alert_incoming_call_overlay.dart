@@ -7,6 +7,7 @@ import 'package:tranoo_pro/services/alert_message_utils.dart';
 import 'package:tranoo_pro/services/alert_pending_store.dart';
 import 'package:tranoo_pro/services/notification_ringtone_player.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Écran plein écran style appel entrant pour les alertes acheteur (vendeurs).
 class AlertIncomingCallOverlay extends StatefulWidget {

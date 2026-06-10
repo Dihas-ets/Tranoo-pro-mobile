@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'RetraitScreen.dart';
 import 'settings_page.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class WalletScreen extends StatefulWidget {
   /// `true` = portefeuille vendeur (même UI que livreur, métriques adaptées).
@@ -40,6 +41,7 @@ class WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final fullName = _userName.isNotEmpty ? _userName : '—';
     final role = _userRole.isNotEmpty ? _userRole : '—';
     final vehicleLine = _userVehicle.isNotEmpty ? _userVehicle : '—';
@@ -204,8 +206,7 @@ class WalletScreenState extends State<WalletScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 12),
                               ),
-                              child: const Text(
-                                'Retirer',
+                              child: Text(l10n.remove,
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,

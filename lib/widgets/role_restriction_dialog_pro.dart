@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service_pro.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Popup attractif pour les restrictions d'accès par rôle (version Tranoo Pro)
 class RoleRestrictionDialogPro extends StatelessWidget {
@@ -21,6 +22,7 @@ class RoleRestrictionDialogPro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return Dialog(
@@ -70,8 +72,7 @@ class RoleRestrictionDialogPro extends StatelessWidget {
             const SizedBox(height: 20),
             
             // Titre
-            Text(
-              'Accès Professionnel',
+            Text(l10n.professionalAccess,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -178,6 +179,7 @@ class _StoreButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: onPressed,
       child: Container(

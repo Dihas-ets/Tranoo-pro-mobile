@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Affiche un aperçu vidéo (première frame) avec bouton lecture cliquable.
 class VideoPreviewPlaceholder extends StatefulWidget {
@@ -30,6 +31,8 @@ class VideoPreviewPlaceholder extends StatefulWidget {
 }
 
 class _VideoPreviewPlaceholderState extends State<VideoPreviewPlaceholder> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   VideoPlayerController? _controller;
   bool _initTried = false;
 

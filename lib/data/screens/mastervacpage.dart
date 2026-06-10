@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 // import 'payement.dart'; // Plus utilisé
 import 'package:tranoo_pro/services/user_service.dart'; // Importez UserService pour gérer les rôles
 import 'package:tranoo_pro/services/cart_service.dart';
@@ -75,6 +76,8 @@ class MastervacPage extends StatefulWidget {
 }
 
 class _MastervacPageState extends State<MastervacPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   int _currentImageIndex = 0;
   late PageController _pageController;
   // SUPPRIME la liste statique _images
@@ -219,8 +222,8 @@ class _MastervacPageState extends State<MastervacPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Certaines images n\'ont pas pu être ajoutées:', 
-                         style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(l10n.imagesNotAllAddedWarning,
+                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   ...errors.map((error) => Text('• $error', 
                          style: const TextStyle(fontSize: 12))),
@@ -234,7 +237,7 @@ class _MastervacPageState extends State<MastervacPage> {
         } else if (validImages.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${validImages.length} image(s) ajoutée(s) avec succès'),
+              content: Text(l10n.imagesAddedSuccess(validImages.length)),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),
@@ -247,7 +250,7 @@ class _MastervacPageState extends State<MastervacPage> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          content: Text(l10n.selectionError(e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -283,7 +286,7 @@ class _MastervacPageState extends State<MastervacPage> {
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Image ajoutée: ${pickedFile.name}'),
+              content: Text(l10n.imageAdded(pickedFile.name)),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),
@@ -304,7 +307,7 @@ class _MastervacPageState extends State<MastervacPage> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors de la sélection: ${e.toString()}'),
+          content: Text(l10n.selectionError(e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -337,7 +340,7 @@ class _MastervacPageState extends State<MastervacPage> {
   void _showSellerContactUnavailable() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Numéro du vendeur indisponible')),
+      SnackBar(content: Text(l10n.sellerPhoneUnavailable)),
     );
   }
 
@@ -359,7 +362,7 @@ class _MastervacPageState extends State<MastervacPage> {
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
+      SnackBar(content: Text(l10n.cannotOpenWhatsApp)),
     );
   }
 
@@ -381,7 +384,7 @@ class _MastervacPageState extends State<MastervacPage> {
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Impossible de passer un appel')),
+      SnackBar(content: Text(l10n.cannotMakeCall)),
     );
   }
 
@@ -464,18 +467,18 @@ class _MastervacPageState extends State<MastervacPage> {
       if (!mounted) return;
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Modifications enregistrées.')),
+          SnackBar(content: Text(l10n.changesSaved)),
         );
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur sauvegarde: ${resp.statusCode}')),
+          SnackBar(content: Text(l10n.saveErrorStatus(resp.statusCode.toString()))),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur sauvegarde: $e')),
+        SnackBar(content: Text(l10n.saveErrorGeneric(e.toString()))),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -496,7 +499,7 @@ class _MastervacPageState extends State<MastervacPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: const Text('Modifier la pièce'),
+        title: Text(l10n.modifyPart),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.4,
@@ -508,7 +511,7 @@ class _MastervacPageState extends State<MastervacPage> {
             TextField(
               controller: _editTitleController,
               decoration: const InputDecoration(
-                labelText: 'Titre',
+                labelText: l10n.titleLabel,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -516,7 +519,7 @@ class _MastervacPageState extends State<MastervacPage> {
             TextField(
               controller: _editYearController,
               decoration: const InputDecoration(
-                labelText: 'Année',
+                labelText: l10n.year,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -524,7 +527,7 @@ class _MastervacPageState extends State<MastervacPage> {
             TextField(
               controller: _editModelController,
               decoration: const InputDecoration(
-                labelText: 'Modèle',
+                labelText: l10n.model,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -536,7 +539,7 @@ class _MastervacPageState extends State<MastervacPage> {
                   .toList(),
               onChanged: (v) => setState(() => _editFuelType = v),
               decoration: const InputDecoration(
-                labelText: 'Type moteur',
+                labelText: l10n.engineTypeShort,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -548,7 +551,7 @@ class _MastervacPageState extends State<MastervacPage> {
                   .toList(),
               onChanged: (v) => setState(() => _editPieceType = v),
               decoration: const InputDecoration(
-                labelText: 'État',
+                labelText: l10n.conditionLabel,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -556,7 +559,7 @@ class _MastervacPageState extends State<MastervacPage> {
             TextField(
               controller: _editPriceController,
               decoration: const InputDecoration(
-                labelText: 'Prix',
+                labelText: l10n.price,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -564,7 +567,7 @@ class _MastervacPageState extends State<MastervacPage> {
             TextField(
               controller: _editCompanyController,
               decoration: const InputDecoration(
-                labelText: 'Entreprise',
+                labelText: l10n.company,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -572,7 +575,7 @@ class _MastervacPageState extends State<MastervacPage> {
             TextField(
               controller: _editLocationController,
               decoration: const InputDecoration(
-                labelText: 'Localisation',
+                labelText: l10n.location,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -581,7 +584,7 @@ class _MastervacPageState extends State<MastervacPage> {
               controller: _editDescriptionController,
               maxLines: 4,
               decoration: const InputDecoration(
-                labelText: 'Description',
+                labelText: l10n.description,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -618,6 +621,7 @@ class _MastervacPageState extends State<MastervacPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (widget.editMode) {
       return _buildEditScaffold();
     }
@@ -723,7 +727,7 @@ class _MastervacPageState extends State<MastervacPage> {
                       errorBuilder: (c, e, s) => Container(
                         color: Colors.grey[300],
                         child: const Center(
-                          child: Text('Image non disponible'),
+                          child: Text(l10n.imageNotAvailable),
                         ),
                       ),
                     )
@@ -734,7 +738,7 @@ class _MastervacPageState extends State<MastervacPage> {
                           errorBuilder: (c, e, s) => Container(
                             color: Colors.grey[300],
                             child: const Center(
-                              child: Text('Image non disponible'),
+                              child: Text(l10n.imageNotAvailable),
                             ),
                           ),
                         )
@@ -1063,7 +1067,7 @@ class _MastervacPageState extends State<MastervacPage> {
                   children: [
                     const Icon(Icons.check_circle, color: Colors.white),
                     const SizedBox(width: 8),
-                    const Text('Article ajouté au panier'),
+                    Text(l10n.addedToCart),
                   ],
                 ),
                 backgroundColor: Colors.green,
@@ -1085,8 +1089,7 @@ class _MastervacPageState extends State<MastervacPage> {
               ),
             );
           },
-          child: const Text(
-            'Ajouter au panier',
+          child: Text(l10n.addToCart,
             style: TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.bold,
@@ -1133,7 +1136,7 @@ class _MastervacPageState extends State<MastervacPage> {
                   children: [
                     const Icon(Icons.check_circle, color: Colors.white),
                     const SizedBox(width: 8),
-                    const Text('Article ajouté au panier'),
+                    Text(l10n.addedToCart),
                   ],
                 ),
                 backgroundColor: Colors.green,
@@ -1155,8 +1158,7 @@ class _MastervacPageState extends State<MastervacPage> {
               ),
             );
           },
-          child: const Text(
-            'Ajouter au panier',
+          child: Text(l10n.addToCart,
             style: TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.bold,
@@ -1250,7 +1252,7 @@ class _MastervacPageState extends State<MastervacPage> {
                         );
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erreur réseau ou serveur')),
+                          SnackBar(content: Text(l10n.networkOrServerError)),
                         );
                       } finally {
                         if (mounted) {

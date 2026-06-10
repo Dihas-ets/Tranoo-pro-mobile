@@ -10,6 +10,7 @@ import 'package:random_string/random_string.dart';
 import 'package:tranoo_pro/data/screens/succes6.dart';
 import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
 import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 final fpToken = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
 final idUser = dotenv.env['ID_USER_FEEXPAY'] ?? '';
@@ -23,6 +24,8 @@ class MobileMoneyPaymentScreen extends StatefulWidget {
 }
 
 class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool isLoading = false;
   String? errorMessage;
   final String transKey = randomAlphaNumeric(15);
@@ -59,6 +62,7 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -421,8 +425,7 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Publicité payée avec succès !'),
+          SnackBar(content: Text(l10n.adPaidSuccess),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),

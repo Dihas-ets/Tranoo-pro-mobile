@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'discussion.dart';
 import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
@@ -11,6 +12,8 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   final ChatService _chatService = ChatService();
   List<Map<String, dynamic>> rooms = [];
   bool isLoading = true;
@@ -167,10 +170,11 @@ class _ChatListPageState extends State<ChatListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false, // Retirer le bouton retour
-        title: const Text('Discussions'),
+        title: Text(l10n.discussions),
         backgroundColor: Colors.amber,
         foregroundColor: Colors.black,
         elevation: 1,
@@ -194,13 +198,11 @@ class _ChatListPageState extends State<ChatListPage> {
                       color: Colors.grey,
                     ),
                     SizedBox(height: 16),
-                    Text(
-                      'Aucune discussion',
+                    Text(l10n.noDiscussions,
                       style: TextStyle(fontSize: 18, color: Colors.grey),
                     ),
                     SizedBox(height: 8),
-                    Text(
-                      'Commencez une discussion avec un vendeur',
+                    Text(l10n.startDiscussionWithSeller,
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                   ],

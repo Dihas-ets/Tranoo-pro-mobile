@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:convert';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 // ——— Google Maps (grisé — réactiver si clé API) ———
 // import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -26,6 +27,8 @@ class DeliveryMapScreen extends StatefulWidget {
 }
 
 class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   // ——— Google Maps (grisé) ———
   // GoogleMapController? _mapController;
   Position? _currentPosition;
@@ -358,7 +361,7 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
       if (res.statusCode == 200 && mounted) {
         setState(() => _deliverDone = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Colis livré')),
+          SnackBar(content: Text(l10n.packageDelivered)),
         );
         Navigator.of(context).pop();
       }
@@ -450,17 +453,17 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
       if (res.statusCode == 200 && mounted) {
         setState(() => _buyerArrived = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Arrivée notifiée à l\'acheteur')),
+          SnackBar(content: Text(l10n.arrivalNotified)),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur arrivée: ${res.statusCode}')),
+          SnackBar(content: Text(l10n.arrivalError(res.statusCode.toString()))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur arrivée: $e')),
+          SnackBar(content: Text(l10n.arrivalError(e.toString()))),
         );
       }
     }
@@ -849,7 +852,7 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
               child: OutlinedButton.icon(
                 onPressed: () => _openOptimizedRouteTo(destination: supplierLatLng),
                 icon: const Icon(Icons.near_me, color: Colors.green, size: 20),
-                label: const Text('Géolocaliser fournisseur'),
+                label: Text(l10n.geolocateSupplier),
               ),
             ),
             const SizedBox(width: 12),
@@ -983,7 +986,7 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
                         )
                     : null,
                 icon: const Icon(Icons.near_me, color: Colors.green, size: 20),
-                label: const Text('Géolocaliser Acheteur'),
+                label: Text(l10n.geolocateBuyer),
               ),
             ),
             const SizedBox(width: 12),

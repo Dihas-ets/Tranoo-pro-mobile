@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart'; // Pour la sélection d'image
 import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class Discussion extends StatefulWidget {
   final String roomId;
@@ -22,6 +23,8 @@ class Discussion extends StatefulWidget {
 }
 
 class _DiscussionState extends State<Discussion> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   final TextEditingController _messageController = TextEditingController();
   final List<Map<String, dynamic>> messages = [];
   final ImagePicker _picker = ImagePicker();
@@ -262,6 +265,7 @@ class _DiscussionState extends State<Discussion> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = const Color(0xFFF0F0F0); // Fond WhatsApp-like
     final accentColor = const Color(0xFFF8BF13); // Amber
     final bubbleColorMe = const Color(0xFFF8BF13); // Amber pour mes messages
@@ -488,7 +492,7 @@ class _DiscussionState extends State<Discussion> {
                     child: TextField(
                       controller: _messageController,
                       decoration: const InputDecoration(
-                        hintText: 'Tapez votre message...',
+                        hintText: l10n.typeMessageHint,
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(
                           horizontal: 16,
@@ -575,7 +579,7 @@ class _DiscussionState extends State<Discussion> {
             children: [
               Icon(Icons.picture_as_pdf, color: Colors.red[700]),
               const SizedBox(width: 8),
-              const Text('PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(l10n.pdfLabel, style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -594,8 +598,7 @@ class _DiscussionState extends State<Discussion> {
             children: [
               Icon(Icons.file_present, color: Colors.blue[700]),
               const SizedBox(width: 8),
-              const Text(
-                'Document',
+              Text(l10n.documentFormat,
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -629,7 +632,7 @@ class _DiscussionState extends State<Discussion> {
                   : Image.asset(imageUrl, fit: BoxFit.cover),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Fermer'),
+                child: Text(l10n.close),
               ),
             ],
           ),

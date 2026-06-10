@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:tranoo_pro/services/user_service.dart';
 
@@ -13,6 +14,8 @@ class MesAchatsPage extends StatefulWidget {
 }
 
 class _MesAchatsPageState extends State<MesAchatsPage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   List<Map<String, dynamic>> achats = [];
   bool isLoading = true;
   String? error;

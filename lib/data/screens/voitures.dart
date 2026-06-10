@@ -16,6 +16,7 @@ import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/utils/catalog_display.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -184,18 +185,17 @@ class _VoituresPageState extends State<VoituresPage>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text(
-          'Voulez-vous vraiment supprimer cette voiture ?',
+        title: Text(l10n.confirmDeletion),
+        content: Text(l10n.confirmDeleteCar,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -217,17 +217,17 @@ class _VoituresPageState extends State<VoituresPage>
       );
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Voiture supprimée avec succès !')),
+          SnackBar(content: Text(l10n.carDeletedSuccess)),
         );
         fetchVoitures();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de la suppression.')),
+          SnackBar(content: Text(l10n.deletionError)),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur réseau ou serveur.')),
+        SnackBar(content: Text(l10n.networkOrServerError)),
       );
     }
   }
@@ -609,7 +609,7 @@ class _VoituresPageState extends State<VoituresPage>
             ),
           ),
           onPressed: _openBudgetSheet,
-          child: const Text('Filtrer par budget'),
+          child: Text(l10n.filterByBudget),
         ),
       ),
     );
@@ -672,8 +672,7 @@ class _VoituresPageState extends State<VoituresPage>
                       ),
                     ),
                   ),
-                  const Text(
-                    'Prix (FCFA)',
+                  Text(l10n.priceFcfa,
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -684,7 +683,7 @@ class _VoituresPageState extends State<VoituresPage>
                           controller: minCtl,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'Min.',
+                            labelText: l10n.minLabel,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -703,7 +702,7 @@ class _VoituresPageState extends State<VoituresPage>
                           controller: maxCtl,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'Max.',
+                            labelText: l10n.maxLabel,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -719,7 +718,7 @@ class _VoituresPageState extends State<VoituresPage>
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('$disponibles véhicule(s) disponible(s)'),
+                  Text(l10n.vehiclesAvailableCount(disponibles)),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -732,7 +731,7 @@ class _VoituresPageState extends State<VoituresPage>
                             });
                             Navigator.pop(context);
                           },
-                          child: const Text('Réinitialiser'),
+                          child: Text(l10n.reset),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -749,7 +748,7 @@ class _VoituresPageState extends State<VoituresPage>
                             });
                             Navigator.pop(context);
                           },
-                          child: const Text('Appliquer'),
+                          child: Text(l10n.apply),
                         ),
                       ),
                     ],
@@ -765,6 +764,7 @@ class _VoituresPageState extends State<VoituresPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final userService = UserService();
     final isVendeur = userService.currentRole == UserRole.vendeur;
 
@@ -820,8 +820,7 @@ class _VoituresPageState extends State<VoituresPage>
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText:
-                              'Rechercher une voiture (marque, modèle, titre)...',
+                          hintText: l10n.searchCarHint,
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.refresh,

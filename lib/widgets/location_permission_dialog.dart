@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class LocationPermissionDialog extends StatelessWidget {
   final String userRole;
@@ -15,6 +16,7 @@ class LocationPermissionDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -45,16 +47,14 @@ class LocationPermissionDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Localisation requise',
+                      Text(l10n.locationRequired,
                         style:
                             Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                 ),
                       ),
-                      Text(
-                        'Autorisation nécessaire',
+                      Text(l10n.authorizationRequired,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Colors.grey[600],
                             ),
@@ -87,8 +87,7 @@ class LocationPermissionDialog extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Ce que nous utilisons :',
+                  Text(l10n.whatWeUse,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
@@ -172,7 +171,7 @@ class LocationPermissionDialog extends StatelessWidget {
                       ),
                     ),
                     // Neutral button label before the system permission prompt.
-                    child: const Text('Continuer'),
+                    child: Text(l10n.continueAction),
                   ),
                 ),
               ],
@@ -288,7 +287,7 @@ class LocationPermissionDialog extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Localisation en arrière-plan'),
+        title: Text(l10n.backgroundLocationTitle),
         content: const Text(
           'Pour assurer un suivi continu de vos missions, nous avons besoin d\'accéder à votre localisation même lorsque l\'application est en arrière-plan.\n\nVous pouvez activer cette permission dans les paramètres de votre appareil.',
         ),
@@ -298,7 +297,7 @@ class LocationPermissionDialog extends StatelessWidget {
               Navigator.of(context).pop();
               onPermissionDenied();
             },
-            child: const Text('Plus tard'),
+            child: Text(l10n.later),
           ),
           TextButton(
             onPressed: () async {
@@ -306,7 +305,7 @@ class LocationPermissionDialog extends StatelessWidget {
               // Ouvrir les paramètres de l'application
               await openAppSettings();
             },
-            child: const Text('Paramètres'),
+            child: Text(l10n.deviceSettings),
           ),
         ],
       ),
@@ -317,14 +316,14 @@ class LocationPermissionDialog extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Permission refusée'),
+        title: Text(l10n.permissionDenied),
         content: Text(
           'La localisation est nécessaire pour utiliser les fonctionnalités de ${_getRoleDisplayName()}. Certaines fonctionnalités pourraient être limitées.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Compris'),
+            child: Text(l10n.understood),
           ),
         ],
       ),
@@ -341,7 +340,7 @@ class LocationPermissionDialog extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: Text(l10n.ok),
           ),
         ],
       ),

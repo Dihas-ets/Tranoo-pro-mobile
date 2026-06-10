@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_home.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ChauffeurRideCompletedScreen extends StatefulWidget {
   final Map<String, dynamic> ride;
@@ -19,6 +20,8 @@ class ChauffeurRideCompletedScreen extends StatefulWidget {
 
 class _ChauffeurRideCompletedScreenState
     extends State<ChauffeurRideCompletedScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   late ConfettiController _confettiController;
   double _rating = 0;
 

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class DeliveryNotificationBanner extends StatefulWidget {
   final Map<String, dynamic> delivery;
@@ -30,6 +31,8 @@ class DeliveryNotificationBanner extends StatefulWidget {
 
 class _DeliveryNotificationBannerState
     extends State<DeliveryNotificationBanner> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   double _slideValue = 0.0;
   bool _isAccepted = false;
   bool _isDismissed = false;

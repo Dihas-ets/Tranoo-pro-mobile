@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:tranoo_pro/utils/geo_address_helper.dart';
 import 'package:tranoo_pro/widgets/location_permission_dialog.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class CapturedProfileLocation {
   final double latitude;
@@ -35,6 +36,8 @@ class RegistrationLocationSection extends StatefulWidget {
 
 class _RegistrationLocationSectionState
     extends State<RegistrationLocationSection> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   CapturedProfileLocation? _captured;
   bool _loading = false;
   String? _error;
@@ -98,11 +101,11 @@ class _RegistrationLocationSectionState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Votre position actuelle',
+        Text(l10n.yourCurrentPosition,
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         const SizedBox(height: 8),
@@ -156,8 +159,7 @@ class _RegistrationLocationSectionState
                     style: const TextStyle(fontSize: 13),
                   )
                 else
-                  const Text(
-                    'Position enregistrée (coordonnées GPS)',
+                  Text(l10n.positionSavedGps,
                     style: TextStyle(fontSize: 13),
                   ),
               ],

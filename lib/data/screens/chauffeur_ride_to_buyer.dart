@@ -9,6 +9,7 @@ import 'package:tranoo_pro/data/screens/osm_map_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_with_buyer.dart';
 import 'dart:convert';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ChauffeurRideToBuyerScreen extends StatefulWidget {
   final Map<String, dynamic> ride;
@@ -22,6 +23,8 @@ class ChauffeurRideToBuyerScreen extends StatefulWidget {
 
 class _ChauffeurRideToBuyerScreenState
     extends State<ChauffeurRideToBuyerScreen> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   Position? _currentPosition;
   List<OsmMarkerData> _osmMarkers = [];
   Timer? _timer;
@@ -185,6 +188,7 @@ class _ChauffeurRideToBuyerScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
@@ -442,8 +446,7 @@ class _ChauffeurRideToBuyerScreenState
                                       elevation: 0,
                                     ),
                                     icon: const Icon(Icons.phone, size: 20),
-                                    label: const Text(
-                                      'Appeler',
+                                    label: Text(l10n.call,
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,

@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../services/user_service.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ParrainagePage extends StatefulWidget {
   const ParrainagePage({super.key});
@@ -14,6 +15,8 @@ class ParrainagePage extends StatefulWidget {
 }
 
 class _ParrainagePageState extends State<ParrainagePage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   String? _referralCode;
   int _totalReferrals = 0;
   int _completedReferrals = 0;
@@ -91,8 +94,7 @@ class _ParrainagePageState extends State<ParrainagePage> {
       await Clipboard.setData(ClipboardData(text: referralLink));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lien de parrainage copié !'),
+          SnackBar(content: Text(l10n.referralLinkCopied),
             backgroundColor: Colors.green,
           ),
         );
@@ -127,8 +129,7 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Partager votre lien de parrainage',
+                Text(l10n.referralShareTitle,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
@@ -238,9 +239,10 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Parrainage'),
+        title: Text(l10n.referralTitle),
         backgroundColor: Colors.amber,
         foregroundColor: Colors.black,
       ),
@@ -268,7 +270,7 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
                       const SizedBox(height: 20),
                       ElevatedButton(
                         onPressed: _loadReferralData,
-                        child: const Text('Réessayer'),
+                        child: Text(l10n.retry),
                       ),
                     ],
                   ),
@@ -302,8 +304,7 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
                               ),
                             ),
                             const SizedBox(height: 16),
-                            const Text(
-                              'Votre Lien de Parrainage',
+                            Text(l10n.referralLinkTitle,
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -352,7 +353,7 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
                                   child: ElevatedButton.icon(
                                     onPressed: _copyReferralCode,
                                     icon: const Icon(Icons.copy),
-                                    label: const Text('Copier le lien'),
+                                    label: Text(l10n.copyLink),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blue,
                                       foregroundColor: Colors.white,
@@ -364,7 +365,7 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
                                   child: ElevatedButton.icon(
                                     onPressed: _shareReferralCode,
                                     icon: const Icon(Icons.share),
-                                    label: const Text('Partager'),
+                                    label: Text(l10n.share),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.green,
                                       foregroundColor: Colors.white,
@@ -381,8 +382,7 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
                     const SizedBox(height: 20),
 
                     // Statistiques
-                    const Text(
-                      'Vos Statistiques',
+                    Text(l10n.yourStats,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -423,8 +423,7 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
                     const SizedBox(height: 20),
 
                     // Liste des parrainages
-                    const Text(
-                      'Vos Parrainages',
+                    Text(l10n.yourReferrals,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -443,16 +442,14 @@ Ensemble, trouvons les meilleures voitures et pièces détachées ! 🚙✨
                                 color: Colors.grey,
                               ),
                               const SizedBox(height: 12),
-                              const Text(
-                                'Aucun parrainage pour le moment',
+                              Text(l10n.noReferralsYet,
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: Colors.grey,
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              const Text(
-                                'Partagez votre code avec vos amis pour commencer !',
+                              Text(l10n.shareReferralHint,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey,

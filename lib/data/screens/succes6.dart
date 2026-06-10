@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
 import 'dart:developer';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SuccesScreen6 extends StatefulWidget {
   const SuccesScreen6({super.key});
@@ -10,6 +11,8 @@ class SuccesScreen6 extends StatefulWidget {
 }
 
 class _SuccesScreen6State extends State<SuccesScreen6> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   bool _canNavigate = false;
 
   @override
@@ -30,6 +33,7 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true, // Permet au contenu de passer sous l'AppBar
@@ -68,8 +72,7 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                           width: 120,
                         ),
                         const SizedBox(height: 24), // Espacement augmenté
-                        const Text(
-                          'Félicitations !',
+                        Text(l10n.congratulations,
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -144,8 +147,7 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                                         ),
                                       ),
                                       SizedBox(width: 8),
-                                      Text(
-                                        'Préparation...',
+                                      Text(l10n.preparing,
                                         style: TextStyle(
                                           fontWeight: FontWeight.w500,
                                           fontSize: 16,

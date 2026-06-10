@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ class AlertDisplayPermissionDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -70,7 +72,7 @@ class AlertDisplayPermissionDialog extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: () => _onActivate(context),
                 icon: const Icon(Icons.notifications),
-                label: const Text('Autoriser les notifications'),
+                label: Text(l10n.allowNotifications),
               ),
             ),
             const SizedBox(height: 8),
@@ -78,7 +80,7 @@ class AlertDisplayPermissionDialog extends StatelessWidget {
               width: double.infinity,
               child: TextButton(
                 onPressed: () => _onLater(context),
-                child: const Text('Plus tard'),
+                child: Text(l10n.later),
               ),
             ),
           ],

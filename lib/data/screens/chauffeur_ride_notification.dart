@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_ride_to_buyer.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ChauffeurRideNotificationBanner extends StatefulWidget {
   final Map<String, dynamic> ride;

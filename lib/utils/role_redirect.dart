@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 import '../services/user_service.dart';
 
 enum UserRole { 
@@ -64,9 +65,10 @@ class RoleRedirect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userService = UserService();
+    final l10n = AppLocalizations.of(context)!;
 
     if (userService.currentRole != requiredRole) {
-      return const Center(child: Text('Accès non autorisé'));
+      return Center(child: Text(l10n.unauthorizedAccess));
     }
 
     return child;

@@ -14,6 +14,7 @@ import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_ride_notification.dart';
 import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
 import 'dart:async';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class ChauffeurHomePage extends StatefulWidget {
   const ChauffeurHomePage({super.key});
@@ -23,6 +24,8 @@ class ChauffeurHomePage extends StatefulWidget {
 }
 
 class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   String _currency = 'XOF';
   double? _balance;
   bool _showBalance = false;
@@ -403,7 +406,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
       final idToken = await user?.getIdToken();
       if (idToken == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur: Utilisateur non connecté')),
+          SnackBar(content: Text(l10n.errorUserNotConnected)),
         );
         return;
       }
@@ -439,6 +442,7 @@ class _ChauffeurHomePageState extends State<ChauffeurHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<myauth.AuthProvider>(
       builder: (context, auth, _) {
         if (auth.user != null && _userData == null) {
