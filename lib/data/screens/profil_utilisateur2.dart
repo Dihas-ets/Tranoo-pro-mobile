@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:tranoo_pro/data/screens/connexion_page.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/profile2.dart';
@@ -9,13 +6,12 @@ import 'package:tranoo_pro/data/screens/historique_transit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
-import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/languesentreprise.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
-import 'package:tranoo_pro/providers/locale_provider.dart';
-import 'package:tranoo_pro/utils/locale_helper.dart';
+import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
+import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 
 class ProfilUtilisateur2 extends StatefulWidget {
   const ProfilUtilisateur2({super.key});
@@ -27,7 +23,6 @@ class ProfilUtilisateur2 extends StatefulWidget {
 class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
   AppLocalizations get l10n => AppLocalizations.of(context)!;
 
-  File? _image;
   String selectedCurrencyValue = "XOF";
   Map<String, dynamic>? userData;
   bool loading = true;
@@ -91,20 +86,20 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
             Expanded(child: Text('Suppression du compte')),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.accountDeletionIrreversible,
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 12),
-            Text(
+            const SizedBox(height: 12),
+            const Text(
               'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(l10n.accountDeletionConfirmWarning,
-              style: TextStyle(color: Colors.black54),
+              style: const TextStyle(color: Colors.black54),
             ),
           ],
         ),
@@ -245,52 +240,6 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final pickedFile =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _image = File(pickedFile.path);
-      });
-      await _uploadPhoto(_image!);
-    }
-  }
-
-  Future<void> _uploadPhoto(File image) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    
-    try {
-      // Upload vers Cloudinary avec le dossier profiles
-      final url = await uploadImageToCloudinary(
-        image,
-        folder: CloudinaryFolders.profiles,
-      );
-      
-      if (url != null) {
-        // Mettre à jour via PATCH /users/me
-        final idToken = await user.getIdToken();
-        final String baseUrl = getBaseUrl();
-        final dio = Dio(
-          BaseOptions(
-            baseUrl: baseUrl,
-            headers: {'Authorization': 'Bearer $idToken'},
-          ),
-        );
-        await dio.patch('/users/me', data: {"photo": url});
-        final me = await dio.get('/protected/me');
-        final refreshedUser = me.data['user'];
-        await local_auth.AuthProvider.saveUserToPrefs(idToken, refreshedUser);
-        if (mounted) {
-          context.read<local_auth.AuthProvider>().reloadUser();
-          await fetchUser();
-        }
-      }
-    } catch (e) {
-      print('Erreur upload photo: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (loading) return Center(child: CircularProgressIndicator());
@@ -300,287 +249,106 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
     if (userData != null && userData?['role'] != 'transitaire') {
       return Center(child: Text(l10n.transitaireAccessOnly));
     }
+    final profileMap = Map<String, dynamic>.from(userData!);
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          "Profil utilisateur",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          'Mon profil',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: kTransitaireNavy,
+          ),
         ),
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.white,
+        foregroundColor: kTransitaireNavy,
         elevation: 0,
+        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 15),
-            _buildProfileCard(),
-            const SizedBox(height: 50),
-            _buildAccountOptions(),
-            const SizedBox(height: 20),
-            Text(l10n.more,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            _buildMoreOptions(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF007AFF), // Fond bleu au lieu de jaune
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: _pickImage,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.grey[300],
-                  backgroundImage:
-                      _image != null
-                          ? FileImage(_image!) as ImageProvider
-                          : (userData != null &&
-                              userData!["photo"] != null &&
-                              userData!["photo"].toString().isNotEmpty)
-                          ? NetworkImage(userData!["photo"].toString()) as ImageProvider
-                          : null,
-                  child: (_image == null && 
-                          (userData == null || 
-                           userData!["photo"] == null || 
-                           userData!["photo"].toString().isEmpty))
-                      ? Icon(Icons.person, size: 30, color: Colors.grey[600])
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: -5,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      color: Colors.black,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                "Itunuoluwa Abidoye",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              Text("abidoye@itunuakwa", style: TextStyle(color: Colors.white)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildListTile({
-    required String title,
-    String? subtitle,
-    required IconData icon,
-    Widget? trailing,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: color ?? Color(0xFFFFCE31)),
-      title: Text(title, style: const TextStyle()),
-      subtitle:
-          subtitle != null
-              ? Text(
-                subtitle,
-                style: const TextStyle(color: Colors.grey, fontSize: 10),
-              )
-              : null,
-      trailing: trailing,
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildAccountOptions() {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          _buildListTile(
-            title: l10n.myAccount,
-            subtitle: l10n.editAccountSubtitle,
-            icon: Icons.person,
-            onTap: () async {
+      body: TransitaireProfileView(
+        user: profileMap,
+        isOwner: true,
+        onEditProfile: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => Profile2()),
+            MaterialPageRoute(builder: (_) => const Profile2()),
               );
               await fetchUser();
             },
-          ),
-          _buildListTile(
-            title: l10n.transitHistory,
-            //subtitle: l10n.becomeSellerSubtitle,
-            icon: Icons.history,
-            onTap: () {
+        onOpenHistory: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HistoriqueTransitPage()),
+          );
+        },
+        onOpenSubscription: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => HistoriqueTransitPage(),
+              builder: (_) => const SellerSubscriptionPage(forTransitaire: true),
                 ),
               );
             },
-          ),
-          // _buildListTile(
-          //   title: "Devenir chauffeur certifié",
-          //   subtitle: "Proposer des services de livraison",
-          //   icon: Icons.delivery_dining,
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(builder: (context) => DriverCertifiedPage()),
-          //     );
-          //   },
-          // ),
-          _buildListTile(
-            title: l10n.accountDeletion,
-            icon: Icons.delete_forever,
-            color: Colors.red,
-            onTap: () => _deleteAccount(),
-          ),
-          _buildListTile(
-            title: l10n.logout,
-            icon: Icons.logout,
-            color: Color(0xFFFFCE31),
-            onTap: () {
+        onOpenNotifications: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => ConnexionPage()),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMoreOptions() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: Column(
-        children: [
-          _buildOption(
-            l10n.notifications,
-            "",
-            Icons.notifications,
-            badge: true,
-            onTap: () {
+            MaterialPageRoute(builder: (_) => Notifications()),
+          );
+        },
+        onOpenLanguage: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => Notifications()),
-              );
-            },
+            MaterialPageRoute(builder: (_) => const LanguesEntreprise()),
+          );
+        },
+        onLogout: () async {
+          await Provider.of<local_auth.AuthProvider>(context, listen: false)
+              .logout();
+          if (!context.mounted) return;
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const ConnexionPage()),
+            (route) => false,
+          );
+        },
+        onDeleteAccount: _deleteAccount,
+        settingsExtra: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-          Consumer<LocaleProvider>(
-            builder: (context, localeProvider, _) {
-              final l10n = AppLocalizations.of(context)!;
-              return _buildOption(
-                l10n.language,
-                LocaleHelper.languageLabel(
-                  localeProvider.languageCode,
-                  l10n,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Portefeuille',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: kTransitaireNavy,
                 ),
-                Icons.language,
-                trailing: IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LanguesEntreprise(),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-          _buildOption(
-            l10n.currency,
-            selectedCurrencyValue,
-            Icons.monetization_on,
-            trailing: IconButton(
-              icon: const Icon(Icons.arrow_forward_ios),
-              onPressed: () => _showCurrencyDialog(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOption(
-    String title,
-    String value,
-    IconData icon, {
-    bool badge = false,
-    Widget? trailing,
-    VoidCallback? onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: Color(0xFFFFCE31)),
-      title: Row(
-        children: [
-          Text(title, style: const TextStyle()),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                value,
-                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                _walletLoading
+                    ? 'Solde : chargement...'
+                    : 'Solde : ${_walletBalance?.toStringAsFixed(0) ?? '0'} $_walletCurrency',
+              ),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: () => _showCurrencyDialog(context),
+                child: Text(
+                  'Devise : $selectedCurrencyValue',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
-      trailing:
-          trailing ??
-          (badge
-              ? const Icon(Icons.circle, size: 12, color: Colors.red)
-              : const Icon(
-                Icons.arrow_forward_ios,
-                size: 14,
-                color: Colors.black,
-              )),
-      onTap: onTap,
     );
   }
 

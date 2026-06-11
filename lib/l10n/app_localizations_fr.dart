@@ -261,6 +261,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get maxLabel => 'Max.';
 
   @override
+  String get budgetMinHint => 'Minimum';
+
+  @override
+  String get budgetMaxHint => 'Maximum';
+
+  @override
   String get confirmDeletion => 'Confirmer la suppression';
 
   @override

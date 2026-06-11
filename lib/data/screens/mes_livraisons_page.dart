@@ -17,6 +17,8 @@ class MesLivraisonsPage extends StatefulWidget {
 
 class _MesLivraisonsPageState extends State<MesLivraisonsPage>
     with SingleTickerProviderStateMixin {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   late TabController _tabController;
   List<Map<String, dynamic>> _pendingDeliveries = [];
   List<Map<String, dynamic>> _activeDeliveries = [];

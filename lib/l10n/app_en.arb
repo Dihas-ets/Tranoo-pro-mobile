@@ -82,6 +82,8 @@
   "filterByBudget": "Filter by budget",
   "minLabel": "Min.",
   "maxLabel": "Max.",
+  "budgetMinHint": "Minimum",
+  "budgetMaxHint": "Maximum",
   "confirmDeletion": "Confirm deletion",
   "deletionError": "Error during deletion.",
   "sendAlert": "Send alert",

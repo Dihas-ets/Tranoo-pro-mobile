@@ -109,11 +109,11 @@ class ProductCard extends StatelessWidget {
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Column(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.precision_manufacturing),
-                        SizedBox(height: 4),
+                        const Icon(Icons.precision_manufacturing),
+                        const SizedBox(height: 4),
                         Text(l10n.model),
                         Text(
                           "124-CFDS",
@@ -131,11 +131,11 @@ class ProductCard extends StatelessWidget {
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Column(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.label_important),
-                        SizedBox(height: 4),
+                        const Icon(Icons.label_important),
+                        const SizedBox(height: 4),
                         Text(l10n.typeLabel),
                         Text(
                           "Rare",

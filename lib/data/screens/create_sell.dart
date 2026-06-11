@@ -21,6 +21,8 @@ import '../../widgets/location_permission_dialog.dart';
 import 'movie.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/services/seller_profile_locations.dart';
+import 'package:tranoo_pro/widgets/country_location_field.dart';
+import 'package:tranoo_pro/utils/location_geocode_helper.dart';
 
 class CreateSellPage extends StatefulWidget {
   final String? alertNotificationId;
@@ -279,6 +281,18 @@ class _CreateSellPageState extends State<CreateSellPage> {
 
   String get _effectiveLieu =>
       _vehicleAddress.isNotEmpty ? _vehicleAddress : _locationController.text.trim();
+
+  Future<String> _resolvedLieu() async {
+    final raw = _effectiveLieu.trim();
+    if (raw.isEmpty) return raw;
+    final resolved = await resolveLocationInput(raw);
+    if (resolved.localisation.isNotEmpty) {
+      _locationController.text = resolved.localisation;
+      _vehicleAddress = resolved.localisation;
+      return resolved.localisation;
+    }
+    return raw;
+  }
 
   Map<String, dynamic>? get _vehicleFournisseurPayload {
     if (_vehicleLatitude == null || _vehicleLongitude == null) return null;
@@ -628,12 +642,12 @@ class _CreateSellPageState extends State<CreateSellPage> {
     });
   }
 
-  void _onValidate() {
+  Future<void> _onValidate() async {
     if (!widget.editMode) {
       _trackDemoEvent('seller_create_started', page: 'create_sell.dart');
     }
     if (widget.editMode) {
-      _saveEditedCar();
+      await _saveEditedCar();
       return;
     }
     // Debug logs
@@ -715,6 +729,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
     final videosList = _cloudinaryVideoUrls.whereType<String>().toList();
     print('[CreateSell] images transmises à CarsInfo: $imagesList');
     print('[CreateSell] vidéos transmises à CarsInfo: $videosList');
+    final lieu = await _resolvedLieu();
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -806,6 +822,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
       final token = await user?.getIdToken();
       if (token == null) return;
 
+      final lieu = await _resolvedLieu();
       final payload = {
         'type': 'voiture',
         'titre': _titleController.text.trim(),
@@ -827,8 +844,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
         'video': videosList.isNotEmpty ? videosList.first : null,
         'entreprise': _companyController.text.trim(),
         // compat lieu/localisation
-        'lieu': _effectiveLieu,
-        'localisation': _effectiveLieu,
+        'lieu': lieu,
+        'localisation': lieu,
         if (_vehicleFournisseurPayload != null)
           'fournisseur': _vehicleFournisseurPayload,
       };
@@ -1088,12 +1105,12 @@ class _CreateSellPageState extends State<CreateSellPage> {
                   if (hasVideo)
                     Container(
                       color: Colors.black87,
-                      child: const Column(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
-                          SizedBox(height: 8),
-                          Text(l10n.videoReady, style: TextStyle(color: Colors.white)),
+                          const Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
+                          const SizedBox(height: 8),
+                          Text(l10n.videoReady, style: const TextStyle(color: Colors.white)),
                         ],
                       ),
                     )
@@ -1351,6 +1368,13 @@ class _CreateSellPageState extends State<CreateSellPage> {
           style: TextStyle(fontSize: 12, color: Colors.black54, height: 1.35),
         ),
         const SizedBox(height: 12),
+        CountryLocationField(
+          controller: _locationController,
+          label: 'Localisation (pays ou ville)',
+          hint: 'Ex. Bénin ou Cotonou, Bénin',
+          onChanged: (v) => _vehicleAddress = v.trim(),
+        ),
+        const SizedBox(height: 12),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -1506,7 +1530,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: TextField(
-                                    decoration: const InputDecoration(
+                                    decoration: InputDecoration(
                                       hintText: l10n.enterBrand,
                                       filled: true,
                                       fillColor: Color(0xFFF2F2F2),
@@ -1534,7 +1558,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                               const SizedBox(height: 8),
                               if (_selectedMarques == 'Autre')
                                 TextField(
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     hintText: l10n.enterModel,
                                     filled: true,
                                     fillColor: Color(0xFFF2F2F2),
@@ -1568,7 +1592,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
                                       Padding(
                                         padding: const EdgeInsets.only(top: 8.0),
                                         child: TextField(
-                                          decoration: const InputDecoration(
+                                          decoration: InputDecoration(
                                             hintText: l10n.enterCustomModel,
                                             filled: true,
                                             fillColor: Color(0xFFF2F2F2),

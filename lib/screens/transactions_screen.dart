@@ -140,7 +140,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         _showSnackBar(l10n.refundSuccess);
         await _refreshData();
       } else {
-        _showSnackBar(result['message'] ?? l10n.refundError, isError: true);
+        _showSnackBar(result['message'] ?? l10n.errorOccurredTitle, isError: true);
       }
     } catch (e) {
       _showSnackBar(l10n.errorGeneric(e.toString()), isError: true);

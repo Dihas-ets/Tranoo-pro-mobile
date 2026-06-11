@@ -82,6 +82,8 @@
   "filterByBudget": "تصفية حسب الميزانية",
   "minLabel": "الحد الأدنى",
   "maxLabel": "الحد الأقصى",
+  "budgetMinHint": "الحد الأدنى",
+  "budgetMaxHint": "الحد الأقصى",
   "confirmDeletion": "تأكيد الحذف",
   "deletionError": "خطأ أثناء الحذف.",
   "sendAlert": "إرسال التنبيه",

@@ -16,6 +16,8 @@ class VerifyResetCodePage extends StatefulWidget {
 
 class _VerifyResetCodePageState extends State<VerifyResetCodePage>
     with WidgetsBindingObserver {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   final _formKey = GlobalKey<FormState>();
   final _pinKey = GlobalKey<OtpPinInputState>();
   String _code = '';

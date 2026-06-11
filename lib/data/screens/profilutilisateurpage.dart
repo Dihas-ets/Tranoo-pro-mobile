@@ -45,6 +45,8 @@ class ProfilUtilisateurPage extends StatefulWidget {
 
 class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
     with SingleTickerProviderStateMixin {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   File? _image;
   String selectedCurrencyValue = "XOF";
   Map<String, dynamic>? userData;
@@ -246,20 +248,20 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
             Expanded(child: Text('Suppression du compte')),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.accountDeletionIrreversible,
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 12),
-            Text(
+            const SizedBox(height: 12),
+            const Text(
               'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(l10n.accountDeletionConfirmWarning,
-              style: TextStyle(color: Colors.black54),
+              style: const TextStyle(color: Colors.black54),
             ),
           ],
         ),

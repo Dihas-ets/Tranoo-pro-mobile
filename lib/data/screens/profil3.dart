@@ -43,6 +43,8 @@ class Profil3 extends StatefulWidget {
 }
 
 class Profil3State extends State<Profil3> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   File? _image;
   String selectedCurrencyValue = "XOF";
   double? _walletBalance;
@@ -146,20 +148,20 @@ class Profil3State extends State<Profil3> {
             Expanded(child: Text('Suppression du compte')),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.accountDeletionIrreversible,
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 12),
-            Text(
+            const SizedBox(height: 12),
+            const Text(
               'Votre compte, votre acces a l\'application et vos donnees liees seront supprimes.',
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(l10n.accountDeletionConfirmWarning,
-              style: TextStyle(color: Colors.black54),
+              style: const TextStyle(color: Colors.black54),
             ),
           ],
         ),

@@ -12,7 +12,9 @@ import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SellerSubscriptionPage extends StatefulWidget {
-  const SellerSubscriptionPage({super.key});
+  final bool forTransitaire;
+
+  const SellerSubscriptionPage({super.key, this.forTransitaire = false});
 
   @override
   State<SellerSubscriptionPage> createState() => _SellerSubscriptionPageState();
@@ -164,7 +166,9 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         data: {
           'transKey': transKey,
           'amount': num.parse(amount),
-          'description': 'Paiement abonnement vendeur ($_selectedMonths mois)',
+          'description': widget.forTransitaire
+              ? 'Paiement abonnement transitaire ($_selectedMonths mois)'
+              : 'Paiement abonnement vendeur ($_selectedMonths mois)',
           'type': 'subscription',
           'status': 'success',
           'duree': '$_selectedMonths mois',
@@ -247,9 +251,9 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Abonnement Vendeur',
-          style: TextStyle(
+        title: Text(
+          widget.forTransitaire ? 'Abonnement Transitaire' : 'Abonnement Vendeur',
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
             color: Colors.black87,

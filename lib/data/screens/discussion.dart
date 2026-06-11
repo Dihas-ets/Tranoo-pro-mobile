@@ -491,7 +491,7 @@ class _DiscussionState extends State<Discussion> {
                     ),
                     child: TextField(
                       controller: _messageController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: l10n.typeMessageHint,
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(

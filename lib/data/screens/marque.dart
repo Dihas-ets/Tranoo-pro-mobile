@@ -20,6 +20,10 @@ import 'package:tranoo_pro/services/views_service.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/utils/catalog_filter_options.dart';
+import 'package:tranoo_pro/widgets/catalog_filter_sections.dart';
+import 'package:tranoo_pro/widgets/seller_stats_dashboard.dart';
+import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -36,6 +40,12 @@ String formatPrice(dynamic price) {
   } catch (e) {
     return price.toString();
   }
+}
+
+String _formatCompactCount(int n) {
+  if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(2)}M';
+  if (n >= 1000) return '${(n / 1000).toStringAsFixed(2)}k';
+  return '$n';
 }
 
 class Article {
@@ -230,15 +240,24 @@ class Marque extends StatefulWidget {
 
 class _MarqueState extends State<Marque>
     with SingleTickerProviderStateMixin, RegisterPageRefresh {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
+  bool _pullRefreshing = false;
+
   @override
   Future<void> onPagePullRefresh() async {
-    await fetchArticlesPieces();
-    await fetchVoituresRecommandees();
-    await fetchPubs();
-    await fetchPubsSponsorisees();
-    if (_userService.currentRole == UserRole.vendeur) {
-      await fetchVoituresEnAttente();
-      await _loadSellerMarqueStats();
+    setState(() => _pullRefreshing = true);
+    try {
+      await fetchArticlesPieces();
+      await fetchVoituresRecommandees();
+      await fetchPubs();
+      await fetchPubsSponsorisees();
+      if (_userService.currentRole == UserRole.vendeur) {
+        await fetchVoituresEnAttente();
+        await _loadSellerMarqueStats();
+      }
+    } finally {
+      if (mounted) setState(() => _pullRefreshing = false);
     }
   }
   int _currentPage = 0;
@@ -748,32 +767,74 @@ class _MarqueState extends State<Marque>
     );
   }
 
+  List<Map<String, dynamic>> _catalogMapsForFilters() {
+    final maps = <Map<String, dynamic>>[];
+    for (final v in voituresRecommandees) {
+      maps.add({
+        'marque': v.marque,
+        'modele': v.modele,
+        'prix': v.prix,
+        'titre': v.titre,
+        'description': v.description,
+        'entreprise': v.entreprise,
+      });
+    }
+    for (final p in articlesPieces) {
+      maps.add({
+        'marque': p.model,
+        'modele': p.model,
+        'pieceType': p.pieceType,
+        'localisation': p.location,
+        'lieu': p.location,
+        'titre': p.title,
+        'entreprise': p.company,
+        'prix': p.price,
+      });
+    }
+    return maps;
+  }
+
   List<ArticleVoiture> _applyFilters(List<ArticleVoiture> source) {
     return source.where((v) {
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
-        if (!v.marque.toLowerCase().contains(_selectedBrand!.toLowerCase())) {
-          return false;
-        }
+        if (!catalogValueMatches(_selectedBrand, v.marque)) return false;
       }
       if (_selectedModel != null && _selectedModel!.isNotEmpty) {
-        if (!v.modele.toLowerCase().contains(_selectedModel!.toLowerCase())) {
-          return false;
-        }
+        if (!catalogValueMatches(_selectedModel, v.modele)) return false;
       }
       if (_selectedLocation != null && _selectedLocation!.isNotEmpty) {
-        final loc =
-            ((v.entreprise ?? '') + ' ' + (v.description)).toLowerCase();
-        if (!loc.contains(_selectedLocation!.toLowerCase()) &&
-            !(v.titre.toLowerCase().contains(
-                  _selectedLocation!.toLowerCase(),
-                ))) {
-          // fallback: try titre
-          return false;
-        }
+        final loc = [
+          v.entreprise,
+          v.description,
+          v.titre,
+        ].map((e) => e?.toString() ?? '').join(' ');
+        if (!catalogValueMatches(_selectedLocation, loc)) return false;
       }
       if (_budgetMin != null || _budgetMax != null) {
         final price =
             double.tryParse(v.prix.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+        if (_budgetMin != null && price < _budgetMin!) return false;
+        if (_budgetMax != null && price > _budgetMax!) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<Article> _applyPieceFilters(List<Article> source) {
+    return source.where((p) {
+      if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
+        if (!catalogValueMatches(_selectedBrand, p.company)) return false;
+      }
+      if (_selectedModel != null && _selectedModel!.isNotEmpty) {
+        if (!catalogValueMatches(_selectedModel, p.model ?? '')) return false;
+      }
+      if (_selectedLocation != null && _selectedLocation!.isNotEmpty) {
+        final loc = [p.location, p.title, p.description].join(' ');
+        if (!catalogValueMatches(_selectedLocation, loc)) return false;
+      }
+      if (_budgetMin != null || _budgetMax != null) {
+        final price =
+            double.tryParse(p.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
         if (_budgetMin != null && price < _budgetMin!) return false;
         if (_budgetMax != null && price > _budgetMax!) return false;
       }
@@ -1497,13 +1558,15 @@ class _MarqueState extends State<Marque>
     }
     final userService = _userService;
     final isVendeur = userService.currentRole == UserRole.vendeur;
-    final piecesEnLigne = articlesPieces
-        .where(
-          (p) =>
-              (p.statut ?? 'en_ligne') == 'en_ligne' &&
-              (p.statut ?? '') != 'vendu',
-        )
-        .toList();
+    final piecesEnLigne = _applyPieceFilters(
+      articlesPieces
+          .where(
+            (p) =>
+                (p.statut ?? 'en_ligne') == 'en_ligne' &&
+                (p.statut ?? '') != 'vendu',
+          )
+          .toList(),
+    );
     // Filtrage recherche
     final filteredPieces = piecesEnLigne.where((p) {
       final q1 = _searchPieceText.trim().toLowerCase();
@@ -1532,7 +1595,7 @@ class _MarqueState extends State<Marque>
           padding: const EdgeInsets.only(bottom: 12),
           child: TextField(
             controller: _searchPieceController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: l10n.searchPartHint,
               prefixIcon: Icon(Icons.search),
               border: OutlineInputBorder(),
@@ -2009,13 +2072,15 @@ Padding(
 
   Widget buildPiecesSection() {
     final isVendeur = _userService.currentRole == UserRole.vendeur;
-    final piecesEnLigne = articlesPieces
-        .where(
-          (p) =>
-              (p.statut ?? 'en_ligne') == 'en_ligne' &&
-              (p.statut ?? '') != 'vendu',
-        )
-        .toList();
+    final piecesEnLigne = _applyPieceFilters(
+      articlesPieces
+          .where(
+            (p) =>
+                (p.statut ?? 'en_ligne') == 'en_ligne' &&
+                (p.statut ?? '') != 'vendu',
+          )
+          .toList(),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2589,39 +2654,53 @@ Widget buildPubsALaUneCarousel() {
     final isPortrait = mediaQuery.orientation == Orientation.portrait;
     final isTransitaire = _userService.currentRole == UserRole.transitaire;
 
+    final showBudgetPanel = _userService.currentRole != UserRole.vendeur &&
+        _tabController.index == _budgetTabIndex;
+
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-                        buildPubsALaUneCarousel(),
-            _buildFilterTabRow(screenWidth, isTransitaire),
-            if (_tabController.index == 0 && isTransitaire)
-              _buildActivitesSection(),
-            if (_tabController.index == _marqueTabIndex) _buildMarqueSection(),
-            if (_tabController.index == _modeleTabIndex) _buildModeleSection(),
-            if (_userService.currentRole == UserRole.vendeur &&
-                _tabController.index == _enAttenteTabIndex)
-              _buildEnAttenteSection(),
-            if (_userService.currentRole == UserRole.vendeur &&
-                _tabController.index == _statistiquesTabIndex)
-              _buildStatistiquesSection(),
-            if (_userService.currentRole != UserRole.vendeur &&
-                _tabController.index == _localisationTabIndex)
-              _buildLocalisationSection(),
-            if (_userService.currentRole != UserRole.vendeur &&
-                _tabController.index == _budgetTabIndex)
-              _buildBudgetSection(),
-            // Section sponsorisée: toujours affichée
-            buildPubsSponsoriseesSection(),
-            if (_userService.currentRole != UserRole.vendeur ||
-                _userService.peutVendreVehicules)
-              buildVoituresRecommandeesSection(),
-            if (_userService.currentRole != UserRole.vendeur ||
-                _userService.peutVendrePieces)
-              buildPiecesSection(),
-            // Add the new sections here
-          ],
-        ),
+      body: Column(
+        children: [
+          Expanded(
+            child: RefreshIndicator(
+              color: const Color(0xFFFFCC00),
+              onRefresh: onPagePullRefresh,
+              child: _pullRefreshing
+                  ? SkeletonPresets.homeMarque()
+                  : SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          buildPubsALaUneCarousel(),
+                          _buildFilterTabRow(screenWidth, isTransitaire),
+                          if (_tabController.index == 0 && isTransitaire)
+                            _buildActivitesSection(),
+                          if (_tabController.index == _marqueTabIndex)
+                            _buildMarqueSection(),
+                          if (_tabController.index == _modeleTabIndex)
+                            _buildModeleSection(),
+                          if (_userService.currentRole == UserRole.vendeur &&
+                              _tabController.index == _enAttenteTabIndex)
+                            _buildEnAttenteSection(),
+                          if (_userService.currentRole == UserRole.vendeur &&
+                              _tabController.index == _statistiquesTabIndex)
+                            _buildStatistiquesSection(),
+                          if (_userService.currentRole != UserRole.vendeur &&
+                              _tabController.index == _localisationTabIndex)
+                            _buildLocalisationSection(),
+                          buildPubsSponsoriseesSection(),
+                          if (_userService.currentRole != UserRole.vendeur ||
+                              _userService.peutVendreVehicules)
+                            buildVoituresRecommandeesSection(),
+                          if (_userService.currentRole != UserRole.vendeur ||
+                              _userService.peutVendrePieces)
+                            buildPiecesSection(),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+          if (showBudgetPanel) _buildBudgetSection(),
+        ],
       ),
     );
   }
@@ -2629,26 +2708,43 @@ Widget buildPubsALaUneCarousel() {
   // Helpers inline supprimés (non utilisés)
 
   Widget _buildActivitesSection() {
-    List<Map<String, dynamic>> activites = [
+    final activites = <Map<String, dynamic>>[
       {
         "name": "Souscrire",
         "icon": "assets/images/souscrire.png",
-        "route": null,
+        "onTap": () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const SellerSubscriptionPage(forTransitaire: true),
+            ),
+          );
+        },
       },
       {
         "name": "Soumettre",
         "icon": "assets/images/soumis.png",
-        "route": null,
+        "onTap": () {},
       },
       {
         "name": "En Transit",
         "icon": "assets/images/transit.png",
-        "route": Transit(),
+        "onTap": () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const Transit()),
+          );
+        },
       },
       {
         "name": "En Consommation",
         "icon": "assets/images/en_consommation.png",
-        "route": Transit(),
+        "onTap": () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const Transit()),
+          );
+        },
       },
     ];
 
@@ -2669,14 +2765,7 @@ Widget buildPubsALaUneCarousel() {
               itemCount: activites.length,
               itemBuilder: (context, index) {
                 return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => activites[index]["route"],
-                      ),
-                    );
-                  },
+                  onTap: activites[index]["onTap"] as VoidCallback?,
                   child: Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFFF9FAFB),
@@ -2716,144 +2805,27 @@ Widget buildPubsALaUneCarousel() {
   }
 
   Widget _buildMarqueSection() {
-    // Liste élargie; on gère les images manquantes avec errorBuilder
-    final List<Map<String, String>> marques = [
-      {"name": "Toyota", "image": "assets/images/Toyota.png"},
-      {"name": "Nissan", "image": "assets/images/nissan.png"},
-      {"name": "Ford", "image": "assets/images/ford.png"},
-      {"name": "Hyundai", "image": "assets/images/hunydai.png"},
-      {"name": "Honda", "image": "assets/images/honda.png"},
-      {"name": "Kia", "image": "assets/images/kia.png"},
-      {"name": "BMW", "image": "assets/images/bmw.png"},
-      {"name": "Mercedes", "image": "assets/images/mercedes.png"},
-      {"name": "Audi", "image": "assets/images/Audi.png"},
-      {"name": "Volkswagen", "image": "assets/images/vw.png"},
-      {"name": "Lexus", "image": "assets/images/lexus.png"},
-      {"name": "Mazda", "image": "assets/images/mazda.webp"},
-      {"name": "Chevrolet", "image": "assets/images/chevrolet.png"},
-      {"name": "Jeep", "image": "assets/images/jeep.png"},
-      {"name": "Peugeot", "image": "assets/images/peugeot.png"},
-      {"name": "Renault", "image": "assets/images/renault.png"},
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SizedBox(
-        height: 70 + 16,
-        child: GridView.builder(
-          scrollDirection: Axis.horizontal,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 1,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            mainAxisExtent: 70,
-          ),
-          itemCount: marques.length,
-          itemBuilder: (context, index) {
-            final item = marques[index];
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedBrand = item["name"];
-                });
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-                ),
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: Image.asset(
-                        item["image"] ?? '',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stack) {
-                          return CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.grey.shade300,
-                            child: Text(
-                              (item["name"] ?? '??').substring(0, 1),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+    if (isLoadingVoitures && voituresRecommandees.isEmpty) {
+      return const CatalogFilterHorizSkeleton();
+    }
+    final maps = _catalogMapsForFilters();
+    final options = buildMarqueFilterOptions(maps, isPiece: true);
+    return CatalogMarqueFilterGrid(
+      options: options,
+      selected: _selectedBrand,
+      onSelected: (v) => setState(() => _selectedBrand = v),
     );
   }
 
   Widget _buildModeleSection() {
-    final List<String> modeles = [
-      'Land Cruiser',
-      'Patrol',
-      'Altima',
-      'RAV4',
-      'Hilux',
-      'Wrangler',
-      'Civic',
-      'Corolla',
-      'Camry',
-      'Accord',
-      'Tucson',
-      'Sportage',
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SizedBox(
-        height: 60 + 16,
-        child: GridView.builder(
-          scrollDirection: Axis.horizontal,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 1,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            mainAxisExtent: 80,
-          ),
-          itemCount: modeles.length,
-          itemBuilder: (context, index) {
-            final name = modeles[index];
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedModel = name;
-                });
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-                ),
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  name,
-                  style: const TextStyle(fontSize: 12),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+    if (isLoadingVoitures && voituresRecommandees.isEmpty) {
+      return const CatalogFilterHorizSkeleton(itemWidth: 88, height: 60);
+    }
+    final modeles = buildModeleFilterOptions(_catalogMapsForFilters());
+    return CatalogModeleFilterGrid(
+      modeles: modeles,
+      selected: _selectedModel,
+      onSelected: (v) => setState(() => _selectedModel = v),
     );
   }
 
@@ -3015,15 +2987,6 @@ Widget buildPubsALaUneCarousel() {
     final totalViews = totalViewsVehicles + totalViewsPieces;
 
     final statsCards = <Map<String, Object?>>[
-      {
-        'kind': 'revenue',
-        'label': 'Revenu ventes',
-        'value': _statsTotalRevenueFcfa,
-        'icon': Icons.payments_outlined,
-        'color': const Color(0xFFF8BF13),
-        'description':
-            '${_statsVenteSuccessCount} crédit(s) « vente » enregistré(s)',
-      },
       if (showVehicules)
         {
           'kind': 'plain',
@@ -3079,6 +3042,41 @@ Widget buildPubsALaUneCarousel() {
         return countB.compareTo(countA);
       });
 
+    final viewPoints = <double>[
+      ...voituresRecommandees.map((v) => (_backendViews[v.id] ?? 0).toDouble()),
+      ...articlesPieces.map((p) => (_backendViews[p.id] ?? 0).toDouble()),
+    ]..sort((a, b) => b.compareTo(a));
+    while (viewPoints.length < 8) {
+      viewPoints.add(0);
+    }
+    final activityPoints = viewPoints.take(8).toList().reversed.toList();
+
+    final kpiCards = statsCards.take(4);
+    final dashboardKpis = kpiCards.map((card) {
+      final valueNum = (card['value'] as num?)?.round() ?? 0;
+      return SellerStatsKpi(
+        label: card['label'] as String,
+        value: '$valueNum',
+        icon: card['icon'] as IconData,
+        color: card['color'] as Color,
+      );
+    }).toList();
+
+    final donutSlices = <SellerStatsDonutSlice>[
+      if (showVehicules && totalViewsVehicles > 0)
+        SellerStatsDonutSlice(
+          label: 'Véhicules',
+          value: totalViewsVehicles.toDouble(),
+          color: const Color(0xFFF8BF13),
+        ),
+      if (showPieces && totalViewsPieces > 0)
+        SellerStatsDonutSlice(
+          label: 'Pièces',
+          value: totalViewsPieces.toDouble(),
+          color: const Color(0xFF5D4037),
+        ),
+    ];
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
@@ -3096,113 +3094,23 @@ Widget buildPubsALaUneCarousel() {
             const LinearProgressIndicator(minHeight: 3),
           ],
           const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: statsCards.map((card) {
-                final kind = card['kind'] as String? ?? 'plain';
-                final isRevenue = kind == 'revenue';
-                const width = 132.0;
-                final valueNum = (card['value'] as num?)?.round() ?? 0;
-                final valueText = isRevenue
-                    ? (_revenueAmountVisible
-                        ? formatPrice(valueNum)
-                        : '••••••')
-                    : '$valueNum';
-                return Container(
-                  width: width,
-                  margin: const EdgeInsets.only(right: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFFF8BF13).withOpacity(0.45),
+          SellerStatsDashboard(
+            activityTitle: 'Activité (vues)',
+            activitySubtitle: 'Répartition par annonces les plus consultées',
+            activityPoints: activityPoints,
+            kpis: dashboardKpis,
+            donutTitle: 'Répartition des vues',
+            donutCenterValue: _formatCompactCount(totalViews),
+            donutCenterLabel: 'Vues totales',
+            donutSlices: donutSlices.isNotEmpty
+                ? donutSlices
+                : const [
+                    SellerStatsDonutSlice(
+                      label: 'Aucune vue',
+                      value: 1,
+                      color: Color(0xFFE0E0E0),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12.withOpacity(0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            card['icon'] as IconData,
-                            color: card['color'] as Color,
-                            size: 18,
-                          ),
-                          if (isRevenue) ...[
-                            const Spacer(),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 26,
-                                minHeight: 26,
-                              ),
-                              tooltip: _revenueAmountVisible
-                                  ? 'Masquer le montant'
-                                  : 'Afficher le montant',
-                              onPressed: () {
-                                setState(() {
-                                  _revenueAmountVisible = !_revenueAmountVisible;
-                                });
-                              },
-                              icon: Icon(
-                                _revenueAmountVisible
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                size: 17,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        card['label'] as String,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isRevenue && _revenueAmountVisible
-                            ? '$valueText FCFA'
-                            : valueText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        card['description'] as String,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
+                  ],
           ),
           const SizedBox(height: 16),
           if (topVehicles.isNotEmpty)
@@ -3220,65 +3128,56 @@ Widget buildPubsALaUneCarousel() {
                 ...topVehicles.take(3).map((vehicle) {
                   final clicks = _backendViews[vehicle.id] ?? 0;
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black12.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      color: const Color(0xFFFFFBF0),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFF8BF13).withOpacity(0.35),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundImage: vehicle.images.isNotEmpty
-                              ? NetworkImage(vehicle.images.first)
-                              : null,
-                          backgroundColor: Colors.grey.shade200,
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: vehicle.images.isNotEmpty
+                              ? Image.network(
+                                  vehicle.images.first,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                )
+                              : Container(
+                                  width: 40,
+                                  height: 40,
+                                  color: const Color(0xFFFFF3C4),
+                                  child: const Icon(Icons.directions_car,
+                                      size: 20),
+                                ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                vehicle.titre,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "${vehicle.marque} | ${vehicle.modele}",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            '${vehicle.titre} · ${vehicle.marque}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1B2B4B),
+                            ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEEF2FF),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            "$clicks vue(s)",
-                            style: const TextStyle(
-                              color: Color(0xFF536DFE),
-                              fontWeight: FontWeight.bold,
-                            ),
+                        Text(
+                          '$clicks vues',
+                          style: const TextStyle(
+                            color: Color(0xFF5D4037),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -3297,256 +3196,38 @@ Widget buildPubsALaUneCarousel() {
     );
   }
 
-  // Section Localisation (visible pour rôles non-vendeurs)
   Widget _buildLocalisationSection() {
-    final List<Map<String, dynamic>> zones = [
-      {"name": "Bénin", "image": "assets/images/benin.png"},
-      {"name": "Mali", "image": "assets/images/mali.png"},
-      {"name": "Niger", "image": "assets/images/niger.png"},
-      {"name": "Burkina-Faso", "image": "assets/images/burkina.png"},
-      {"name": "Côte d'Ivoire", "image": "assets/images/ci.webp"},
-      {"name": "Sénégal", "image": "assets/images/senegal.png"},
-      {"name": "Togo", "image": "assets/images/togo.webp"},
-      {"name": "Ghana", "image": "assets/images/ghana.png"},
-      {"name": "Nigéria", "image": "assets/images/nigeria.png"},
-      {"name": "Maroc", "image": "assets/images/maroc.png"},
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SizedBox(
-        height: 106,
-        child: GridView.builder(
-          scrollDirection: Axis.horizontal,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 1,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            mainAxisExtent: 120,
-          ),
-          itemCount: zones.length,
-          itemBuilder: (context, index) {
-            final item = zones[index];
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedLocation = item["name"];
-                });
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-                ),
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 36,
-                      height: 24,
-                      child: Image.asset(item["image"], fit: BoxFit.contain),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item["name"],
-                      style: const TextStyle(fontSize: 12),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  // Section Budget (visible pour rôles non-vendeurs)
-  Widget _buildBudgetSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFF8BF13), // Jaune unifié plus doux
-            foregroundColor: const Color(0xFF000000),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          onPressed: _openBudgetSheet,
-          child: Text(l10n.filterByBudget),
-        ),
-      ),
-    );
-  }
-
-  void _openBudgetSheet() {
-    // Construire la liste des prix à partir des voitures en ligne
-    final List<double> prixList = voituresRecommandees
-        .where((v) => (v.statut ?? 'en_ligne') == 'en_ligne')
-        .map((v) => double.tryParse(v.prix.replaceAll(RegExp(r'[^0-9.]'), '')))
-        .whereType<double>()
-        .toList()
-      ..sort();
-
-    final double minPrice = prixList.isNotEmpty ? prixList.first : 0;
-    final double maxPrice = prixList.isNotEmpty ? prixList.last : 200000;
-    double currentMin = _budgetMin ?? minPrice;
-    double currentMax = _budgetMax ?? maxPrice;
-
-    final minCtl = TextEditingController(text: currentMin.toStringAsFixed(0));
-    final maxCtl = TextEditingController(text: currentMax.toStringAsFixed(0));
-
-    int compterDansIntervalle(double a, double b) {
-      return voituresRecommandees.where((v) {
-        final p = double.tryParse(v.prix.replaceAll(RegExp(r'[^0-9.]'), ''));
-        if (p == null) return false;
-        final enLigne = (v.statut ?? 'en_ligne') == 'en_ligne';
-        return enLigne && p >= a && p <= b;
-      }).length;
+    if (isLoadingVoitures && voituresRecommandees.isEmpty) {
+      return const CatalogFilterHorizSkeleton();
     }
+    final options = buildLocationFilterOptions(_catalogMapsForFilters());
+    return CatalogLocationFilterGrid(
+      options: options,
+      selected: _selectedLocation,
+      onSelected: (v) => setState(() => _selectedLocation = v),
+    );
+  }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final disponibles = compterDansIntervalle(currentMin, currentMax);
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-                top: 8,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  Text(l10n.priceFcfa,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: minCtl,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: l10n.minLabel,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onChanged: (val) {
-                            final v = double.tryParse(val) ?? currentMin;
-                            setModalState(() {
-                              currentMin = v.clamp(minPrice, currentMax);
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: maxCtl,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: l10n.maxLabel,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onChanged: (val) {
-                            final v = double.tryParse(val) ?? currentMax;
-                            setModalState(() {
-                              currentMax = v.clamp(currentMin, maxPrice);
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  RangeSlider(
-                    values: RangeValues(currentMin, currentMax),
-                    min: minPrice,
-                    max: maxPrice,
-                    onChanged: (values) {
-                      setModalState(() {
-                        currentMin = values.start;
-                        currentMax = values.end;
-                        minCtl.text = currentMin.toStringAsFixed(0);
-                        maxCtl.text = currentMax.toStringAsFixed(0);
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setModalState(() {
-                              currentMin = minPrice;
-                              currentMax = maxPrice;
-                              minCtl.text = currentMin.toStringAsFixed(0);
-                              maxCtl.text = currentMax.toStringAsFixed(0);
-                            });
-                          },
-                          child: Text(l10n.reset),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _budgetMin = currentMin;
-                              _budgetMax = currentMax;
-                            });
-                            Navigator.pop(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(
-                                0xFFF8BF13), // Jaune unifié plus doux
-                            foregroundColor: const Color(0xFF000000),
-                          ),
-                          child: Text('Afficher $disponibles véhicule(s)'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+  Widget _buildBudgetSection() {
+    final carMaps = voituresRecommandees
+        .map((v) => <String, dynamic>{'prix': v.prix, 'statut': v.statut})
+        .toList();
+    final pieceMaps = articlesPieces
+        .map((p) => <String, dynamic>{'prix': p.price, 'statut': p.statut})
+        .toList();
+    return CatalogBudgetFilterPanel(
+      articles: [...carMaps, ...pieceMaps],
+      budgetMin: _budgetMin,
+      budgetMax: _budgetMax,
+      countLabel: (n) => l10n.vehiclesAvailableCount(n),
+      onReset: () => setState(() {
+        _budgetMin = null;
+        _budgetMax = null;
+      }),
+      onApply: (min, max) => setState(() {
+        _budgetMin = min;
+        _budgetMax = max;
+      }),
     );
   }
 }

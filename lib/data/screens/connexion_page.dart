@@ -11,8 +11,6 @@
 // }
 
 // class _ConnexionPageState extends State<ConnexionPage> {
-  AppLocalizations get l10n => AppLocalizations.of(context)!;
-
 //   bool isEmailFocused = false;
 //   bool isPasswordFocused = false;
 
@@ -446,7 +444,7 @@ class _ConnexionPageState extends State<ConnexionPage> {
               SizedBox(height: screenHeight * (isPortrait ? 0.05 : 0.1)),
 
               SegmentedButton<bool>(
-                segments: const [
+                segments: [
                   ButtonSegment(value: false, label: Text(l10n.phoneTab)),
                   ButtonSegment(
                     value: true,

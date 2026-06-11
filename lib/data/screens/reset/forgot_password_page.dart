@@ -80,7 +80,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 padding: const EdgeInsets.all(16),
                 child: TextField(
                   controller: search,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: l10n.searchCountry,
                     prefixIcon: Icon(Icons.search),
                   ),

@@ -155,9 +155,9 @@ class _PackageValidationScreenState extends State<PackageValidationScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(l10n.packageLabel,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),
                   Icon(Icons.chevron_right, color: Colors.grey.shade500),
@@ -336,7 +336,7 @@ class _DeliveryQrScannerScreenState extends State<DeliveryQrScannerScreen> {
               controller: _qrController,
               minLines: 2,
               maxLines: 4,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.qrContent,
                 border: OutlineInputBorder(),
               ),

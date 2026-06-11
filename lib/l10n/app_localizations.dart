@@ -592,6 +592,18 @@ abstract class AppLocalizations {
   /// **'Max.'**
   String get maxLabel;
 
+  /// No description provided for @budgetMinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum'**
+  String get budgetMinHint;
+
+  /// No description provided for @budgetMaxHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum'**
+  String get budgetMaxHint;
+
   /// No description provided for @confirmDeletion.
   ///
   /// In en, this message translates to:

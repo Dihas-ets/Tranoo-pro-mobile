@@ -18,6 +18,10 @@ import '../../widgets/location_permission_dialog.dart';
 import 'movie.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/services/seller_profile_locations.dart';
+import 'package:tranoo_pro/widgets/country_location_field.dart';
+import 'package:tranoo_pro/utils/location_geocode_helper.dart';
+
+enum PieceSellCategory { pieceDetachee, pneu, huileMoteur }
 
 class CreateSellPage2 extends StatefulWidget {
   final String? alertNotificationId;
@@ -42,21 +46,52 @@ class CreateSellPage2 extends StatefulWidget {
 }
 
 class CreateSellPage2State extends State<CreateSellPage2> {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   static const int _maxMediaSlots = 12;
+
+  PieceSellCategory _sellCategory = PieceSellCategory.pieceDetachee;
+
+  // Pièce détachée
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _anneeController = TextEditingController();
+  final TextEditingController _marqueModeleController = TextEditingController();
+  String? _selectedPieceCondition;
+
+  // Huile moteur
+  final TextEditingController _oilCommercialNameController =
+      TextEditingController();
+  final TextEditingController _oilDescriptionController =
+      TextEditingController();
+  final TextEditingController _oilBrandController = TextEditingController();
+  String? _selectedOilViscosity;
+  String? _selectedOilType;
+  String? _selectedOilVolume;
+  final TextEditingController _oilViscosityOtherController =
+      TextEditingController();
+  final TextEditingController _oilVolumeOtherController =
+      TextEditingController();
+
+  // Pneu
+  final TextEditingController _tireBrandController = TextEditingController();
+  final TextEditingController _tireModelController = TextEditingController();
+  final TextEditingController _tireWidthController = TextEditingController();
+  final TextEditingController _tireHeightController = TextEditingController();
+  final TextEditingController _tireDiameterController = TextEditingController();
+  String? _selectedTireVehicleType;
+  final TextEditingController _tireVehicleTypeOtherController =
+      TextEditingController();
+
   final TextEditingController _localisationController = TextEditingController();
   final TextEditingController _prixController = TextEditingController();
-  // Infos fournisseur
   final TextEditingController _fournisseurTelController = TextEditingController();
-  final TextEditingController _marqueModeleController = TextEditingController();
+
   double? _fournisseurLatitude;
   double? _fournisseurLongitude;
   String _fournisseurAddress = '';
   String _fournisseurCity = '';
   bool _useSupplierCurrentLocation = false;
   bool _loadingSupplierAddress = false;
-  String? _selectedPieceType;
   bool _loadingPhone = true;
   
   // Variables pour l'upload d'images - Liste dynamique
@@ -72,11 +107,35 @@ class CreateSellPage2State extends State<CreateSellPage2> {
   bool get _isAnyUploading => _isUploadingImage.contains(true) || _isUploadingVideo;
   bool _isSaving = false;
 
-  final List<String> _pieceTypes = ['Nouveau', 'Occasion'];
+  final List<String> _pieceConditions = ['Nouveau', 'Occasion'];
+
+  static const List<String> _oilViscosities = [
+    '5W30',
+    '10W40',
+    '15W40',
+    '5W40',
+    '0W20',
+    'Autre',
+  ];
+  static const List<String> _oilTypes = [
+    'Synthétique',
+    'Semi-synthétique',
+    'Minérale',
+  ];
+  static const List<String> _oilVolumes = ['1L', '4L', '5L', '20L', 'Autre'];
+
+  static const List<String> _tireVehicleTypes = [
+    'Voiture',
+    'Moto',
+    'Camion',
+    'SUV',
+    'Autre',
+  ];
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
+      hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
       filled: true,
       fillColor: const Color(0xFFF2F2F2),
       border: OutlineInputBorder(
@@ -96,7 +155,36 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       _anneeController.text = (init['annee'] ?? '').toString();
       _prixController.text = (init['prix'] ?? '').toString();
       _marqueModeleController.text = (init['modele'] ?? '').toString();
-      _selectedPieceType = (init['pieceType'] ?? init['condition'])?.toString();
+      _selectedPieceCondition =
+          (init['pieceType'] ?? init['condition'])?.toString();
+      final cat = (init['categorie'] ?? '').toString().toLowerCase();
+      if (cat == 'pneu') {
+        _sellCategory = PieceSellCategory.pneu;
+        _tireBrandController.text = (init['marque'] ?? '').toString();
+        _tireModelController.text = (init['modele'] ?? '').toString();
+        final titre = (init['titre'] ?? '').toString();
+        final dimMatch = RegExp(r'(\d{2,3})/(\d{2,3})\s*(R?\d{2})')
+            .firstMatch(titre);
+        if (dimMatch != null) {
+          _tireWidthController.text = dimMatch.group(1) ?? '';
+          _tireHeightController.text = dimMatch.group(2) ?? '';
+          _tireDiameterController.text = dimMatch.group(3) ?? '';
+        }
+        _initTireVehicleTypeFromEdit((init['typeMoteur'] ?? '').toString());
+      } else if (cat == 'huile_moteur') {
+        _sellCategory = PieceSellCategory.huileMoteur;
+        _oilBrandController.text = (init['marque'] ?? '').toString();
+        _oilCommercialNameController.text = (init['titre'] ?? '').toString();
+        _initOilViscosityFromEdit((init['modele'] ?? '').toString());
+        _selectedOilType = (init['typeMoteur'] ?? '').toString();
+        final desc = (init['description'] ?? '').toString();
+        _oilDescriptionController.text = desc;
+        final volMatch =
+            RegExp(r'Contenance:\s*([^·]+)').firstMatch(desc);
+        _initOilVolumeFromEdit(
+          volMatch?.group(1)?.trim() ?? '',
+        );
+      }
       if (init['photos'] is List) {
         final urls = (init['photos'] as List).map((e) => e?.toString()).whereType<String>().where((e) => e.isNotEmpty).toList();
         _cloudinaryUrls = urls.map((e) => e).toList();
@@ -519,6 +607,485 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     );
   }
 
+  Widget _buildDropdown({
+    required String hint,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    String Function(String value)? itemLabel,
+  }) {
+    final resolved = (value != null && value.isNotEmpty)
+        ? (items.contains(value) ? value : (items.contains('Autre') ? 'Autre' : null))
+        : null;
+    return DropdownButtonFormField<String>(
+      value: resolved,
+      isExpanded: true,
+      decoration: _inputDecoration(hint),
+      items: items
+          .map(
+            (e) => DropdownMenuItem<String>(
+              value: e,
+              child: Text(itemLabel != null ? itemLabel(e) : e),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  String _oilViscosityValue() {
+    if (_selectedOilViscosity == 'Autre') {
+      return _oilViscosityOtherController.text.trim();
+    }
+    return _selectedOilViscosity ?? '';
+  }
+
+  String _oilVolumeValue() {
+    if (_selectedOilVolume == 'Autre') {
+      return _oilVolumeOtherController.text.trim();
+    }
+    return _selectedOilVolume ?? '';
+  }
+
+  String _tireVehicleTypeValue() {
+    if (_selectedTireVehicleType == 'Autre') {
+      return _tireVehicleTypeOtherController.text.trim();
+    }
+    return _selectedTireVehicleType ?? '';
+  }
+
+  void _initOilViscosityFromEdit(String raw) {
+    if (raw.isEmpty) return;
+    if (_oilViscosities.contains(raw)) {
+      _selectedOilViscosity = raw;
+    } else {
+      _selectedOilViscosity = 'Autre';
+      _oilViscosityOtherController.text = raw;
+    }
+  }
+
+  void _initOilVolumeFromEdit(String raw) {
+    if (raw.isEmpty) return;
+    if (_oilVolumes.contains(raw)) {
+      _selectedOilVolume = raw;
+    } else {
+      _selectedOilVolume = 'Autre';
+      _oilVolumeOtherController.text = raw;
+    }
+  }
+
+  void _initTireVehicleTypeFromEdit(String raw) {
+    if (raw.isEmpty) return;
+    if (_tireVehicleTypes.contains(raw)) {
+      _selectedTireVehicleType = raw;
+    } else {
+      _selectedTireVehicleType = 'Autre';
+      _tireVehicleTypeOtherController.text = raw;
+    }
+  }
+
+  String _categoryLabel(PieceSellCategory cat) => switch (cat) {
+        PieceSellCategory.pieceDetachee => 'Pièce détachée',
+        PieceSellCategory.pneu => 'Pneu',
+        PieceSellCategory.huileMoteur => 'Huile moteur',
+      };
+
+  Widget _buildArticleTypeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel("Type d'article"),
+        const SizedBox(height: 8),
+        _buildDropdown(
+          hint: 'Choisir le type',
+          value: _sellCategory.name,
+          items: PieceSellCategory.values.map((c) => c.name).toList(),
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() {
+              _sellCategory = PieceSellCategory.values.firstWhere(
+                (c) => c.name == v,
+              );
+            });
+          },
+          itemLabel: (v) => _categoryLabel(
+            PieceSellCategory.values.firstWhere((c) => c.name == v),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPieceDetacheeForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Nom de la pièce'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _titleController,
+          decoration: _inputDecoration('Nom de la pièce'),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('État'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _pieceConditions.map((type) {
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Radio<String>(
+                            value: type,
+                            groupValue: _selectedPieceCondition,
+                            onChanged: (value) =>
+                                setState(() => _selectedPieceCondition = value),
+                            activeColor: Colors.amber,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          Text(type, style: const TextStyle(fontSize: 14)),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Année', isRequired: false),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _anneeController,
+                    keyboardType: TextInputType.number,
+                    decoration: _inputDecoration('Ex: 2020 (optionnel)'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildLabel('Marque & modèle'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _marqueModeleController,
+          decoration: _inputDecoration('Ex: Toyota Corolla, Honda Civic...'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHuileForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Marque'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _oilBrandController,
+          decoration: _inputDecoration('Total, Shell, Castrol...'),
+        ),
+        const SizedBox(height: 20),
+        _buildLabel('Nom commercial'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _oilCommercialNameController,
+          decoration: _inputDecoration('Ex: Quartz 9000, Helix Ultra...'),
+        ),
+        const SizedBox(height: 20),
+        _buildLabel('Viscosité'),
+        const SizedBox(height: 8),
+        _buildDropdown(
+          hint: 'Choisir la viscosité',
+          value: _selectedOilViscosity,
+          items: _oilViscosities,
+          onChanged: (v) => setState(() => _selectedOilViscosity = v),
+        ),
+        if (_selectedOilViscosity == 'Autre') ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _oilViscosityOtherController,
+            decoration: _inputDecoration('Précisez la viscosité'),
+          ),
+        ],
+        const SizedBox(height: 20),
+        _buildLabel('Type'),
+        const SizedBox(height: 8),
+        _buildDropdown(
+          hint: 'Choisir le type',
+          value: _selectedOilType,
+          items: _oilTypes,
+          onChanged: (v) => setState(() => _selectedOilType = v),
+        ),
+        const SizedBox(height: 20),
+        _buildLabel('Contenance'),
+        const SizedBox(height: 8),
+        _buildDropdown(
+          hint: 'Choisir la contenance',
+          value: _selectedOilVolume,
+          items: _oilVolumes,
+          onChanged: (v) => setState(() => _selectedOilVolume = v),
+        ),
+        if (_selectedOilVolume == 'Autre') ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _oilVolumeOtherController,
+            decoration: _inputDecoration('Ex: 2L, 10L...'),
+          ),
+        ],
+        const SizedBox(height: 20),
+        _buildLabel('Description', isRequired: false),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _oilDescriptionController,
+          maxLines: 3,
+          decoration: _inputDecoration('Informations complémentaires (optionnel)'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPneuForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Marque'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _tireBrandController,
+          decoration: _inputDecoration('Michelin, Bridgestone, Goodyear...'),
+        ),
+        const SizedBox(height: 20),
+        _buildLabel('Référence / Modèle'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _tireModelController,
+          decoration: _inputDecoration('Ex: Pilot Sport 4, Turanza...'),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Dimensions',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Largeur'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _tireWidthController,
+                    keyboardType: TextInputType.number,
+                    decoration: _inputDecoration('205'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Hauteur'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _tireHeightController,
+                    keyboardType: TextInputType.number,
+                    decoration: _inputDecoration('55'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Diamètre'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _tireDiameterController,
+                    decoration: _inputDecoration('R16'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildLabel('Type de véhicule'),
+        const SizedBox(height: 8),
+        _buildDropdown(
+          hint: 'Voiture, Moto, Camion...',
+          value: _selectedTireVehicleType,
+          items: _tireVehicleTypes,
+          onChanged: (v) => setState(() => _selectedTireVehicleType = v),
+        ),
+        if (_selectedTireVehicleType == 'Autre') ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _tireVehicleTypeOtherController,
+            decoration: _inputDecoration('Précisez le type de véhicule'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCategoryForm() {
+    return switch (_sellCategory) {
+      PieceSellCategory.pieceDetachee => _buildPieceDetacheeForm(),
+      PieceSellCategory.huileMoteur => _buildHuileForm(),
+      PieceSellCategory.pneu => _buildPneuForm(),
+    };
+  }
+
+  Widget _buildPriceField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Prix'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _prixController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            ...decimalOptionalInputFormatters,
+            LengthLimitingTextInputFormatter(14),
+          ],
+          decoration: _inputDecoration('Prix en FCFA'),
+        ),
+      ],
+    );
+  }
+
+  bool _validateForm() {
+    final prix = _prixController.text.trim();
+    final phone = _fournisseurTelController.text.trim();
+    if (prix.isEmpty || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.fillRequiredFields)),
+      );
+      return false;
+    }
+
+    switch (_sellCategory) {
+      case PieceSellCategory.pieceDetachee:
+        if (_titleController.text.trim().isEmpty ||
+            _selectedPieceCondition == null ||
+            _marqueModeleController.text.trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.fillRequiredFields)),
+          );
+          return false;
+        }
+      case PieceSellCategory.huileMoteur:
+        if (_oilBrandController.text.trim().isEmpty ||
+            _oilCommercialNameController.text.trim().isEmpty ||
+            _selectedOilViscosity == null ||
+            _oilViscosityValue().isEmpty ||
+            _selectedOilType == null ||
+            _selectedOilVolume == null ||
+            _oilVolumeValue().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.fillRequiredFields)),
+          );
+          return false;
+        }
+      case PieceSellCategory.pneu:
+        if (_tireBrandController.text.trim().isEmpty ||
+            _tireModelController.text.trim().isEmpty ||
+            _tireWidthController.text.trim().isEmpty ||
+            _tireHeightController.text.trim().isEmpty ||
+            _tireDiameterController.text.trim().isEmpty ||
+            _selectedTireVehicleType == null ||
+            _tireVehicleTypeValue().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.fillRequiredFields)),
+          );
+          return false;
+        }
+    }
+    return true;
+  }
+
+  ({
+    String title,
+    String year,
+    String description,
+    String company,
+    String model,
+    String? pieceType,
+    String? fuelType,
+    String categorie,
+    String marque,
+  }) _buildListingData() {
+    switch (_sellCategory) {
+      case PieceSellCategory.pieceDetachee:
+        return (
+          title: _titleController.text.trim(),
+          year: _anneeController.text.trim(),
+          description: '',
+          company: '',
+          model: _marqueModeleController.text.trim(),
+          pieceType: _selectedPieceCondition,
+          fuelType: null,
+          categorie: 'piece_detachee',
+          marque: '',
+        );
+      case PieceSellCategory.huileMoteur:
+        final desc = _oilDescriptionController.text.trim();
+        final volume = _oilVolumeValue();
+        final viscosity = _oilViscosityValue();
+        final meta = 'Contenance: $volume · Type: $_selectedOilType';
+        return (
+          title: _oilCommercialNameController.text.trim(),
+          year: '',
+          description: desc.isEmpty ? meta : '$desc\n$meta',
+          company: '',
+          model: viscosity,
+          pieceType: null,
+          fuelType: _selectedOilType,
+          categorie: 'huile_moteur',
+          marque: _oilBrandController.text.trim(),
+        );
+      case PieceSellCategory.pneu:
+        final width = _tireWidthController.text.trim();
+        final height = _tireHeightController.text.trim();
+        final diameter = _tireDiameterController.text.trim();
+        final dims = '$width/$height $diameter';
+        final vehicleType = _tireVehicleTypeValue();
+        return (
+          title:
+              '${_tireBrandController.text.trim()} ${_tireModelController.text.trim()} $dims'
+                  .trim(),
+          year: '',
+          description: 'Véhicule: $vehicleType',
+          company: '',
+          model: _tireModelController.text.trim(),
+          pieceType: null,
+          fuelType: vehicleType,
+          categorie: 'pneu',
+          marque: _tireBrandController.text.trim(),
+        );
+    }
+  }
+
   // Widget vidéo identique à celui de create_sell
   Widget _buildVideoSection() {
     return Container(
@@ -552,12 +1119,12 @@ class CreateSellPage2State extends State<CreateSellPage2> {
               if (_cloudinaryVideoUrl != null)
                 Container(
                   color: Colors.black87,
-                  child: const Column(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
-                      SizedBox(height: 8),
-                      Text(l10n.videoReady, style: TextStyle(color: Colors.white)),
+                      const Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
+                      const SizedBox(height: 8),
+                      Text(l10n.videoReady, style: const TextStyle(color: Colors.white)),
                     ],
                   ),
                 )
@@ -712,29 +1279,14 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     );
   }
 
-  void _onValidate() {
+  Future<void> _onValidate() async {
     if (!widget.editMode) {
       _trackDemoEvent('seller_create_started', page: 'create_sell2.dart');
     }
-    final title = _titleController.text.trim();
-    final annee = _anneeController.text.trim();
-    final prix = _prixController.text.trim();
-    const description = '';
-    const company = '';
-    final pieceType = _selectedPieceType;
-    final model = _marqueModeleController.text.trim();
-    final phone = _fournisseurTelController.text.trim();
+    if (!_validateForm()) return;
 
-    if (title.isEmpty ||
-        pieceType == null ||
-        model.isEmpty ||
-        prix.isEmpty ||
-        phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.fillRequiredFields)),
-      );
-      return;
-    }
+    final data = _buildListingData();
+    final prix = _prixController.text.trim();
 
     final imagesCount = _cloudinaryUrls.whereType<String>().where((url) => url.isNotEmpty).length;
     final hasImages = imagesCount > 0;
@@ -752,24 +1304,37 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     }
 
     final images = _cloudinaryUrls.whereType<String>().where((url) => url.isNotEmpty).toList();
+    final locInput = _localisationController.text.trim().isNotEmpty
+        ? _localisationController.text.trim()
+        : _fournisseurAddress;
+    final resolvedLoc = locInput.isNotEmpty
+        ? await resolveLocationInput(locInput)
+        : const ResolvedLocation(localisation: '', lieu: '');
+    if (resolvedLoc.geocoded && resolvedLoc.localisation.isNotEmpty) {
+      _localisationController.text = resolvedLoc.localisation;
+      _fournisseurAddress = resolvedLoc.localisation;
+    }
     final fournisseur = {
-      'telephone': phone,
+      'telephone': _fournisseurTelController.text.trim(),
       'latitude': _fournisseurLatitude,
       'longitude': _fournisseurLongitude,
-      'adresseTexte': _fournisseurAddress.isNotEmpty
-          ? _fournisseurAddress
-          : _localisationController.text.trim(),
+      'adresseTexte': resolvedLoc.localisation.isNotEmpty
+          ? resolvedLoc.localisation
+          : _fournisseurAddress,
     };
 
     if (widget.editMode) {
       _saveEditedPiece(
-        title: title,
-        annee: annee,
-        description: description,
-        company: company,
+        title: data.title,
+        annee: data.year,
+        description: data.description,
+        company: data.company,
         prix: prix,
-        model: model,
-        pieceType: pieceType,
+        model: data.model,
+        pieceType: data.pieceType,
+        fuelType: data.fuelType,
+        categorie: data.categorie,
+        marque: data.marque,
         images: images,
         video: _cloudinaryVideoUrl,
         fournisseur: fournisseur,
@@ -782,14 +1347,19 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       MaterialPageRoute(
         builder: (context) => MastervacPage(
           isAcheteur: false,
-          title: title,
-          year: annee,
-          description: description,
-          company: company,
-          location: _fournisseurAddress.isNotEmpty ? _fournisseurAddress : null,
+          title: data.title,
+          year: data.year,
+          description: data.description,
+          company: data.company,
+          location: resolvedLoc.localisation.isNotEmpty
+              ? resolvedLoc.localisation
+              : (_fournisseurAddress.isNotEmpty ? _fournisseurAddress : null),
           price: prix,
-          model: model,
-          pieceType: pieceType,
+          model: data.model,
+          pieceType: data.pieceType,
+          fuelType: data.fuelType,
+          categorie: data.categorie,
+          marque: data.marque,
           images: images,
           video: _cloudinaryVideoUrl,
           fournisseur: fournisseur,
@@ -809,6 +1379,9 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     required String prix,
     required String model,
     required String? pieceType,
+    required String? fuelType,
+    required String categorie,
+    required String marque,
     required List<String> images,
     required String? video,
     required Map<String, dynamic> fournisseur,
@@ -820,6 +1393,13 @@ class CreateSellPage2State extends State<CreateSellPage2> {
       final user = FirebaseAuth.instance.currentUser;
       final token = await user?.getIdToken();
       if (token == null) return;
+      final locInput = _localisationController.text.trim();
+      final resolved = locInput.isNotEmpty
+          ? await resolveLocationInput(locInput)
+          : const ResolvedLocation(localisation: '', lieu: '');
+      final lieuValue = resolved.localisation.isNotEmpty
+          ? resolved.localisation
+          : locInput;
       final payload = {
         'type': 'piece',
         'titre': title,
@@ -828,12 +1408,15 @@ class CreateSellPage2State extends State<CreateSellPage2> {
         'entreprise': company,
         'prix': prix,
         'modele': model,
-        'pieceType': pieceType,
+        'marque': marque,
+        'categorie': categorie,
+        if (pieceType != null) 'condition': pieceType,
+        if (fuelType != null) 'typeMoteur': fuelType,
         'photos': images,
         'video': video,
         'fournisseur': fournisseur,
-        'lieu': _localisationController.text.trim(),
-        'localisation': _localisationController.text.trim(),
+        'lieu': lieuValue,
+        'localisation': lieuValue,
       };
       final resp = await Dio().put(
         '${UserService().dio.options.baseUrl}/articles/$id',
@@ -983,15 +1566,13 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                     const SizedBox(height: 8),
                     _buildVideoSection(),
                     const SizedBox(height: 24),
-                    
-                    // Titre
-                    _buildLabel('Nom de la pièce'),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _titleController,
-                      decoration: _inputDecoration('Nom de la pièce'),
-                    ),
+
+                    _buildArticleTypeSelector(),
                     const SizedBox(height: 20),
+                    _buildCategoryForm(),
+                    const SizedBox(height: 20),
+                    _buildPriceField(),
+                    const SizedBox(height: 24),
 
                     const Text(
                       'Fournisseur (profil)',
@@ -1004,78 +1585,14 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                       style: TextStyle(fontSize: 12, color: Colors.black54, height: 1.35),
                     ),
                     const SizedBox(height: 12),
+                    CountryLocationField(
+                      controller: _localisationController,
+                      label: 'Localisation',
+                      hint: 'Pays ou Ville, Pays (ex. Cotonou, Bénin)',
+                      onChanged: (v) => _fournisseurAddress = v.trim(),
+                    ),
+                    const SizedBox(height: 12),
                     _buildProfileFournisseurSummary(),
-                    const SizedBox(height: 20),
-
-                    // Type et Année
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Type'),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                children: _pieceTypes.map((type) {
-                                  return Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Radio<String>(
-                                        value: type,
-                                        groupValue: _selectedPieceType,
-                                        onChanged: (value) => setState(() => _selectedPieceType = value),
-                                        activeColor: Colors.amber,
-                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      Text(type, style: const TextStyle(fontSize: 14)),
-                                    ],
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Année', isRequired: false),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _anneeController,
-                                keyboardType: TextInputType.number,
-                                decoration: _inputDecoration('Ex: 2020 (optionnel)'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    _buildLabel('Marque & modèle'),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _marqueModeleController,
-                      decoration: _inputDecoration('Ex: Toyota Corolla, Honda Civic...'),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Prix
-                    _buildLabel('Prix'),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _prixController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        ...decimalOptionalInputFormatters,
-                        LengthLimitingTextInputFormatter(14),
-                      ],
-                      decoration: _inputDecoration('Prix en FCFA'),
-                    ),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -1097,6 +1614,17 @@ class CreateSellPage2State extends State<CreateSellPage2> {
     _prixController.dispose();
     _fournisseurTelController.dispose();
     _marqueModeleController.dispose();
+    _oilCommercialNameController.dispose();
+    _oilDescriptionController.dispose();
+    _oilBrandController.dispose();
+    _oilViscosityOtherController.dispose();
+    _oilVolumeOtherController.dispose();
+    _tireBrandController.dispose();
+    _tireModelController.dispose();
+    _tireWidthController.dispose();
+    _tireHeightController.dispose();
+    _tireDiameterController.dispose();
+    _tireVehicleTypeOtherController.dispose();
     super.dispose();
   }
 }

@@ -20,6 +20,8 @@ class Profile extends StatefulWidget {
 }
 
 class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   String? selectedGender;
   String? selectedCountry;
   File? _image; // Pour stocker l'image sélectionnée
@@ -462,14 +464,14 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                           TextField(
                                             controller: _prenomsController,
                                             autofocus: true,
-                                            decoration: const InputDecoration(
+                                            decoration: InputDecoration(
                                               labelText: l10n.firstName,
                                             ),
                                           ),
                                           const SizedBox(height: 8),
                                           TextField(
                                             controller: _nomController,
-                                            decoration: const InputDecoration(
+                                            decoration: InputDecoration(
                                               labelText: l10n.lastName,
                                             ),
                                           ),
@@ -489,7 +491,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                     ? TextField(
                                         controller: _emailController,
                                         keyboardType: TextInputType.emailAddress,
-                                        decoration: const InputDecoration(
+                                        decoration: InputDecoration(
                                           labelText: l10n.email,
                                         ),
                                       )
@@ -506,7 +508,7 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                                     ? TextField(
                                         controller: _telephoneController,
                                         keyboardType: TextInputType.phone,
-                                        decoration: const InputDecoration(
+                                        decoration: InputDecoration(
                                           labelText: l10n.phone,
                                         ),
                                       )

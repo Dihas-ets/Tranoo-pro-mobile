@@ -284,6 +284,7 @@ class LocationPermissionDialog extends StatelessWidget {
 
   void _showBackgroundPermissionDialog(
       BuildContext context, VoidCallback onGranted) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -313,6 +314,7 @@ class LocationPermissionDialog extends StatelessWidget {
   }
 
   void _showPermissionDeniedDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -331,6 +333,7 @@ class LocationPermissionDialog extends StatelessWidget {
   }
 
   void _showErrorDialog(BuildContext context, String error) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

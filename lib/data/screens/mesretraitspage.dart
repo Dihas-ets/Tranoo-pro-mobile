@@ -47,16 +47,17 @@ class MesRetraitsPage extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            buildRetraitCard(),
+            buildRetraitCard(context),
             const SizedBox(height: 16),
-            buildRetraitCard(),
+            buildRetraitCard(context),
           ],
         ),
       ),
     );
   }
 
-  Widget buildRetraitCard() {
+  Widget buildRetraitCard(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

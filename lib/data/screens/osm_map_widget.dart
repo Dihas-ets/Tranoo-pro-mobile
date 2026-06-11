@@ -131,15 +131,15 @@ class OsmMapWidget extends StatelessWidget {
               child: InkWell(
                 onTap: () => openNavigation(navigateToDestination!),
                 borderRadius: BorderRadius.circular(8),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.directions, color: Colors.blue),
-                      SizedBox(width: 8),
+                      const Icon(Icons.directions, color: Colors.blue),
+                      const SizedBox(width: 8),
                       Text(l10n.navigate,
-                          style: TextStyle(fontWeight: FontWeight.w600)),
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),

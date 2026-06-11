@@ -91,7 +91,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 value: _selectedPaymentMethod,
                 hint: Text(l10n.selectToChoose),
                 isExpanded: true,
-                items: const [
+                items: [
                   DropdownMenuItem(
                     value: 'Paiement bancaire',
                     child: Text(l10n.bankPayment),

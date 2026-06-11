@@ -12,6 +12,8 @@ class Transit extends StatefulWidget {
 }
 
 class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
   late TabController _tabController;
   final UserService _userService = UserService();
   String? currentUserId;
@@ -171,7 +173,7 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
     }
 
     if (list.isEmpty) {
-      return const Center(child: Text(l10n.noArticlesInCategory));
+      return Center(child: Text(l10n.noArticlesInCategory));
     }
 
     return ListView.builder(

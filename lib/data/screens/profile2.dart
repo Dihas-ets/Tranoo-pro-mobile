@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/cloudinary_upload.dart';
+import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 
 class Profile2 extends StatefulWidget {
   const Profile2({super.key});
@@ -20,8 +22,24 @@ class _Profile2State extends State<Profile2> {
   AppLocalizations get l10n => AppLocalizations.of(context)!;
 
   File? _image;
-  String? selectedGender = "Mâle";
-  String? selectedCountry = "Mali";
+  String? selectedCountry = "Bénin";
+  static const List<String> _countries = [
+    'Bénin',
+    'Togo',
+    'Côte d\'Ivoire',
+    'Sénégal',
+    'Mali',
+    'Niger',
+    'Burkina-Faso',
+    'Ghana',
+    'Nigéria',
+    'Maroc',
+    'Gabon',
+    'Cameroun',
+    'France',
+    'Belgique',
+    'Canada',
+  ];
   Map<String, dynamic>? userData;
   bool loading = true;
   String? errorMsg;
@@ -55,12 +73,6 @@ class _Profile2State extends State<Profile2> {
     super.dispose();
   }
 
-  String get _fullDisplayName {
-    final p = (userData?['prenoms'] ?? '').toString().trim();
-    final n = (userData?['nom'] ?? '').toString().trim();
-    return [p, n].where((s) => s.isNotEmpty).join(' ');
-  }
-
   Future<void> fetchUser() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -90,6 +102,10 @@ class _Profile2State extends State<Profile2> {
         _entrepriseController.text = userData?["entreprise"] ?? "";
         _emailController.text = userData?["email"] ?? "";
         _telephoneController.text = userData?["telephone"] ?? "";
+        final pays = (userData?["pays"] ?? "").toString().trim();
+        if (pays.isNotEmpty && _countries.contains(pays)) {
+          selectedCountry = pays;
+        }
       });
     } catch (e) {
       setState(() {
@@ -115,23 +131,24 @@ class _Profile2State extends State<Profile2> {
   Future<void> _uploadPhoto(File image) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final idToken = await user.getIdToken();
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: getBaseUrl(),
-        headers: {'Authorization': 'Bearer $idToken'},
-      ),
-    );
-    FormData formData = FormData.fromMap({
-      "photo": await MultipartFile.fromFile(
-        image.path,
-        filename: "profile.jpg",
-      ),
-    });
-    final response = await dio.post('/users/photo', data: formData);
-    setState(() {
-      userData?["photo"] = response.data["photo"];
-    });
+    try {
+      final url = await uploadImageToCloudinary(
+        image,
+        folder: CloudinaryFolders.profiles,
+      );
+      if (url == null) return;
+      final idToken = await user.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: getBaseUrl(),
+          headers: {'Authorization': 'Bearer $idToken'},
+        ),
+      );
+      await dio.patch('/users/me', data: {'photo': url});
+      if (mounted) {
+        setState(() => userData?['photo'] = url);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -144,314 +161,127 @@ class _Profile2State extends State<Profile2> {
     if (userData != null && userData?['role'] != 'transitaire') {
       return Center(child: Text(l10n.transitaireAccessOnly));
     }
-    // Récupération des dimensions de l'écran
-    final mediaQuery = MediaQuery.of(context);
-    final screenWidth = mediaQuery.size.width;
-    final screenHeight = mediaQuery.size.height;
-    final isPortrait = mediaQuery.orientation == Orientation.portrait;
-
-    // Calcul des dimensions adaptatives
-    final avatarRadius = screenWidth * (isPortrait ? 0.15 : 0.1);
-    final fontSize = screenWidth * (isPortrait ? 0.04 : 0.03);
-    final spacing = screenHeight * (isPortrait ? 0.02 : 0.03);
-    final padding = screenWidth * (isPortrait ? 0.05 : 0.1);
+    final photo = (userData?['photo'] ?? '').toString();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(l10n.myAccount,
+        title: const Text(
+          'Modifier le profil',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: fontSize * 1.2,
-            color: Colors.black,
+            fontSize: 18,
+            color: kTransitaireNavy,
           ),
         ),
+        backgroundColor: Colors.white,
+        foregroundColor: kTransitaireNavy,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(padding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: avatarRadius,
-                  backgroundImage:
-                      _image != null
-                          ? FileImage(_image!)
-                          : (userData != null &&
-                              userData!["photo"] != null &&
-                              userData!["photo"].toString().isNotEmpty)
-                          ? NetworkImage(userData!["photo"])
-                          : const AssetImage("assets/images/jenifer.jpg")
-                              as ImageProvider,
-                  child:
-                      _image == null
-                          ? Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: fontSize * 1.5,
-                          )
-                          : null,
-                ),
-              ),
-              SizedBox(height: spacing * 2),
-              Text(
-                _fullDisplayName.isNotEmpty
-                    ? _fullDisplayName
-                    : (userData?["nom"] ?? ""),
-                style: TextStyle(
-                  fontSize: fontSize * 1.2,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                userData?["email"] ?? "",
-                style: TextStyle(color: Colors.grey, fontSize: fontSize),
-              ),
-              SizedBox(height: spacing * 2),
-
-              // Champs dynamiques
-              _buildTextField(
-                controller: _prenomsController,
-                hintText: l10n.firstName,
-                fontSize: fontSize,
-              ),
-              SizedBox(height: spacing),
-              _buildTextField(
-                controller: _nomController,
-                hintText: l10n.lastName,
-                fontSize: fontSize,
-              ),
-              SizedBox(height: spacing),
-              _buildTextField(
-                controller: _entrepriseController,
-                hintText: l10n.company,
-                fontSize: fontSize,
-              ),
-              SizedBox(height: spacing),
-              _buildTextField(
-                controller: _emailController,
-                hintText: l10n.email,
-                fontSize: fontSize,
-              ),
-              SizedBox(height: spacing),
-              _buildTextField(
-                controller: _telephoneController,
-                hintText: l10n.phone,
-                fontSize: fontSize,
-              ),
-              SizedBox(height: spacing),
-              _buildCountryDropdown(fontSize),
-              SizedBox(height: spacing),
-
-              _buildGenderDropdown(fontSize),
-              SizedBox(height: spacing),
-
-              _buildPasswordField(fontSize),
-              SizedBox(height: spacing * 2),
-
-              _buildUpdateButton(context, fontSize),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hintText,
-    required double fontSize,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Color.fromRGBO(
-              Colors.grey.r.toInt(),
-              Colors.grey.g.toInt(),
-              Colors.grey.b.toInt(),
-              0.1,
-            ),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        style: TextStyle(fontSize: fontSize),
-        decoration: InputDecoration(
-          hintText: hintText,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: fontSize,
-          ),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCountryDropdown(double fontSize) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Color.fromRGBO(
-              Colors.grey.r.toInt(),
-              Colors.grey.g.toInt(),
-              Colors.grey.b.toInt(),
-              0.1,
-            ),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Image.asset(
-              "assets/images/mali.png",
-              width: 24,
-              height: 16,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.flag, size: 24);
-              },
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: selectedCountry,
-                  hint: Text(l10n.country, style: TextStyle(fontSize: fontSize)),
-                  isExpanded: true,
-                  items:
-                      ["Bénin", "Gabon", "Mali", "Canada"].map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(
-                            value,
-                            style: TextStyle(fontSize: fontSize),
-                          ),
-                        );
-                      }).toList(),
-                  onChanged: (newValue) {
-                    setState(() {
-                      selectedCountry = newValue;
-                    });
-                  },
+            Center(
+              child: GestureDetector(
+                onTap: _pickImage,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 52,
+                      backgroundColor: const Color(0xFFE8F1FF),
+                      backgroundImage: _image != null
+                          ? FileImage(_image!)
+                          : (photo.isNotEmpty ? NetworkImage(photo) : null)
+                              as ImageProvider?,
+                      child: _image == null && photo.isEmpty
+                          ? Text(
+                              TransitaireProfileHelpers.initials(userData!),
+                              style: const TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.bold,
+                                color: kTransitaireNavy,
+                              ),
+                            )
+                          : null,
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: kTransitaireNavy,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            const SizedBox(height: 28),
+            TextField(
+              controller: _prenomsController,
+              decoration: transitaireFieldDecoration(l10n.firstName),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _nomController,
+              decoration: transitaireFieldDecoration(l10n.lastName),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _entrepriseController,
+              decoration: transitaireFieldDecoration(l10n.company),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: transitaireFieldDecoration(l10n.email),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _telephoneController,
+              keyboardType: TextInputType.phone,
+              decoration: transitaireFieldDecoration(l10n.phone),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              value: selectedCountry,
+              decoration: transitaireFieldDecoration(l10n.country),
+              items: _countries
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (v) => setState(() => selectedCountry = v),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _newPasswordController,
+              obscureText: !_showNewPassword,
+              decoration: transitaireFieldDecoration(l10n.newPassword).copyWith(
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showNewPassword ? Icons.visibility_off : Icons.visibility,
+                    color: kTransitaireNavy,
+                  ),
+                  onPressed: () =>
+                      setState(() => _showNewPassword = !_showNewPassword),
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            _buildUpdateButton(context),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenderDropdown(double fontSize) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Color.fromRGBO(
-              Colors.grey.r.toInt(),
-              Colors.grey.g.toInt(),
-              Colors.grey.b.toInt(),
-              0.1,
-            ),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: selectedGender,
-            hint: Text(l10n.gender, style: TextStyle(fontSize: fontSize)),
-            isExpanded: true,
-            items:
-                ["Mâle", "Femelle", "Autre"].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value, style: TextStyle(fontSize: fontSize)),
-                  );
-                }).toList(),
-            onChanged: (newValue) {
-              setState(() {
-                selectedGender = newValue;
-              });
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPasswordField(double fontSize) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Color.fromRGBO(
-              Colors.grey.r.toInt(),
-              Colors.grey.g.toInt(),
-              Colors.grey.b.toInt(),
-              0.1,
-            ),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _newPasswordController,
-        style: TextStyle(fontSize: fontSize),
-        obscureText: !_showNewPassword,
-        decoration: InputDecoration(
-          hintText: l10n.newPassword,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: fontSize,
-          ),
-          border: InputBorder.none,
-          prefixIcon: Icon(
-            Icons.lock_outline,
-            color: Colors.grey,
-            size: fontSize * 1.2,
-          ),
-          suffixIcon: IconButton(
-            icon: Icon(
-              _showNewPassword ? Icons.visibility_off : Icons.visibility,
-              color: Colors.amber,
-              size: fontSize * 1.2,
-            ),
-            onPressed: () {
-              setState(() {
-                _showNewPassword = !_showNewPassword;
-              });
-            },
-          ),
         ),
       ),
     );
@@ -478,6 +308,7 @@ class _Profile2State extends State<Profile2> {
       'entreprise': _entrepriseController.text.trim(),
       'email': _emailController.text.trim(),
       'telephone': _telephoneController.text.trim(),
+      if (selectedCountry != null) 'pays': selectedCountry,
     };
 
     try {
@@ -532,29 +363,30 @@ class _Profile2State extends State<Profile2> {
     }
   }
 
-  Widget _buildUpdateButton(BuildContext context, double fontSize) {
+  Widget _buildUpdateButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: isSaving ? null : _saveProfile,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFF8BF13),
-          foregroundColor: Colors.black,
-          padding: EdgeInsets.symmetric(vertical: fontSize * 1.2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: kTransitaireNavy,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 0,
         ),
         child: isSaving
-            ? SizedBox(
-                height: fontSize * 1.2,
-                width: fontSize * 1.2,
-                child: const CircularProgressIndicator(
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.black,
+                  color: Colors.white,
                 ),
               )
-            : Text(l10n.updateProfile,
-                style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w500),
+            : const Text(
+                'Enregistrer les modifications',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               ),
       ),
     );

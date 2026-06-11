@@ -261,6 +261,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get maxLabel => 'الحد الأقصى';
 
   @override
+  String get budgetMinHint => 'الحد الأدنى';
+
+  @override
+  String get budgetMaxHint => 'الحد الأقصى';
+
+  @override
   String get confirmDeletion => 'تأكيد الحذف';
 
   @override

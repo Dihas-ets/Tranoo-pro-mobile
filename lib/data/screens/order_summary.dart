@@ -211,7 +211,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _addressController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: l10n.deliveryAddress,
                     border: OutlineInputBorder(),
                   ),
@@ -221,7 +221,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                   controller: _noteController,
                   maxLength: 500,
                   maxLines: 4,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: l10n.addDeliveryNote,
                     border: OutlineInputBorder(),
                     counterText: '0/500',

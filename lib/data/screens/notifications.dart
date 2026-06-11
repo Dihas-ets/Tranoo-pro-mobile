@@ -763,9 +763,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       body: provider.loading
           ? const Center(child: CircularProgressIndicator())
           : provider.notifications.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(l10n.noNotifications,
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 )
               : RefreshIndicator(
@@ -866,7 +866,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       );
     } catch (e) {
       print('Erreur _buildNotificationsList: $e');
-      return const Center(
+      return Center(
         child: Text(l10n.notificationsLoadError),
       );
     }
@@ -1056,7 +1056,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                 notif: notif,
                 provider: provider,
               ),
-              itemBuilder: (_) => const [
+              itemBuilder: (_) => [
                 PopupMenuItem(
                   value: 'unread',
                   child: Text(l10n.markAsUnread),

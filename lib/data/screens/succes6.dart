@@ -135,10 +135,10 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                                       fontSize: 16,
                                     ),
                                   )
-                                : const Row(
+                                : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      SizedBox(
+                                      const SizedBox(
                                         width: 16,
                                         height: 16,
                                         child: CircularProgressIndicator(
@@ -146,9 +146,9 @@ class _SuccesScreen6State extends State<SuccesScreen6> {
                                           color: Colors.white,
                                         ),
                                       ),
-                                      SizedBox(width: 8),
+                                      const SizedBox(width: 8),
                                       Text(l10n.preparing,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.w500,
                                           fontSize: 16,
                                         ),

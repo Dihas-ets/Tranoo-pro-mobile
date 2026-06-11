@@ -18,6 +18,7 @@ import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
+import 'package:tranoo_pro/widgets/spec_info_card.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 
 class CarsInfo extends StatefulWidget {
@@ -127,7 +128,6 @@ class _CarsinfoState extends State<CarsInfo> {
   bool _isOnline = false;
   bool _isPublishing = false;
   int _verificationPrice = 20000;
-
   String _formatFcfa(int value) {
     final priceStr = value.toString();
     final reversed = priceStr.split('').reversed.join('');
@@ -389,7 +389,7 @@ class _CarsinfoState extends State<CarsInfo> {
                               errorBuilder: (context, error, stackTrace) =>
                                   Container(
                                 color: Colors.grey[300],
-                                child: const Center(
+                                child: Center(
                                   child: Text(l10n.imageNotAvailable),
                                 ),
                               ),
@@ -734,8 +734,88 @@ class _CarsinfoState extends State<CarsInfo> {
     );
   }
 
-  // Spécifications de la voiture sous forme de grille
-  Widget _buildSpecifications(double screenWidth) {
+  List<Widget> _buildAllSpecCards() {
+    return [
+      _buildSpecCard(
+        'Cylindre',
+        (widget.cylindre != null && widget.cylindre!.isNotEmpty)
+            ? widget.cylindre!
+            : 'Non renseigné',
+        Icons.settings,
+      ),
+      _buildSpecCard(
+        'Carburant',
+        (widget.carburant != null && widget.carburant!.isNotEmpty)
+            ? widget.carburant!
+            : 'Non renseigné',
+        Icons.local_gas_station,
+      ),
+      _buildSpecCard(
+        'Climatiseur',
+        (widget.climatiseur != null && widget.climatiseur!.isNotEmpty)
+            ? widget.climatiseur!
+            : 'Non renseigné',
+        Icons.ac_unit,
+      ),
+      _buildSpecCard(
+        'Distance',
+        (widget.distance != null && widget.distance!.isNotEmpty)
+            ? widget.distance!
+            : 'Non renseigné',
+        Icons.speed,
+      ),
+      _buildSpecCard(
+        'Localisation',
+        () {
+          final raw = concatLocationParts(
+            location: widget.lieu,
+            company: widget.entreprise,
+          );
+          if (raw.isEmpty) return 'Non renseigné';
+          return truncateWithEllipsis(raw);
+        }(),
+        Icons.location_on,
+      ),
+      _buildSpecCard(
+        'Sièges',
+        (widget.sieges != null && widget.sieges!.isNotEmpty)
+            ? widget.sieges!
+            : 'Non renseigné',
+        Icons.event_seat,
+      ),
+      _buildSpecCard(
+        'Portes',
+        (widget.portes != null && widget.portes!.isNotEmpty)
+            ? widget.portes!
+            : 'Non renseigné',
+        Icons.door_front_door,
+      ),
+      _buildSpecCard(
+        'Boîte à vitesse',
+        (widget.boiteVitesse != null && widget.boiteVitesse!.isNotEmpty)
+            ? widget.boiteVitesse!
+            : 'Non renseigné',
+        Icons.settings,
+      ),
+      _buildSpecCardWithColor(
+        'Couleur',
+        (widget.couleur != null && widget.couleur!.isNotEmpty)
+            ? widget.couleur!
+            : 'Non renseigné',
+        Icons.palette,
+        widget.couleur,
+      ),
+      _buildSpecCard(
+        'Dédouanement',
+        widget.dedouanement != null
+            ? (widget.dedouanement! ? 'Oui' : 'Non')
+            : 'Non renseigné',
+        Icons.check_circle,
+      ),
+    ];
+  }
+
+  Widget _buildSpecGrid(List<Widget> cards) {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -743,80 +823,12 @@ class _CarsinfoState extends State<CarsInfo> {
       childAspectRatio: 1.5,
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
-      children: [
-        _buildSpecCard(
-          'Cylindre',
-          (widget.cylindre != null && widget.cylindre!.isNotEmpty)
-              ? widget.cylindre!
-              : 'Non renseigné',
-          Icons.settings,
-        ),
-        _buildSpecCard(
-          'Carburant',
-          (widget.carburant != null && widget.carburant!.isNotEmpty)
-              ? widget.carburant!
-              : 'Non renseigné',
-          Icons.local_gas_station,
-        ),
-        _buildSpecCard(
-          'Climatiseur',
-          (widget.climatiseur != null && widget.climatiseur!.isNotEmpty)
-              ? widget.climatiseur!
-              : 'Non renseigné',
-          Icons.ac_unit,
-        ),
-        _buildSpecCard(
-          'Distance',
-          (widget.distance != null && widget.distance!.isNotEmpty)
-              ? widget.distance!
-              : 'Non renseigné',
-          Icons.speed,
-        ),
-        _buildSpecCard(
-          'Localisation',
-          (widget.lieu != null && widget.lieu!.trim().isNotEmpty)
-              ? truncateWithEllipsis(widget.lieu!.trim())
-              : 'Non renseigné',
-          Icons.location_on,
-        ),
-        _buildSpecCard(
-          'Sièges',
-          (widget.sieges != null && widget.sieges!.isNotEmpty)
-              ? widget.sieges!
-              : 'Non renseigné',
-          Icons.event_seat,
-        ),
-        _buildSpecCard(
-          'Portes',
-          (widget.portes != null && widget.portes!.isNotEmpty)
-              ? widget.portes!
-              : 'Non renseigné',
-          Icons.door_front_door,
-        ),
-        _buildSpecCard(
-          'Boîte à vitesse',
-          (widget.boiteVitesse != null && widget.boiteVitesse!.isNotEmpty)
-              ? widget.boiteVitesse!
-              : 'Non renseigné',
-          Icons.settings,
-        ),
-        _buildSpecCardWithColor(
-          'Couleur',
-          (widget.couleur != null && widget.couleur!.isNotEmpty)
-              ? widget.couleur!
-              : 'Non renseigné',
-          Icons.palette,
-          widget.couleur,
-        ),
-        _buildSpecCard(
-          'Dédouanement',
-          widget.dedouanement != null
-              ? (widget.dedouanement! ? 'Oui' : 'Non')
-              : 'Non renseigné',
-          Icons.check_circle,
-        ),
-      ],
+      children: cards,
     );
+  }
+
+  Widget _buildSpecifications(double screenWidth) {
+    return _buildSpecGrid(_buildAllSpecCards());
   }
 
   // Map des couleurs
@@ -877,90 +889,37 @@ class _CarsinfoState extends State<CarsInfo> {
 
   // Carte d'information générique pour les spécifications
   Widget _buildSpecCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F1FF),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Colors.black87),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
-          ),
-        ],
-      ),
-    );
+    return SpecInfoCard(title: title, value: value, icon: icon);
   }
 
-  // Carte spéciale pour la couleur avec carré de couleur
   Widget _buildSpecCardWithColor(
     String title,
     String value,
     IconData icon,
     String? couleur,
   ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F1FF),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Colors.black87),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+    Widget? swatch;
+    if (couleur != null && _couleurs.containsKey(couleur)) {
+      swatch = Container(
+        width: 16,
+        height: 16,
+        decoration: BoxDecoration(
+          color: _couleurs[couleur],
+          border: Border.all(
+            color: _couleurs[couleur] == Colors.white
+                ? Colors.grey
+                : Colors.transparent,
+            width: 1,
           ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              if (couleur != null && _couleurs.containsKey(couleur))
-                Container(
-                  width: 16,
-                  height: 16,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: _couleurs[couleur],
-                    border: Border.all(
-                      color: _couleurs[couleur] == Colors.white
-                          ? Colors.grey
-                          : Colors.transparent,
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              Expanded(
-                child: Text(
-                  value,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+          borderRadius: BorderRadius.circular(3),
+        ),
+      );
+    }
+    return SpecInfoCard(
+      title: title,
+      value: value,
+      icon: icon,
+      valueTrailing: swatch,
     );
   }
 

@@ -747,7 +747,7 @@ class _UneState extends State<Une> {
           !e.toString().contains('timeout') &&
           !e.toString().contains('network')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.mediaUploadError(e.toString())),
+          SnackBar(content: Text(l10n.mediaUploadError(e.toString()))),
         );
       }
     } finally {
@@ -1278,7 +1278,7 @@ class _UneState extends State<Une> {
       log('[DEBUG] Exception lors de la création de la pub: $e');
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.errorNetwork(e.toString())));
+      ).showSnackBar(SnackBar(content: Text(l10n.errorNetwork(e.toString()))));
     } finally {
       setState(() {
         _isLoading = false;
@@ -1775,7 +1775,7 @@ class _UneState extends State<Une> {
                     TextFormField(
                       controller: _descriptionController,
                       maxLines: 3,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: l10n.description,
                         border: OutlineInputBorder(),
                       ),
@@ -1794,7 +1794,7 @@ class _UneState extends State<Une> {
                               ),
                             )
                             .toList(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.adType,
                           border: OutlineInputBorder(),
                         ),
@@ -1834,7 +1834,7 @@ class _UneState extends State<Une> {
                             ),
                           )
                           .toList(),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: l10n.adDuration,
                         border: OutlineInputBorder(),
                       ),
@@ -1857,7 +1857,7 @@ class _UneState extends State<Une> {
                     TextFormField(
                       controller: _prixController,
                       enabled: false,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: l10n.priceFcfa,
                         border: OutlineInputBorder(),
                       ),
@@ -1879,7 +1879,7 @@ class _UneState extends State<Une> {
                     if (widget.isStandalone || _selectedVoiture == 'À la une') ...[
                       TextFormField(
                         controller: _linkController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.externalLinkOptional,
                           hintText: 'https://...',
                           border: OutlineInputBorder(),
@@ -1903,7 +1903,7 @@ class _UneState extends State<Une> {
                       // Nom de la pièce/voiture
                       TextFormField(
                         controller: _carNameController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.itemName,
                           border: OutlineInputBorder(),
                         ),
@@ -1919,7 +1919,7 @@ class _UneState extends State<Une> {
                       // Année
                       TextFormField(
                         controller: _carYearController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.year,
                           border: OutlineInputBorder(),
                         ),
@@ -1999,14 +1999,14 @@ class _UneState extends State<Une> {
                                 ),
                                 const SizedBox(height: 8),
                                 if (_loadingAddress)
-                                  const Row(
+                                  Row(
                                     children: [
-                                      SizedBox(
+                                      const SizedBox(
                                         width: 16,
                                         height: 16,
                                         child: CircularProgressIndicator(strokeWidth: 2),
                                       ),
-                                      SizedBox(width: 8),
+                                      const SizedBox(width: 8),
                                       Text(l10n.searchingAddress),
                                     ],
                                   )
@@ -2027,7 +2027,7 @@ class _UneState extends State<Une> {
                           // Champ caché pour la validation
                           TextFormField(
                             controller: _carLocationController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.zero,
                             ),
@@ -2045,7 +2045,7 @@ class _UneState extends State<Une> {
                       // Prix
                       TextFormField(
                         controller: _carPriceController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.price,
                           border: OutlineInputBorder(),
                         ),
@@ -2062,7 +2062,7 @@ class _UneState extends State<Une> {
                       TextFormField(
                         controller: _carDescriptionController,
                         maxLines: 3,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.carDescription,
                           border: OutlineInputBorder(),
                         ),
@@ -2072,7 +2072,7 @@ class _UneState extends State<Une> {
                       // Entreprise
                       TextFormField(
                         controller: _carCompanyController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Nom de l\'entreprise',
                           border: OutlineInputBorder(),
                         ),
@@ -2096,7 +2096,7 @@ class _UneState extends State<Une> {
                               ),
                             )
                             .toList(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.engineType,
                           border: OutlineInputBorder(),
                         ),
@@ -2125,7 +2125,7 @@ class _UneState extends State<Une> {
                               ),
                             )
                             .toList(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.model,
                           border: OutlineInputBorder(),
                         ),
@@ -2148,7 +2148,7 @@ class _UneState extends State<Une> {
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: TextEditingController(text: _customCarModel ?? ''),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: l10n.specifyModel,
                             border: OutlineInputBorder(),
                           ),
@@ -2176,7 +2176,7 @@ class _UneState extends State<Une> {
                               ),
                             )
                             .toList(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: l10n.typeLabel,
                           border: OutlineInputBorder(),
                         ),

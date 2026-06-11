@@ -178,6 +178,7 @@ class _AvantHomeState extends State<AvantHome>
     showDialog(
       context: context,
       builder: (ctx) {
+        final l10n = AppLocalizations.of(ctx)!;
         final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
         return Dialog(
           backgroundColor: Colors.black,
@@ -494,7 +495,7 @@ class _AvantHomeState extends State<AvantHome>
                                     size: iconSize,
                                   ),
                                 ),
-                                if (role != 'vendeur')
+                                if (role != 'vendeur' && role != 'transitaire')
                                   _buildDrawerButton(
                                     context,
                                     text: l10n.myWallet,

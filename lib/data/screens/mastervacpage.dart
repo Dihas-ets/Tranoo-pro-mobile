@@ -7,6 +7,7 @@ import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/services/user_service.dart'; // Importez UserService pour gérer les rôles
 import 'package:tranoo_pro/services/cart_service.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
+import 'package:tranoo_pro/widgets/spec_info_card.dart';
 import 'cart_page.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 // import 'package:tranoo_pro/data/screens/paymentscreen.dart';
@@ -39,6 +40,8 @@ class MastervacPage extends StatefulWidget {
   final String? fuelType;
   final String? model;
   final String? pieceType;
+  final String? categorie;
+  final String? marque;
   final List<String?> images;
   final String? video;
   final bool fromPub;
@@ -61,6 +64,8 @@ class MastervacPage extends StatefulWidget {
     this.fuelType,
     this.model,
     this.pieceType,
+    this.categorie,
+    this.marque,
     required this.images,
     this.video,
     this.fromPub = false,
@@ -87,6 +92,10 @@ class _MastervacPageState extends State<MastervacPage> {
   late ConfettiController _confettiController;
   bool _isOnline = false;
   String? _sellerPhone;
+  String? _loadedCategorie;
+  String? _loadedMarque;
+  String? _loadedLocation;
+  String? _loadedCompany;
   
   // Variables pour la gestion des images
   List<File> _selectedImages = [];
@@ -406,9 +415,15 @@ class _MastervacPageState extends State<MastervacPage> {
         final statut = (data['statut'] ?? '').toString().toLowerCase();
         final phone = _extractSellerPhone(data) ?? _sellerPhone;
         if (!mounted) return;
+        final loc = (data['localisation'] ?? data['lieu'])?.toString().trim();
+        final company = data['entreprise']?.toString().trim();
         setState(() {
           _isOnline = (statut == 'en_ligne');
           _sellerPhone = phone;
+          _loadedCategorie = data['categorie']?.toString();
+          _loadedMarque = data['marque']?.toString();
+          if (loc != null && loc.isNotEmpty) _loadedLocation = loc;
+          if (company != null && company.isNotEmpty) _loadedCompany = company;
         });
       }
     } catch (_) {}
@@ -510,7 +525,7 @@ class _MastervacPageState extends State<MastervacPage> {
           children: [
             TextField(
               controller: _editTitleController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.titleLabel,
                 border: OutlineInputBorder(),
               ),
@@ -518,7 +533,7 @@ class _MastervacPageState extends State<MastervacPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _editYearController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.year,
                 border: OutlineInputBorder(),
               ),
@@ -526,7 +541,7 @@ class _MastervacPageState extends State<MastervacPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _editModelController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.model,
                 border: OutlineInputBorder(),
               ),
@@ -538,7 +553,7 @@ class _MastervacPageState extends State<MastervacPage> {
                   .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                   .toList(),
               onChanged: (v) => setState(() => _editFuelType = v),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.engineTypeShort,
                 border: OutlineInputBorder(),
               ),
@@ -550,7 +565,7 @@ class _MastervacPageState extends State<MastervacPage> {
                   .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                   .toList(),
               onChanged: (v) => setState(() => _editPieceType = v),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.conditionLabel,
                 border: OutlineInputBorder(),
               ),
@@ -558,7 +573,7 @@ class _MastervacPageState extends State<MastervacPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _editPriceController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.price,
                 border: OutlineInputBorder(),
               ),
@@ -566,7 +581,7 @@ class _MastervacPageState extends State<MastervacPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _editCompanyController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.company,
                 border: OutlineInputBorder(),
               ),
@@ -574,7 +589,7 @@ class _MastervacPageState extends State<MastervacPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _editLocationController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.location,
                 border: OutlineInputBorder(),
               ),
@@ -583,7 +598,7 @@ class _MastervacPageState extends State<MastervacPage> {
             TextField(
               controller: _editDescriptionController,
               maxLines: 4,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.description,
                 border: OutlineInputBorder(),
               ),
@@ -726,7 +741,7 @@ class _MastervacPageState extends State<MastervacPage> {
                       fit: BoxFit.cover,
                       errorBuilder: (c, e, s) => Container(
                         color: Colors.grey[300],
-                        child: const Center(
+                        child: Center(
                           child: Text(l10n.imageNotAvailable),
                         ),
                       ),
@@ -737,7 +752,7 @@ class _MastervacPageState extends State<MastervacPage> {
                           fit: BoxFit.cover,
                           errorBuilder: (c, e, s) => Container(
                             color: Colors.grey[300],
-                            child: const Center(
+                            child: Center(
                               child: Text(l10n.imageNotAvailable),
                             ),
                           ),
@@ -950,7 +965,68 @@ class _MastervacPageState extends State<MastervacPage> {
     );
   }
 
+  String get _effectiveCategorie =>
+      (_loadedCategorie ?? widget.categorie ?? '').toLowerCase();
+
+  String get _effectiveMarque =>
+      (_loadedMarque ?? widget.marque ?? '').trim();
+
+  String _specValue(String? value) =>
+      (value != null && value.trim().isNotEmpty) ? value.trim() : 'Non renseigné';
+
   Widget _buildSpecifications() {
+    const notProvided = 'Non renseigné';
+    final locationRaw = concatLocationParts(
+      location: _loadedLocation ?? widget.location,
+      company: _loadedCompany ?? widget.company,
+    );
+    final locationValue = locationRaw.isEmpty
+        ? notProvided
+        : truncateWithEllipsis(locationRaw);
+
+    final List<({String title, String value, IconData icon})> specs;
+    switch (_effectiveCategorie) {
+      case 'huile_moteur':
+        specs = [
+          (title: 'Marque', value: _specValue(_effectiveMarque), icon: Icons.business),
+          (title: 'Viscosité', value: _specValue(widget.model), icon: Icons.opacity),
+          (title: 'Type', value: _specValue(widget.fuelType), icon: Icons.local_gas_station),
+          (title: 'Détails', value: _specValue(widget.description), icon: Icons.description),
+          (title: 'Localisation', value: locationValue, icon: Icons.location_on),
+        ];
+        break;
+      case 'pneu':
+        final dimsMatch =
+            RegExp(r'(\d+/\d+\s+R?\d+)').firstMatch(widget.title);
+        specs = [
+          (title: 'Marque', value: _specValue(_effectiveMarque), icon: Icons.business),
+          (title: 'Référence', value: _specValue(widget.model), icon: Icons.tag),
+          (
+            title: 'Dimensions',
+            value: dimsMatch?.group(1) ?? notProvided,
+            icon: Icons.straighten,
+          ),
+          (
+            title: 'Type véhicule',
+            value: _specValue(widget.fuelType),
+            icon: Icons.directions_car,
+          ),
+          (title: 'Localisation', value: locationValue, icon: Icons.location_on),
+        ];
+        break;
+      default:
+        specs = [
+          (title: 'Modèle', value: _specValue(widget.model), icon: Icons.settings),
+          (
+            title: 'État',
+            value: _specValue(widget.pieceType),
+            icon: Icons.verified,
+          ),
+          (title: 'Année', value: _specValue(widget.year), icon: Icons.calendar_today),
+          (title: 'Localisation', value: locationValue, icon: Icons.location_on),
+        ];
+    }
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -958,72 +1034,15 @@ class _MastervacPageState extends State<MastervacPage> {
       childAspectRatio: 1.8,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      children: [
-        _buildSpecCard(
-          'Modèle',
-          (widget.model != null && widget.model!.isNotEmpty)
-              ? widget.model!
-              : 'Non renseigné',
-          Icons.settings,
-        ),
-        _buildSpecCard(
-          'Type de pièce',
-          (widget.pieceType != null && widget.pieceType!.isNotEmpty)
-              ? widget.pieceType!
-              : 'Non renseigné',
-          Icons.category,
-        ),
-        _buildSpecCard(
-          'Type moteur',
-          (widget.fuelType != null && widget.fuelType!.isNotEmpty)
-              ? widget.fuelType!
-              : 'Non renseigné',
-          Icons.local_gas_station,
-        ),
-        _buildSpecCard(
-          'Année',
-          widget.year.isNotEmpty ? widget.year : 'Non renseigné',
-          Icons.calendar_today,
-        ),
-        _buildSpecCard(
-          'Localisation',
-          (widget.location?.isNotEmpty == true)
-              ? truncateWithEllipsis(widget.location!.trim())
-              : 'Non renseigné',
-          Icons.location_on,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSpecCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F1FF),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20, color: Colors.black87),
-          const SizedBox(height: 6),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+      children: specs
+          .map(
+            (s) => SpecInfoCard(
+              title: s.title,
+              value: s.value,
+              icon: s.icon,
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 13, color: Colors.black54),
-          ),
-        ],
-      ),
+          )
+          .toList(),
     );
   }
 
@@ -1200,7 +1219,11 @@ class _MastervacPageState extends State<MastervacPage> {
                         'prix': widget.price,
                         'typeMoteur': widget.fuelType,
                         'modele': widget.model,
-                        'condition': widget.pieceType, // Nouveau/Occasion
+                        if ((widget.marque ?? '').isNotEmpty) 'marque': widget.marque,
+                        if ((widget.categorie ?? '').isNotEmpty)
+                          'categorie': widget.categorie,
+                        if (widget.pieceType != null && widget.pieceType!.isNotEmpty)
+                          'condition': widget.pieceType,
                         'photos': widget.images.whereType<String>().toList(),
                         'video': widget.video,
                         'fournisseur': widget.fournisseur, // Ajout des infos fournisseur
