@@ -286,6 +286,91 @@ List<CatalogFilterOption> get catalogSeedLocations =>
 
 List<String> get catalogSeedModeles => List<String>.from(_seedModeles);
 
+class PieceTypeFilterOption {
+  final String label;
+  final String normalizedKey;
+  final List<String> categorieKeys;
+
+  const PieceTypeFilterOption({
+    required this.label,
+    required this.normalizedKey,
+    required this.categorieKeys,
+  });
+}
+
+const List<PieceTypeFilterOption> kPieceTypeFilters = [
+  PieceTypeFilterOption(
+    label: 'Pièces détachées',
+    normalizedKey: 'pieces_detachees',
+    categorieKeys: ['piece_detachee', 'piece', 'pieces', 'pieces_detachees'],
+  ),
+  PieceTypeFilterOption(
+    label: 'Pneus',
+    normalizedKey: 'pneus',
+    categorieKeys: ['pneu', 'pneus'],
+  ),
+  PieceTypeFilterOption(
+    label: 'Huiles et lubrifiants',
+    normalizedKey: 'huiles_lubrifiants',
+    categorieKeys: ['huile_moteur', 'huile', 'lubrifiant', 'lubrifiants'],
+  ),
+  PieceTypeFilterOption(
+    label: 'Batteries',
+    normalizedKey: 'batteries',
+    categorieKeys: ['batterie', 'batteries'],
+  ),
+  PieceTypeFilterOption(
+    label: 'Accessoires',
+    normalizedKey: 'accessoires',
+    categorieKeys: ['accessoire', 'accessoires'],
+  ),
+];
+
+String pieceTypeFilterLabel(dynamic l10n, String normalizedKey) {
+  switch (normalizedKey) {
+    case 'pieces_detachees':
+      return l10n.pieceTypeSpareParts;
+    case 'pneus':
+      return l10n.pieceTypeTires;
+    case 'huiles_lubrifiants':
+      return l10n.pieceTypeOils;
+    case 'batteries':
+      return l10n.pieceTypeBatteries;
+    case 'accessoires':
+      return l10n.pieceTypeAccessories;
+    default:
+      return normalizedKey;
+  }
+}
+
+PieceTypeFilterOption? _matchPieceTypeFilter(String? selected) {
+  if (selected == null || selected.isEmpty) return null;
+  final sel = normalizeCatalogKey(selected);
+  for (final opt in kPieceTypeFilters) {
+    if (normalizeCatalogKey(opt.label) == sel ||
+        opt.normalizedKey == sel) {
+      return opt;
+    }
+  }
+  return null;
+}
+
+bool pieceMatchesTypeFilter(dynamic piece, String? selectedType) {
+  if (selectedType == null || selectedType.isEmpty) return true;
+  final opt = _matchPieceTypeFilter(selectedType);
+  if (opt == null) return true;
+  final cat = normalizeCatalogKey((piece['categorie'] ?? '').toString());
+  final titre =
+      normalizeCatalogKey((piece['titre'] ?? piece['title'] ?? '').toString());
+  for (final key in opt.categorieKeys) {
+    final nk = normalizeCatalogKey(key);
+    if (cat.contains(nk) || nk.contains(cat) || titre.contains(nk)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 String? normalizeVendorMarque(String? raw) {
   if (raw == null) return null;
   final trimmed = raw.trim();

@@ -51,6 +51,7 @@ class _Profile2State extends State<Profile2> {
   final TextEditingController _entrepriseController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
 
   // Password
   final TextEditingController _newPasswordController = TextEditingController();
@@ -69,6 +70,7 @@ class _Profile2State extends State<Profile2> {
     _entrepriseController.dispose();
     _emailController.dispose();
     _telephoneController.dispose();
+    _descriptionController.dispose();
     _newPasswordController.dispose();
     super.dispose();
   }
@@ -102,6 +104,8 @@ class _Profile2State extends State<Profile2> {
         _entrepriseController.text = userData?["entreprise"] ?? "";
         _emailController.text = userData?["email"] ?? "";
         _telephoneController.text = userData?["telephone"] ?? "";
+        _descriptionController.text =
+            (userData?["transitaireDescription"] ?? "").toString();
         final pays = (userData?["pays"] ?? "").toString().trim();
         if (pays.isNotEmpty && _countries.contains(pays)) {
           selectedCountry = pays;
@@ -266,6 +270,18 @@ class _Profile2State extends State<Profile2> {
             ),
             const SizedBox(height: 14),
             TextField(
+              controller: _descriptionController,
+              maxLines: 4,
+              maxLength: 500,
+              decoration: transitaireFieldDecoration(
+                l10n.transitaireDescriptionLabel,
+              ).copyWith(
+                hintText: l10n.transitaireDescriptionHint,
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
               controller: _newPasswordController,
               obscureText: !_showNewPassword,
               decoration: transitaireFieldDecoration(l10n.newPassword).copyWith(
@@ -309,6 +325,7 @@ class _Profile2State extends State<Profile2> {
       'email': _emailController.text.trim(),
       'telephone': _telephoneController.text.trim(),
       if (selectedCountry != null) 'pays': selectedCountry,
+      'transitaireDescription': _descriptionController.text.trim(),
     };
 
     try {
@@ -343,15 +360,23 @@ class _Profile2State extends State<Profile2> {
           context,
         ).showSnackBar(SnackBar(content: Text(l10n.profileUpdated)));
       }
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (mounted) {
+        final data = e.response?.data;
+        final msg = data is Map
+            ? (data['message']?.toString() ??
+                data['error']?.toString())
+            : null;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              e.response?.data?['message']?.toString() ??
-                  'Erreur lors de la mise à jour',
-            ),
+            content: Text(msg ?? 'Erreur lors de la mise à jour'),
           ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la mise à jour')),
         );
       }
     } finally {

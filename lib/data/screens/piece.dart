@@ -59,15 +59,15 @@ class _PieceState extends State<Piece>
 
   // Filtres
   String? _selectedBrand;
-  String? _selectedModel;
+  String? _selectedType;
   String? _selectedLocation;
   double? _budgetMin;
   double? _budgetMax;
 
   // TabController pour les filtres
   late TabController _tabController;
+  late int _typeTabIndex;
   late int _marqueTabIndex;
-  late int _modeleTabIndex;
   late int _localisationTabIndex;
   late int _budgetTabIndex;
   late int _statusPendingTabIndex;
@@ -87,17 +87,15 @@ class _PieceState extends State<Piece>
     // Initialisation des indices des onglets selon le rôle
     final isVendeur = _userService.currentRole == UserRole.vendeur;
     if (isVendeur) {
-      // Vendeur: 5 onglets (2 filtres + 3 statuts)
-      _marqueTabIndex = 0;
-      _modeleTabIndex = 1;
+      _typeTabIndex = 0;
+      _marqueTabIndex = 1;
       _statusPendingTabIndex = 2;
       _statusOnlineTabIndex = 3;
       _statusRejectedTabIndex = 4;
       _tabController = TabController(length: 5, vsync: this);
     } else {
-      // Autres rôles: tous les filtres
-      _marqueTabIndex = 0;
-      _modeleTabIndex = 1;
+      _typeTabIndex = 0;
+      _marqueTabIndex = 1;
       _localisationTabIndex = 2;
       _budgetTabIndex = 3;
       _tabController = TabController(length: 4, vsync: this);
@@ -162,7 +160,7 @@ class _PieceState extends State<Piece>
 
     // Réinitialiser les filtres
     _selectedBrand = null;
-    _selectedModel = null;
+    _selectedType = null;
     _selectedLocation = null;
     _budgetMin = null;
     _budgetMax = null;
@@ -414,13 +412,11 @@ class _PieceState extends State<Piece>
     return source.where((p) {
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
         final marque =
-            (p['marque'] ?? p['pieceType'] ?? p['condition'] ?? '')
-                .toString();
+            (p['marque'] ?? p['pieceType'] ?? p['condition'] ?? '').toString();
         if (!catalogValueMatches(_selectedBrand, marque)) return false;
       }
-      if (_selectedModel != null && _selectedModel!.isNotEmpty) {
-        final modele = (p['modele'] ?? '').toString();
-        if (!catalogValueMatches(_selectedModel, modele)) return false;
+      if (_selectedType != null && _selectedType!.isNotEmpty) {
+        if (!pieceMatchesTypeFilter(p, _selectedType)) return false;
       }
       if (_selectedLocation != null && _selectedLocation!.isNotEmpty) {
         final loc = [
@@ -504,15 +500,13 @@ class _PieceState extends State<Piece>
     );
   }
 
-  Widget _buildModeleSection() {
+  Widget _buildTypeSection() {
     if (isLoading && pieces.isEmpty) {
-      return const CatalogFilterHorizSkeleton(itemWidth: 88, height: 60);
+      return const CatalogFilterHorizSkeleton(itemWidth: 76, height: 86);
     }
-    final modeles = buildModeleFilterOptions(pieces);
-    return CatalogModeleFilterGrid(
-      modeles: modeles,
-      selected: _selectedModel,
-      onSelected: (v) => setState(() => _selectedModel = v),
+    return CatalogPieceTypeFilterGrid(
+      selected: _selectedType,
+      onSelected: (v) => setState(() => _selectedType = v),
     );
   }
 
@@ -634,493 +628,515 @@ class _PieceState extends State<Piece>
                     ],
                   )
                 : Column(
-                  children: [
-                    if (isVendeur &&
-                        !_loadingAccessStatus &&
-                        (_accessStatus?.showExpiryWarning ?? false))
+                    children: [
+                      if (isVendeur &&
+                          !_loadingAccessStatus &&
+                          (_accessStatus?.showExpiryWarning ?? false))
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF4CC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFF8BF13)),
+                          ),
+                          child: Text(
+                            _accessStatus?.paidPlanActive == true
+                                ? 'Attention: votre Plan Pro expire dans ${_accessStatus?.paidPlanRemainingDays ?? 0} jour(s).'
+                                : 'Votre Plan Decouverte se termine dans ${_accessStatus?.freeTrialRemainingDays ?? 0} jour(s).',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF8A6D3B),
+                            ),
+                          ),
+                        ),
+                      // Barre de recherche
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: l10n.searchPartHint,
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.refresh,
+                                  color: Color(0xFF8C9199)),
+                              onPressed: _reloadAll,
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[200],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Filtres TabBar
                       Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF4CC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFF8BF13)),
-                        ),
-                        child: Text(
-                          _accessStatus?.paidPlanActive == true
-                              ? 'Attention: votre Plan Pro expire dans ${_accessStatus?.paidPlanRemainingDays ?? 0} jour(s).'
-                              : 'Votre Plan Decouverte se termine dans ${_accessStatus?.freeTrialRemainingDays ?? 0} jour(s).',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF8A6D3B),
-                          ),
-                        ),
-                      ),
-                    // Barre de recherche
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: l10n.searchPartHint,
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.refresh,
-                                color: Color(0xFF8C9199)),
-                            onPressed: _reloadAll,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[200],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Filtres TabBar
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      child: Center(
-                        child: TabBar(
-                          controller: _tabController,
-                          isScrollable: true,
-                          tabAlignment: TabAlignment.center,
-                          indicator: const BoxDecoration(),
-                          padding: EdgeInsets.zero,
-                          labelPadding:
-                              const EdgeInsets.symmetric(horizontal: 4),
-                          tabs: [
-                            _buildTabButton("Marque", _marqueTabIndex),
-                            _buildTabButton("Modèles", _modeleTabIndex),
-                            if (isVendeur)
+                        padding: const EdgeInsets.all(8),
+                        child: Center(
+                          child: TabBar(
+                            controller: _tabController,
+                            isScrollable: true,
+                            tabAlignment: TabAlignment.center,
+                            indicator: const BoxDecoration(),
+                            padding: EdgeInsets.zero,
+                            labelPadding:
+                                const EdgeInsets.symmetric(horizontal: 4),
+                            tabs: [
                               _buildTabButton(
-                                  "En attente", _statusPendingTabIndex,
-                                  isWide: true),
-                            if (isVendeur)
-                              _buildTabButton("En ligne", _statusOnlineTabIndex,
-                                  isWide: true),
-                            if (isVendeur)
-                              _buildTabButton("Rejeté", _statusRejectedTabIndex,
-                                  isWide: true),
-                            if (!isVendeur)
-                              _buildTabButton(
-                                "Localisation",
-                                _localisationTabIndex,
+                                l10n.filterTypeTab,
+                                _typeTabIndex,
                                 isWide: true,
                               ),
-                            if (!isVendeur)
-                              _buildTabButton("Budget", _budgetTabIndex),
-                          ],
+                              _buildTabButton(
+                                l10n.filterBrandTab,
+                                _marqueTabIndex,
+                              ),
+                              if (isVendeur)
+                                _buildTabButton(
+                                    "En attente", _statusPendingTabIndex,
+                                    isWide: true),
+                              if (isVendeur)
+                                _buildTabButton(
+                                    "En ligne", _statusOnlineTabIndex,
+                                    isWide: true),
+                              if (isVendeur)
+                                _buildTabButton(
+                                    "Rejeté", _statusRejectedTabIndex,
+                                    isWide: true),
+                              if (!isVendeur)
+                                _buildTabButton(
+                                  l10n.filterLocationTab,
+                                  _localisationTabIndex,
+                                  isWide: true,
+                                ),
+                              if (!isVendeur)
+                                _buildTabButton(
+                                  l10n.budgetLabel,
+                                  _budgetTabIndex,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    // Sections de filtres
-                    if (_tabController.index == _marqueTabIndex)
-                      _buildMarqueSection(),
-                    if (_tabController.index == _modeleTabIndex)
-                      _buildModeleSection(),
-                    if (!isVendeur &&
-                        _tabController.index == _localisationTabIndex)
-                      _buildLocalisationSection(),
-                    // Liste des pièces
-                    Expanded(
-                      child: filteredPieces.isEmpty
-                          ? Center(
-                              child: Text(
-                                isVendeur
-                                    ? "Vous n'avez aucune pièce en ligne actuellement"
-                                    : "Aucune pièce en ligne actuellement",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
+                      // Sections de filtres
+                      if (_tabController.index == _typeTabIndex)
+                        _buildTypeSection(),
+                      if (_tabController.index == _marqueTabIndex)
+                        _buildMarqueSection(),
+                      if (!isVendeur &&
+                          _tabController.index == _localisationTabIndex)
+                        _buildLocalisationSection(),
+                      // Liste des pièces
+                      Expanded(
+                        child: filteredPieces.isEmpty
+                            ? Center(
+                                child: Text(
+                                  isVendeur
+                                      ? "Vous n'avez aucune pièce en ligne actuellement"
+                                      : "Aucune pièce en ligne actuellement",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: GridView.builder(
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: 0.78,
-                                ),
-                                itemCount: filteredPieces.length,
-                                itemBuilder: (context, index) {
-                                  final piece = filteredPieces[index];
-                                  final pieceId = piece['_id'] ?? '';
-                                  final canManagePieces =
-                                      _accessStatus?.canCreateArticle ?? true;
-                                  return AnimatedOpacity(
-                                    opacity: _isVisible.length > index &&
-                                            _isVisible[index]
-                                        ? 1.0
-                                        : 0.0,
-                                    duration: const Duration(milliseconds: 400),
-                                    child: Stack(
-                                      children: [
-                                        ColorFiltered(
-                                          colorFilter:
-                                              isVendeur && !canManagePieces
-                                                  ? const ColorFilter
-                                                      .matrix(<double>[
-                                                      0.2126,
-                                                      0.7152,
-                                                      0.0722,
-                                                      0,
-                                                      0,
-                                                      0.2126,
-                                                      0.7152,
-                                                      0.0722,
-                                                      0,
-                                                      0,
-                                                      0.2126,
-                                                      0.7152,
-                                                      0.0722,
-                                                      0,
-                                                      0,
-                                                      0,
-                                                      0,
-                                                      0,
-                                                      1,
-                                                      0,
-                                                    ])
-                                                  : const ColorFilter.mode(
-                                                      Colors.transparent,
-                                                      BlendMode.dst,
+                              )
+                            : Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: GridView.builder(
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 0.78,
+                                  ),
+                                  itemCount: filteredPieces.length,
+                                  itemBuilder: (context, index) {
+                                    final piece = filteredPieces[index];
+                                    final pieceId = piece['_id'] ?? '';
+                                    final canManagePieces =
+                                        _accessStatus?.canCreateArticle ?? true;
+                                    return AnimatedOpacity(
+                                      opacity: _isVisible.length > index &&
+                                              _isVisible[index]
+                                          ? 1.0
+                                          : 0.0,
+                                      duration:
+                                          const Duration(milliseconds: 400),
+                                      child: Stack(
+                                        children: [
+                                          ColorFiltered(
+                                            colorFilter:
+                                                isVendeur && !canManagePieces
+                                                    ? const ColorFilter
+                                                        .matrix(<double>[
+                                                        0.2126,
+                                                        0.7152,
+                                                        0.0722,
+                                                        0,
+                                                        0,
+                                                        0.2126,
+                                                        0.7152,
+                                                        0.0722,
+                                                        0,
+                                                        0,
+                                                        0.2126,
+                                                        0.7152,
+                                                        0.0722,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        1,
+                                                        0,
+                                                      ])
+                                                    : const ColorFilter.mode(
+                                                        Colors.transparent,
+                                                        BlendMode.dst,
+                                                      ),
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                final articleMap =
+                                                    Map<String, dynamic>.from(
+                                                        piece);
+                                                trackArticleView(
+                                                    articleIdFromMap(
+                                                        articleMap));
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        MastervacPage(
+                                                      id: (piece['_id'] ??
+                                                              piece['id'] ??
+                                                              piece[
+                                                                  'articleId'] ??
+                                                              piece['Id'] ??
+                                                              piece['article'])
+                                                          ?.toString(),
+                                                      isAcheteur: isChauffeur,
+                                                      title:
+                                                          piece['titre'] ?? '',
+                                                      year:
+                                                          piece['annee'] ?? '',
+                                                      description: piece[
+                                                              'description'] ??
+                                                          '',
+                                                      company:
+                                                          piece['entreprise'] ??
+                                                              '',
+                                                      location:
+                                                          _pieceDisplayLocation(
+                                                              piece),
+                                                      price: piece['prix']
+                                                              ?.toString() ??
+                                                          '',
+                                                      images: (piece['photos']
+                                                                  as List?)
+                                                              ?.map((e) =>
+                                                                  e.toString())
+                                                              .toList() ??
+                                                          [],
+                                                      fuelType:
+                                                          piece['typeMoteur'],
+                                                      model: piece['modele']
+                                                          ?.toString(),
+                                                      pieceType: piece[
+                                                              'condition'] ??
+                                                          piece['pieceType'],
+                                                      categorie:
+                                                          piece['categorie']
+                                                              ?.toString(),
+                                                      marque: piece['marque']
+                                                          ?.toString(),
+                                                      video: piece['video'],
                                                     ),
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              final articleMap =
-                                                  Map<String, dynamic>.from(
-                                                      piece);
-                                              trackArticleView(
-                                                  articleIdFromMap(articleMap));
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      MastervacPage(
-                                                    id: (piece['_id'] ??
-                                                            piece['id'] ??
-                                                            piece[
-                                                                'articleId'] ??
-                                                            piece['Id'] ??
-                                                            piece['article'])
-                                                        ?.toString(),
-                                                    isAcheteur: isChauffeur,
-                                                    title: piece['titre'] ?? '',
-                                                    year: piece['annee'] ?? '',
-                                                    description:
-                                                        piece['description'] ??
-                                                            '',
-                                                    company:
-                                                        piece['entreprise'] ??
-                                                            '',
-                                                    location:
-                                                        _pieceDisplayLocation(
-                                                            piece),
-                                                    price: piece['prix']
-                                                            ?.toString() ??
-                                                        '',
-                                                    images: (piece['photos']
-                                                                as List?)
-                                                            ?.map((e) =>
-                                                                e.toString())
-                                                            .toList() ??
-                                                        [],
-                                                    fuelType:
-                                                        piece['typeMoteur'],
-                                                    model: piece['modele']
-                                                        ?.toString(),
-                                                    pieceType:
-                                                        piece['condition'] ??
-                                                            piece['pieceType'],
-                                                    categorie:
-                                                        piece['categorie']
-                                                            ?.toString(),
-                                                    marque: piece['marque']
-                                                        ?.toString(),
-                                                    video: piece['video'],
                                                   ),
+                                                ).then((_) => fetchPieces());
+                                              },
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black12
+                                                          .withOpacity(0.08),
+                                                      blurRadius: 12,
+                                                      offset:
+                                                          const Offset(0, 6),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ).then((_) => fetchPieces());
-                                            },
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black12
-                                                        .withOpacity(0.08),
-                                                    blurRadius: 12,
-                                                    offset: const Offset(0, 6),
-                                                  ),
-                                                ],
-                                              ),
-                                              padding: const EdgeInsets.all(10),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            16),
-                                                    child: SizedBox(
-                                                      height: 100,
-                                                      width: double.infinity,
-                                                      child: Stack(
-                                                        children: [
-                                                          Positioned.fill(
-                                                            child: (piece['photos']
-                                                                            as List?)
-                                                                        ?.isNotEmpty ==
-                                                                    true
-                                                                ? Image.network(
-                                                                    piece['photos']
-                                                                        [0],
-                                                                    fit: BoxFit
-                                                                        .cover,
-                                                                  )
-                                                                : (piece['video'] !=
-                                                                            null &&
-                                                                        (piece['video']?.toString().isNotEmpty ??
-                                                                            false))
-                                                                    ? VideoPreviewPlaceholder(
-                                                                        videoUrl:
-                                                                            piece['video']?.toString(),
-                                                                        iconSize:
-                                                                            36,
-                                                                      )
-                                                                    : Container(
-                                                                        color: Colors
-                                                                            .grey[200],
-                                                                        child:
-                                                                            const Icon(
-                                                                          Icons
-                                                                              .image_not_supported,
-                                                                          size:
-                                                                              30,
+                                                padding:
+                                                    const EdgeInsets.all(10),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              16),
+                                                      child: SizedBox(
+                                                        height: 100,
+                                                        width: double.infinity,
+                                                        child: Stack(
+                                                          children: [
+                                                            Positioned.fill(
+                                                              child: (piece['photos']
+                                                                              as List?)
+                                                                          ?.isNotEmpty ==
+                                                                      true
+                                                                  ? Image
+                                                                      .network(
+                                                                      piece['photos']
+                                                                          [0],
+                                                                      fit: BoxFit
+                                                                          .cover,
+                                                                    )
+                                                                  : (piece['video'] !=
+                                                                              null &&
+                                                                          (piece['video']?.toString().isNotEmpty ??
+                                                                              false))
+                                                                      ? VideoPreviewPlaceholder(
+                                                                          videoUrl:
+                                                                              piece['video']?.toString(),
+                                                                          iconSize:
+                                                                              36,
+                                                                        )
+                                                                      : Container(
                                                                           color:
-                                                                              Colors.black26,
+                                                                              Colors.grey[200],
+                                                                          child:
+                                                                              const Icon(
+                                                                            Icons.image_not_supported,
+                                                                            size:
+                                                                                30,
+                                                                            color:
+                                                                                Colors.black26,
+                                                                          ),
                                                                         ),
-                                                                      ),
-                                                          ),
-                                                          Positioned(
-                                                            top: 6,
-                                                            right: 6,
-                                                            child: Builder(
-                                                              builder:
-                                                                  (context) {
-                                                                final status =
-                                                                    (piece['statut'] ??
-                                                                            '')
-                                                                        .toString()
-                                                                        .toLowerCase();
-                                                                Color bg;
-                                                                Color fg;
-                                                                String label;
-                                                                if (status ==
-                                                                    'en_ligne') {
-                                                                  bg = const Color(
-                                                                      0xFFE8F5E9);
-                                                                  fg = const Color(
-                                                                      0xFF2E7D32);
-                                                                  label =
-                                                                      'En ligne';
-                                                                } else if (status ==
-                                                                    'en_attente') {
-                                                                  bg = const Color(
-                                                                      0xFFFFF8E1);
-                                                                  fg = const Color(
-                                                                      0xFFB45309);
-                                                                  label =
-                                                                      'En attente';
-                                                                } else {
-                                                                  bg = const Color(
-                                                                      0xFFFFEBEE);
-                                                                  fg = const Color(
-                                                                      0xFFC62828);
-                                                                  label =
-                                                                      'Rejeté';
-                                                                }
-                                                                return Container(
-                                                                  padding:
-                                                                      const EdgeInsets
-                                                                          .symmetric(
-                                                                    horizontal:
-                                                                        8,
-                                                                    vertical: 4,
-                                                                  ),
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: bg,
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                            10),
-                                                                  ),
-                                                                  child: Text(
-                                                                    label,
-                                                                    style:
-                                                                        TextStyle(
-                                                                      color: fg,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w700,
-                                                                      fontSize:
-                                                                          10,
-                                                                    ),
-                                                                  ),
-                                                                );
-                                                              },
                                                             ),
-                                                          ),
-                                                          Positioned(
-                                                            bottom: 6,
-                                                            left: 6,
-                                                            child:
-                                                                buildArticleViewBadge(
-                                                              articleViewsFromMap(
-                                                                Map<String,
-                                                                        dynamic>.from(
-                                                                    piece),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          if (isVendeur)
                                                             Positioned(
+                                                              top: 6,
                                                               right: 6,
-                                                              bottom: 6,
-                                                              child: Row(
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .min,
-                                                                children: [
-                                                                  _sellerCardAction(
-                                                                    icon: Icons
-                                                                        .edit,
-                                                                    color: const Color(
-                                                                        0xFF0461B6),
-                                                                    onPressed:
-                                                                        canManagePieces
-                                                                            ? () {
-                                                                                final id = (piece['_id'] ?? piece['id'] ?? piece['articleId'] ?? piece['Id'] ?? piece['article'])?.toString();
-                                                                                Navigator.push(
-                                                                                  context,
-                                                                                  MaterialPageRoute(
-                                                                                    builder: (context) => CreateSellPage2(
-                                                                                      editMode: true,
-                                                                                      editArticleId: id,
-                                                                                      initialData: Map<String, dynamic>.from(piece),
-                                                                                    ),
-                                                                                  ),
-                                                                                ).then((_) => fetchPieces());
-                                                                              }
-                                                                            : null,
-                                                                  ),
-                                                                  const SizedBox(
-                                                                      width: 6),
-                                                                  _sellerCardAction(
-                                                                    icon: Icons
-                                                                        .close,
-                                                                    color: Colors
-                                                                        .red,
-                                                                    onPressed: canManagePieces
-                                                                        ? () => _deletePiece(
-                                                                              pieceId,
-                                                                              index,
-                                                                            )
-                                                                        : null,
-                                                                  ),
-                                                                ],
+                                                              child: Builder(
+                                                                builder:
+                                                                    (context) {
+                                                                  final status =
+                                                                      (piece['statut'] ??
+                                                                              '')
+                                                                          .toString()
+                                                                          .toLowerCase();
+                                                                  Color bg;
+                                                                  Color fg;
+                                                                  String label;
+                                                                  if (status ==
+                                                                      'en_ligne') {
+                                                                    bg = const Color(
+                                                                        0xFFE8F5E9);
+                                                                    fg = const Color(
+                                                                        0xFF2E7D32);
+                                                                    label =
+                                                                        'En ligne';
+                                                                  } else if (status ==
+                                                                      'en_attente') {
+                                                                    bg = const Color(
+                                                                        0xFFFFF8E1);
+                                                                    fg = const Color(
+                                                                        0xFFB45309);
+                                                                    label =
+                                                                        'En attente';
+                                                                  } else {
+                                                                    bg = const Color(
+                                                                        0xFFFFEBEE);
+                                                                    fg = const Color(
+                                                                        0xFFC62828);
+                                                                    label =
+                                                                        'Rejeté';
+                                                                  }
+                                                                  return Container(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          4,
+                                                                    ),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: bg,
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                              10),
+                                                                    ),
+                                                                    child: Text(
+                                                                      label,
+                                                                      style:
+                                                                          TextStyle(
+                                                                        color:
+                                                                            fg,
+                                                                        fontWeight:
+                                                                            FontWeight.w700,
+                                                                        fontSize:
+                                                                            10,
+                                                                      ),
+                                                                    ),
+                                                                  );
+                                                                },
                                                               ),
                                                             ),
-                                                        ],
+                                                            Positioned(
+                                                              bottom: 6,
+                                                              left: 6,
+                                                              child:
+                                                                  buildArticleViewBadge(
+                                                                articleViewsFromMap(
+                                                                  Map<String,
+                                                                          dynamic>.from(
+                                                                      piece),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            if (isVendeur)
+                                                              Positioned(
+                                                                right: 6,
+                                                                bottom: 6,
+                                                                child: Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    _sellerCardAction(
+                                                                      icon: Icons
+                                                                          .edit,
+                                                                      color: const Color(
+                                                                          0xFF0461B6),
+                                                                      onPressed: canManagePieces
+                                                                          ? () {
+                                                                              final id = (piece['_id'] ?? piece['id'] ?? piece['articleId'] ?? piece['Id'] ?? piece['article'])?.toString();
+                                                                              Navigator.push(
+                                                                                context,
+                                                                                MaterialPageRoute(
+                                                                                  builder: (context) => CreateSellPage2(
+                                                                                    editMode: true,
+                                                                                    editArticleId: id,
+                                                                                    initialData: Map<String, dynamic>.from(piece),
+                                                                                  ),
+                                                                                ),
+                                                                              ).then((_) => fetchPieces());
+                                                                            }
+                                                                          : null,
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            6),
+                                                                    _sellerCardAction(
+                                                                      icon: Icons
+                                                                          .close,
+                                                                      color: Colors
+                                                                          .red,
+                                                                      onPressed: canManagePieces
+                                                                          ? () => _deletePiece(
+                                                                                pieceId,
+                                                                                index,
+                                                                              )
+                                                                          : null,
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  Text(
-                                                    piece['titre'] ??
-                                                        'Sans titre',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize: 13,
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      piece['titre'] ??
+                                                          'Sans titre',
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        fontSize: 13,
+                                                      ),
                                                     ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      piece['entreprise'] ??
+                                                          'Entreprise inconnue',
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        color: Colors.black54,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 10),
+                                                    catalogPiecePricePill(
+                                                        piece['prix']),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          if (isVendeur && !canManagePieces)
+                                            Positioned.fill(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withOpacity(0.45),
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
                                                   ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    piece['entreprise'] ??
-                                                        'Entreprise inconnue',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: Colors.black54,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black54,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            14),
+                                                  ),
+                                                  child: const Text(
+                                                    'Abonnement expire',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontSize: 11,
                                                     ),
                                                   ),
-                                                  const SizedBox(height: 10),
-                                                  catalogPiecePricePill(piece['prix']),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        if (isVendeur && !canManagePieces)
-                                          Positioned.fill(
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: Colors.white
-                                                    .withOpacity(0.45),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                              ),
-                                              alignment: Alignment.center,
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 6,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.black54,
-                                                  borderRadius:
-                                                      BorderRadius.circular(14),
-                                                ),
-                                                child: const Text(
-                                                  'Abonnement expire',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 11,
-                                                  ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                    ),
-                    if (!isVendeur && _tabController.index == _budgetTabIndex)
-                      _buildBudgetSection(),
-                  ],
-                ),
+                      ),
+                      if (!isVendeur && _tabController.index == _budgetTabIndex)
+                        _buildBudgetSection(),
+                    ],
+                  ),
       ),
     );
   }

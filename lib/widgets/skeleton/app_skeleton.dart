@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Couleurs et animation shimmer partagées (Tranoo Pro).
 abstract final class AppSkeletonTheme {
@@ -438,6 +437,141 @@ abstract final class SkeletonPresets {
               borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  static Widget transitairesList({int count = 5}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 140,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            itemCount: 4,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, __) => const SkeletonBox(
+              width: 120,
+              height: 120,
+              borderRadius: BorderRadius.all(Radius.circular(16)),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Row(
+            children: const [
+              SkeletonLine(widthFactor: 0.18, height: 14, margin: EdgeInsets.zero),
+              SizedBox(width: 32),
+              SkeletonLine(widthFactor: 0.12, height: 14, margin: EdgeInsets.zero),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            itemCount: count,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (_, __) => const SkeletonBox(
+              height: 88,
+              borderRadius: BorderRadius.all(Radius.circular(16)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static Widget transitaireProfile() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 200,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const SkeletonBox(
+                width: double.infinity,
+                height: 140,
+                borderRadius: BorderRadius.zero,
+              ),
+              const Positioned(
+                top: 66,
+                left: 0,
+                right: 0,
+                child: Center(child: SkeletonCircle(size: 88)),
+              ),
+              Positioned(
+                top: 158,
+                left: 24,
+                right: 24,
+                child: Column(
+                  children: const [
+                    SkeletonLine(widthFactor: 0.45, height: 16, margin: EdgeInsets.zero),
+                    SizedBox(height: 8),
+                    SkeletonLine(widthFactor: 0.35, height: 12, margin: EdgeInsets.zero),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              SkeletonLine(widthFactor: 0.2, height: 14, margin: EdgeInsets.zero),
+              SizedBox(width: 40),
+              SkeletonLine(widthFactor: 0.2, height: 14, margin: EdgeInsets.zero),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              children: const [
+                SkeletonBox(
+                  width: double.infinity,
+                  height: 48,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
+                SizedBox(height: 16),
+                SkeletonBox(
+                  width: double.infinity,
+                  height: 140,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static Widget transitaireGalleryGrid({int count = 6}) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.72,
+        ),
+        itemCount: count,
+        itemBuilder: (_, __) => const SkeletonBox(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
       ),
     );

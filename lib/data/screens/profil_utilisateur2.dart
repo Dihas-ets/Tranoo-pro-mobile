@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/languesentreprise.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 
@@ -234,28 +235,44 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
       setState(() {
         loading = false;
         userData = null;
-        errorMsg =
-            "Impossible de charger le profil. Vérifiez votre connexion ou vos droits.";
+        errorMsg = AppLocalizations.of(context)!.profileLoadError;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return Center(child: CircularProgressIndicator());
-    if (errorMsg != null) return Center(child: Text(errorMsg!));
-    if (userData == null)
-      return Center(child: Text(l10n.noUserData));
+    if (loading) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SkeletonPresets.transitaireProfile(),
+      );
+    }
+    if (errorMsg != null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: Text(errorMsg!)),
+      );
+    }
+    if (userData == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: Text(l10n.noUserData)),
+      );
+    }
     if (userData != null && userData?['role'] != 'transitaire') {
-      return Center(child: Text(l10n.transitaireAccessOnly));
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: Text(l10n.transitaireAccessOnly)),
+      );
     }
     final profileMap = Map<String, dynamic>.from(userData!);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Mon profil',
-          style: TextStyle(
+        title: Text(
+          l10n.myProfile,
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
             color: kTransitaireNavy,
@@ -269,6 +286,8 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
       body: TransitaireProfileView(
         user: profileMap,
         isOwner: true,
+        embeddedInMainNav: true,
+        onGalleryChanged: (_) => fetchUser(),
         onEditProfile: () async {
               await Navigator.push(
                 context,

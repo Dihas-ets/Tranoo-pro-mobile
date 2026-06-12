@@ -1,32 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/transitaire_gallery_section.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const Color kTransitaireNavy = Color(0xFF1B2B4B);
 const Color kTransitaireAmber = Color(0xFFF8BF13);
 
 class TransitaireProfileHelpers {
-  static String displayName(Map<String, dynamic> user) {
+  static String displayName(
+    Map<String, dynamic> user, {
+    AppLocalizations? l10n,
+  }) {
     final entreprise = (user['entreprise'] ?? '').toString().trim();
     if (entreprise.isNotEmpty) return entreprise;
     final nom = (user['nom'] ?? '').toString().trim();
     final prenoms = (user['prenoms'] ?? '').toString().trim();
     final full = '$prenoms $nom'.trim();
-    return full.isNotEmpty ? full : 'Transitaire';
+    return full.isNotEmpty
+        ? full
+        : (l10n?.transitaireDefaultName ?? 'Transitaire');
   }
 
-  static String subtitle(Map<String, dynamic> user) {
+  static String subtitle(
+    Map<String, dynamic> user, {
+    AppLocalizations? l10n,
+  }) {
     final entreprise = (user['entreprise'] ?? '').toString().trim();
-    if (entreprise.isNotEmpty) return 'Transitaire';
-    return 'Services de transit international';
+    if (entreprise.isNotEmpty) {
+      return l10n?.transitaireBadgeLabel ?? 'Transitaire';
+    }
+    return l10n?.transitaireServicesSubtitle ??
+        'Services de transit international';
   }
 
-  static String locationLine(Map<String, dynamic> user) {
+  static String locationLine(
+    Map<String, dynamic> user, {
+    AppLocalizations? l10n,
+  }) {
     final ville = (user['ville'] ?? '').toString().trim();
     final pays = (user['pays'] ?? '').toString().trim();
     if (ville.isNotEmpty && pays.isNotEmpty) return '$ville, $pays';
     if (pays.isNotEmpty) return pays;
     if (ville.isNotEmpty) return ville;
-    return 'Afrique de l\'Ouest';
+    return l10n?.westAfricaDefault ?? 'Afrique de l\'Ouest';
   }
 
   static String? photoUrl(Map<String, dynamic> user) {
@@ -40,7 +56,121 @@ class TransitaireProfileHelpers {
   }
 }
 
-class TransitaireProfileView extends StatelessWidget {
+class _ConvexTopClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(0, 30);
+    path.quadraticBezierTo(size.width / 2, -6, size.width, 30);
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+void _showProfilePhotoZoom(
+  BuildContext context, {
+  required String? photoUrl,
+  required String initials,
+}) {
+  showGeneralDialog(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.88),
+    pageBuilder: (ctx, _, __) => SafeArea(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(ctx).pop(),
+            child: InteractiveViewer(
+              child: photoUrl != null
+                  ? Image.network(photoUrl, fit: BoxFit.contain)
+                  : CircleAvatar(
+                      radius: 80,
+                      backgroundColor: kTransitaireAmber.withOpacity(0.2),
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          fontSize: 56,
+                          fontWeight: FontWeight.bold,
+                          color: kTransitaireNavy,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class TransitaireProfileAvatar extends StatelessWidget {
+  final String? photoUrl;
+  final String initials;
+  final double radius;
+  final bool premium;
+
+  const TransitaireProfileAvatar({
+    super.key,
+    required this.photoUrl,
+    required this.initials,
+    this.radius = 50,
+    this.premium = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final inner = CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0xFFE8EDF5),
+      backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
+      child: photoUrl == null
+          ? Text(
+              initials,
+              style: TextStyle(
+                fontSize: radius * 0.72,
+                fontWeight: FontWeight.bold,
+                color: kTransitaireNavy,
+              ),
+            )
+          : null,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: premium
+            ? Border.all(color: kTransitaireAmber.withOpacity(0.7), width: 2.5)
+            : null,
+      ),
+      child: inner,
+    );
+  }
+}
+
+class TransitaireProfileView extends StatefulWidget {
   final Map<String, dynamic> user;
   final bool isOwner;
   final VoidCallback? onEditProfile;
@@ -51,11 +181,14 @@ class TransitaireProfileView extends StatelessWidget {
   final VoidCallback? onLogout;
   final VoidCallback? onDeleteAccount;
   final Widget? settingsExtra;
+  final ValueChanged<List<TransitaireGalleryItem>>? onGalleryChanged;
+  final bool embeddedInMainNav;
 
   const TransitaireProfileView({
     super.key,
     required this.user,
     this.isOwner = false,
+    this.embeddedInMainNav = false,
     this.onEditProfile,
     this.onOpenHistory,
     this.onOpenSubscription,
@@ -64,13 +197,55 @@ class TransitaireProfileView extends StatelessWidget {
     this.onLogout,
     this.onDeleteAccount,
     this.settingsExtra,
+    this.onGalleryChanged,
   });
 
+  @override
+  State<TransitaireProfileView> createState() => _TransitaireProfileViewState();
+}
+
+class _TransitaireProfileViewState extends State<TransitaireProfileView>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  late List<TransitaireGalleryItem> _galleryItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
+    _galleryItems = parseTransitaireGallery(widget.user['transitaireGallery']);
+  }
+
+  @override
+  void didUpdateWidget(TransitaireProfileView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user['transitaireGallery'] != widget.user['transitaireGallery']) {
+      _galleryItems = parseTransitaireGallery(widget.user['transitaireGallery']);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onGalleryUpdated(List<TransitaireGalleryItem> items) {
+    setState(() {
+      _galleryItems = items;
+      widget.user['transitaireGallery'] =
+          items.map((e) => e.toJson()).toList();
+    });
+    widget.onGalleryChanged?.call(items);
+  }
+
   Future<void> _contactTransitaire(BuildContext context) async {
-    final tel = (user['telephone'] ?? '').toString().trim();
+    final l10n = AppLocalizations.of(context)!;
+    final tel = (widget.user['telephone'] ?? '').toString().trim();
     if (tel.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Numéro de contact indisponible.')),
+        SnackBar(content: Text(l10n.contactPhoneUnavailable)),
       );
       return;
     }
@@ -82,229 +257,262 @@ class TransitaireProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = TransitaireProfileHelpers.displayName(user);
+    final l10n = AppLocalizations.of(context)!;
+    final user = widget.user;
+    final name = TransitaireProfileHelpers.displayName(user, l10n: l10n);
     final photo = TransitaireProfileHelpers.photoUrl(user);
-    final location = TransitaireProfileHelpers.locationLine(user);
-    final subtitle = TransitaireProfileHelpers.subtitle(user);
+    final initials = TransitaireProfileHelpers.initials(user);
+    final location = TransitaireProfileHelpers.locationLine(user, l10n: l10n);
+    final subtitle = TransitaireProfileHelpers.subtitle(user, l10n: l10n);
     final subscribed = user['hasSubscription'] == true ||
         user['subscriptionStatus'] == 'active';
+    final onGalleryTab = _tabController.index == 1;
+    final navLift = widget.embeddedInMainNav
+        ? kBottomNavigationBarHeight + MediaQuery.paddingOf(context).bottom
+        : MediaQuery.paddingOf(context).bottom;
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                height: 150,
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF2C3E6B), kTransitaireNavy],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+    return Stack(
+      children: [
+        Column(
+          children: [
+            _ProfileCoverHeader(
+              photoUrl: photo,
+              initials: initials,
+              name: name,
+              subtitle: subtitle,
+              location: location,
+              premium: subscribed,
+            ),
+            _ProfileTabBar(controller: _tabController, l10n: l10n),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _DetailsTab(
+                    user: user,
+                    isOwner: widget.isOwner,
+                    l10n: l10n,
+                    scrollBottomPadding: navLift + 32,
+                    onContact: () => _contactTransitaire(context),
+                    onEditProfile: widget.onEditProfile,
+                    onOpenHistory: widget.onOpenHistory,
+                    onOpenSubscription: widget.onOpenSubscription,
+                    onOpenNotifications: widget.onOpenNotifications,
+                    onOpenLanguage: widget.onOpenLanguage,
+                    onLogout: widget.onLogout,
+                    onDeleteAccount: widget.onDeleteAccount,
+                    settingsExtra: widget.settingsExtra,
                   ),
-                ),
+                  TransitaireGalleryGrid(
+                    items: _galleryItems,
+                    user: user,
+                    isOwner: widget.isOwner,
+                    onItemsChanged:
+                        widget.isOwner ? _onGalleryUpdated : null,
+                    emptyMessage: l10n.transitaireGalleryEmpty,
+                    bottomPadding: widget.isOwner ? navLift + 72 : navLift + 24,
+                  ),
+                ],
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: -48,
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 52,
-                      backgroundColor: Colors.white,
-                      child: CircleAvatar(
-                        radius: 48,
-                        backgroundColor: const Color(0xFFE8F1FF),
-                        backgroundImage:
-                            photo != null ? NetworkImage(photo) : null,
-                        child: photo == null
-                            ? Text(
-                                TransitaireProfileHelpers.initials(user),
-                                style: const TextStyle(
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.bold,
-                                  color: kTransitaireNavy,
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+          ],
+        ),
+        if (widget.isOwner && onGalleryTab)
+          Positioned(
+            bottom: navLift + 16,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: FloatingActionButton(
+                onPressed: _galleryItems.length >= kTransitaireGalleryMaxItems
+                    ? null
+                    : () => showTransitaireGalleryUploadSheet(
+                          context,
+                          items: _galleryItems,
+                          onUpdated: _onGalleryUpdated,
+                        ),
+                backgroundColor: kTransitaireAmber,
+                foregroundColor: kTransitaireNavy,
+                elevation: 4,
+                shape: const CircleBorder(),
+                child: const Icon(Icons.add_rounded, size: 30),
               ),
-            ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ProfileCoverHeader extends StatelessWidget {
+  final String? photoUrl;
+  final String initials;
+  final String name;
+  final String subtitle;
+  final String location;
+  final bool premium;
+
+  const _ProfileCoverHeader({
+    required this.photoUrl,
+    required this.initials,
+    required this.name,
+    required this.subtitle,
+    required this.location,
+    required this.premium,
+  });
+
+  Widget _defaultCover() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2A3F6B), kTransitaireNavy],
+        ),
+      ),
+    );
+  }
+
+  Widget _coverBackground() {
+    if (photoUrl == null) return _defaultCover();
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.network(
+          photoUrl!,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              color: const Color(0xFFE8EDF5),
+              alignment: Alignment.center,
+              child: const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => _defaultCover(),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.08),
+                Colors.black.withOpacity(0.3),
+              ],
+            ),
           ),
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 58, 20, 0),
-            child: Column(
-              children: [
-                Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: kTransitaireNavy,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        location,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                if (subscribed) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: kTransitaireAmber.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Abonné Tranoo',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: kTransitaireNavy,
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    _StatItem(
-                      value: isOwner ? '—' : '4.8',
-                      label: isOwner ? 'Livraisons' : 'Note',
-                    ),
-                    _StatItem(
-                      value: isOwner ? '—' : '—',
-                      label: 'En transit',
-                    ),
-                    _StatItem(
-                      value: subscribed ? 'Actif' : '—',
-                      label: 'Abonnement',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                if (isOwner) ...[
-                  Row(
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 132,
+              width: double.infinity,
+              child: _coverBackground(),
+            ),
+            Transform.translate(
+              offset: const Offset(0, -16),
+              child: ClipPath(
+                clipper: _ConvexTopClipper(),
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(20, 88, 20, 10),
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: _PrimaryOutlineButton(
-                          label: 'Modifier le profil',
-                          onPressed: onEditProfile,
+                      Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: kTransitaireNavy,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _PrimaryFilledButton(
-                          label: 'Historique',
-                          onPressed: onOpenHistory,
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.place_outlined,
+                              size: 15, color: Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              location,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (premium) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: kTransitaireAmber.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Abonné Tranoo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTransitaireNavy,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
-                ] else ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: _PrimaryFilledButton(
-                      label: 'Contacter',
-                      onPressed: () => _contactTransitaire(context),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                _InfoSection(user: user),
-                if (isOwner) ...[
-                  const SizedBox(height: 20),
-                  _SettingsGroup(
-                    title: 'Compte',
-                    items: [
-                      _SettingsItem(
-                        icon: Icons.person_outline,
-                        label: 'Modifier le profil',
-                        onTap: onEditProfile,
-                      ),
-                      _SettingsItem(
-                        icon: Icons.card_membership_outlined,
-                        label: 'Abonnement',
-                        onTap: onOpenSubscription,
-                      ),
-                      _SettingsItem(
-                        icon: Icons.history,
-                        label: 'Historique des transits',
-                        onTap: onOpenHistory,
-                      ),
-                      _SettingsItem(
-                        icon: Icons.notifications_outlined,
-                        label: 'Notifications',
-                        onTap: onOpenNotifications,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _SettingsGroup(
-                    title: 'Préférences',
-                    items: [
-                      _SettingsItem(
-                        icon: Icons.language,
-                        label: 'Langue',
-                        onTap: onOpenLanguage,
-                      ),
-                    ],
-                  ),
-                  if (settingsExtra != null) ...[
-                    const SizedBox(height: 12),
-                    settingsExtra!,
-                  ],
-                  const SizedBox(height: 12),
-                  _SettingsGroup(
-                    title: 'Actions',
-                    items: [
-                      _SettingsItem(
-                        icon: Icons.logout,
-                        label: 'Déconnexion',
-                        onTap: onLogout,
-                        color: kTransitaireNavy,
-                      ),
-                      _SettingsItem(
-                        icon: Icons.delete_forever_outlined,
-                        label: 'Supprimer le compte',
-                        onTap: onDeleteAccount,
-                        color: Colors.red,
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 32),
-              ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          top: 66,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: () => _showProfilePhotoZoom(
+                context,
+                photoUrl: photoUrl,
+                initials: initials,
+              ),
+              child: TransitaireProfileAvatar(
+                photoUrl: photoUrl,
+                initials: initials,
+                premium: premium,
+              ),
             ),
           ),
         ),
@@ -313,32 +521,164 @@ class TransitaireProfileView extends StatelessWidget {
   }
 }
 
-class _StatItem extends StatelessWidget {
-  final String value;
-  final String label;
+class _ProfileTabBar extends StatelessWidget {
+  final TabController controller;
+  final AppLocalizations l10n;
 
-  const _StatItem({required this.value, required this.label});
+  const _ProfileTabBar({required this.controller, required this.l10n});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: kTransitaireNavy,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: TabBar(
+        controller: controller,
+        indicatorColor: kTransitaireAmber,
+        indicatorWeight: 3,
+        labelColor: kTransitaireNavy,
+        unselectedLabelColor: Colors.grey.shade500,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        tabs: [
+          Tab(text: l10n.details),
+          Tab(text: l10n.transitaireProfileTabGallery),
         ],
       ),
+    );
+  }
+}
+
+class _DetailsTab extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final bool isOwner;
+  final AppLocalizations l10n;
+  final double scrollBottomPadding;
+  final VoidCallback onContact;
+  final VoidCallback? onEditProfile;
+  final VoidCallback? onOpenHistory;
+  final VoidCallback? onOpenSubscription;
+  final VoidCallback? onOpenNotifications;
+  final VoidCallback? onOpenLanguage;
+  final VoidCallback? onLogout;
+  final VoidCallback? onDeleteAccount;
+  final Widget? settingsExtra;
+
+  const _DetailsTab({
+    required this.user,
+    required this.isOwner,
+    required this.l10n,
+    this.scrollBottomPadding = 32,
+    required this.onContact,
+    this.onEditProfile,
+    this.onOpenHistory,
+    this.onOpenSubscription,
+    this.onOpenNotifications,
+    this.onOpenLanguage,
+    this.onLogout,
+    this.onDeleteAccount,
+    this.settingsExtra,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, scrollBottomPadding),
+      children: [
+        if (isOwner) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _PrimaryOutlineButton(
+                  label: l10n.editProfile,
+                  onPressed: onEditProfile,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _PrimaryFilledButton(
+                  label: l10n.transitHistory,
+                  onPressed: onOpenHistory,
+                ),
+              ),
+            ],
+          ),
+        ] else ...[
+          SizedBox(
+            width: double.infinity,
+            child: _PrimaryFilledButton(
+              label: l10n.contactTransitaire,
+              onPressed: onContact,
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        _InfoSection(user: user, l10n: l10n),
+        if (isOwner) ...[
+          const SizedBox(height: 20),
+          _SettingsGroup(
+            title: l10n.account,
+            items: [
+              _SettingsItem(
+                icon: Icons.person_outline,
+                label: l10n.editProfile,
+                onTap: onEditProfile,
+              ),
+              _SettingsItem(
+                icon: Icons.card_membership_outlined,
+                label: l10n.forwarderSubscription,
+                onTap: onOpenSubscription,
+              ),
+              _SettingsItem(
+                icon: Icons.history,
+                label: l10n.transitHistoryTitle,
+                onTap: onOpenHistory,
+              ),
+              _SettingsItem(
+                icon: Icons.notifications_outlined,
+                label: l10n.notifications,
+                onTap: onOpenNotifications,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _SettingsGroup(
+            title: l10n.preferences,
+            items: [
+              _SettingsItem(
+                icon: Icons.language,
+                label: l10n.language,
+                onTap: onOpenLanguage,
+              ),
+            ],
+          ),
+          if (settingsExtra != null) ...[
+            const SizedBox(height: 12),
+            settingsExtra!,
+          ],
+          const SizedBox(height: 12),
+          _SettingsGroup(
+            title: l10n.actions,
+            items: [
+              _SettingsItem(
+                icon: Icons.logout,
+                label: l10n.logout,
+                onTap: onLogout,
+                color: kTransitaireNavy,
+              ),
+              _SettingsItem(
+                icon: Icons.delete_forever_outlined,
+                label: l10n.deleteAccount,
+                onTap: onDeleteAccount,
+                color: Colors.red,
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
@@ -354,8 +694,8 @@ class _PrimaryFilledButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: kTransitaireNavy,
-        foregroundColor: Colors.white,
+        backgroundColor: kTransitaireAmber,
+        foregroundColor: kTransitaireNavy,
         padding: const EdgeInsets.symmetric(vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         elevation: 0,
@@ -377,7 +717,7 @@ class _PrimaryOutlineButton extends StatelessWidget {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         foregroundColor: kTransitaireNavy,
-        side: const BorderSide(color: kTransitaireNavy),
+        side: BorderSide(color: kTransitaireAmber.withOpacity(0.9), width: 1.5),
         padding: const EdgeInsets.symmetric(vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -388,8 +728,9 @@ class _PrimaryOutlineButton extends StatelessWidget {
 
 class _InfoSection extends StatelessWidget {
   final Map<String, dynamic> user;
+  final AppLocalizations l10n;
 
-  const _InfoSection({required this.user});
+  const _InfoSection({required this.user, required this.l10n});
 
   @override
   Widget build(BuildContext context) {
@@ -397,11 +738,16 @@ class _InfoSection extends StatelessWidget {
     final tel = (user['telephone'] ?? '').toString().trim();
     final email = (user['email'] ?? '').toString().trim();
     final entreprise = (user['entreprise'] ?? '').toString().trim();
+    final description =
+        (user['transitaireDescription'] ?? '').toString().trim();
     if (entreprise.isNotEmpty) {
-      rows.add(MapEntry('Entreprise', entreprise));
+      rows.add(MapEntry(l10n.company, entreprise));
     }
-    if (tel.isNotEmpty) rows.add(MapEntry('Téléphone', tel));
-    if (email.isNotEmpty) rows.add(MapEntry('E-mail', email));
+    if (tel.isNotEmpty) rows.add(MapEntry(l10n.phone, tel));
+    if (email.isNotEmpty) rows.add(MapEntry(l10n.email, email));
+    if (description.isNotEmpty) {
+      rows.add(MapEntry(l10n.description, description));
+    }
 
     if (rows.isEmpty) return const SizedBox.shrink();
 
@@ -416,9 +762,9 @@ class _InfoSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Informations',
-            style: TextStyle(
+          Text(
+            l10n.stepInfo,
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
               color: kTransitaireNavy,

@@ -17,6 +17,10 @@ class CloudinaryFolders {
   static const String pieceVideos = '$root/pieces/videos';
   static const String verificationDocs = '$root/verification/documents';
   static const String misc = '$root/misc';
+  static const String transitaireGalleryImages =
+      '$root/transitaires/gallery/images';
+  static const String transitaireGalleryVideos =
+      '$root/transitaires/gallery/videos';
 }
 
 Future<String?> uploadImageToCloudinary(
