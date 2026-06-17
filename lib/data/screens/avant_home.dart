@@ -10,6 +10,7 @@ import 'package:tranoo_pro/data/screens/transit.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
 import 'package:tranoo_pro/data/screens/voitures.dart';
+import 'package:tranoo_pro/data/screens/motos.dart';
 
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
@@ -159,6 +160,9 @@ class _AvantHomeState extends State<AvantHome>
     ];
     if (userService.peutVendreVehicules) {
       pages.add(const VoituresPage());
+    }
+    if (userService.peutVendreMotos) {
+      pages.add(const MotosPage());
     }
     if (userService.peutVendrePieces) {
       pages.add(Piece());
@@ -652,71 +656,21 @@ class _AvantHomeState extends State<AvantHome>
     );
   }
 
-  // Méthode pour construire le menu des vendeurs selon le type
+  Widget _buildMotoNavIcon(double size) {
+    final motoSize = size * 1.25;
+    return Image.asset(
+      'assets/images/motorbike.png',
+      width: motoSize,
+      height: motoSize,
+      fit: BoxFit.contain,
+    );
+  }
+
+  // Menu vendeur dynamique selon vendeurType (motos avant pièces)
   List<BottomNavigationBarItem> _buildVendeurMenuItems(
       String? role, double iconSize, AppLocalizations l10n) {
     final userService = UserService();
-
-    // Menu selon vendeurType (compat: null => mixte)
-    if (userService.peutVendreVehicules && userService.peutVendrePieces) {
-      return [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.storefront_outlined, size: iconSize),
-          label: l10n.shopLabel,
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.campaign, size: iconSize),
-          label: l10n.advertisingLabel,
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.directions_car, size: iconSize),
-          label: l10n.cars,
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.build, size: iconSize),
-          label: l10n.pieces,
-        ),
-      ];
-    }
-
-    // Vendeur de véhicules uniquement
-    if (userService.peutVendreVehicules && !userService.peutVendrePieces) {
-      return [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.storefront_outlined, size: iconSize),
-          label: l10n.shopLabel,
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.campaign, size: iconSize),
-          label: l10n.advertisingLabel,
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.directions_car, size: iconSize),
-          label: l10n.cars,
-        ),
-      ];
-    }
-
-    // Vendeur de pièces uniquement
-    if (userService.peutVendrePieces && !userService.peutVendreVehicules) {
-      return [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.storefront_outlined, size: iconSize),
-          label: l10n.shopLabel,
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.campaign, size: iconSize),
-          label: l10n.advertisingLabel,
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.build, size: iconSize),
-          label: l10n.pieces,
-        ),
-      ];
-    }
-
-    // Menu par défaut (fallback)
-    return [
+    final items = <BottomNavigationBarItem>[
       BottomNavigationBarItem(
         icon: Icon(Icons.storefront_outlined, size: iconSize),
         label: l10n.shopLabel,
@@ -726,5 +680,24 @@ class _AvantHomeState extends State<AvantHome>
         label: l10n.advertisingLabel,
       ),
     ];
+    if (userService.peutVendreVehicules) {
+      items.add(BottomNavigationBarItem(
+        icon: Icon(Icons.directions_car, size: iconSize),
+        label: l10n.cars,
+      ));
+    }
+    if (userService.peutVendreMotos) {
+      items.add(BottomNavigationBarItem(
+        icon: _buildMotoNavIcon(iconSize),
+        label: 'Motos',
+      ));
+    }
+    if (userService.peutVendrePieces) {
+      items.add(BottomNavigationBarItem(
+        icon: Icon(Icons.build, size: iconSize),
+        label: l10n.pieces,
+      ));
+    }
+    return items;
   }
 }

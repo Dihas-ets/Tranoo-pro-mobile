@@ -1050,7 +1050,9 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                             ? 'vehicules'
                                             : _typeVendeur == 'vendeurPieces'
                                                 ? 'pieces'
-                                                : 'mixte')
+                                                : _typeVendeur == 'vendeurMotos'
+                                                    ? 'motos'
+                                                    : 'mixte')
                                         : null,
                                     entreprise: selectedRole == 'Transitaire'
                                         ? _entrepriseController.text.trim()
@@ -1377,13 +1379,12 @@ class _InscriptionPageState extends State<InscriptionPage> {
           // Options radio
           _buildRadioOption(
             'vendeur',
-            'Vendeur mixte (recommandé)',
+            'Vendeur mixte',
             'Je vends des véhicules ET des pièces',
             Icons.category,
             screenWidth,
             screenHeight,
             isPortrait,
-            true,
           ),
           
           _buildRadioOption(
@@ -1394,7 +1395,16 @@ class _InscriptionPageState extends State<InscriptionPage> {
             screenWidth,
             screenHeight,
             isPortrait,
-            false,
+          ),
+          
+          _buildRadioOption(
+            'vendeurMotos',
+            'Vendeur de motos',
+            'Je vends uniquement des motos',
+            Icons.motorcycle,
+            screenWidth,
+            screenHeight,
+            isPortrait,
           ),
           
           _buildRadioOption(
@@ -1405,7 +1415,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
             screenWidth,
             screenHeight,
             isPortrait,
-            false,
           ),
         ],
       ),
@@ -1420,7 +1429,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
     double screenWidth,
     double screenHeight,
     bool isPortrait,
-    bool isRecommended,
   ) {
     return Padding(
       padding: EdgeInsets.only(bottom: screenHeight * 0.01),
@@ -1450,25 +1458,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                 ),
               ),
             ),
-            if (isRecommended)
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.02,
-                  vertical: screenHeight * 0.005,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "Recommandé",
-                  style: TextStyle(
-                    color: Colors.green[700],
-                    fontSize: screenWidth * 0.025,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
           ],
         ),
         subtitle: Padding(

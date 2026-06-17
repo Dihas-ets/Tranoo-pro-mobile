@@ -39,7 +39,7 @@ class UserService extends ChangeNotifier {
   }
 
   UserRole? _currentRole;
-  String? _vendeurType; // 'mixte' | 'vehicules' | 'pieces' | null (compat)
+  String? _vendeurType; // 'mixte' | 'vehicules' | 'pieces' | 'motos' | null (compat)
 
   // =============================
   // IMPORTANT : URL DU BACKEND
@@ -58,6 +58,7 @@ class UserService extends ChangeNotifier {
   // Compat: ces flags reposent maintenant sur vendeurType (pas sur des rôles backend)
   bool get isVendeurVehicules => isVendeur && _vendeurType == 'vehicules';
   bool get isVendeurPieces => isVendeur && _vendeurType == 'pieces';
+  bool get isVendeurMotos => isVendeur && _vendeurType == 'motos';
   bool get isChauffeur => _currentRole == UserRole.chauffeur;
   bool get isAgentCommercial => _currentRole == UserRole.agentCommercial;
   bool get isLivreur => _currentRole == UserRole.livreur;
@@ -68,6 +69,9 @@ class UserService extends ChangeNotifier {
       
   bool get peutVendrePieces =>
       isVendeur && (_vendeurType == null || _vendeurType == 'mixte' || _vendeurType == 'pieces');
+
+  bool get peutVendreMotos =>
+      isVendeur && _vendeurType == 'motos';
 
   void setRole(UserRole role) {
     _currentRole = role;

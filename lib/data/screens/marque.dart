@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:tranoo_pro/data/screens/cars_info.dart';
 import 'package:tranoo_pro/data/screens/voitures.dart';
+import 'package:tranoo_pro/data/screens/motos.dart';
+import 'package:tranoo_pro/data/screens/moto_info.dart';
 import 'package:tranoo_pro/data/screens/piece.dart';
 import 'package:tranoo_pro/data/screens/mastervacpage.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
@@ -20,6 +22,7 @@ import 'package:tranoo_pro/services/views_service.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/catalog_article_grid_card.dart';
 import 'package:tranoo_pro/utils/catalog_filter_options.dart';
 import 'package:tranoo_pro/widgets/catalog_filter_sections.dart';
 import 'package:tranoo_pro/widgets/seller_stats_dashboard.dart';
@@ -126,6 +129,20 @@ class ArticleVoiture {
   final String? entreprise;
   final String? statut;
   final int views;
+  final String? typeMoto;
+  final String? typeMoteur;
+  final String? puissance;
+  final String? transmission;
+  final String? demarrage;
+  final String? refroidissement;
+  final String? capaciteReservoir;
+  final String? autonomie;
+  final String? disponibilite;
+  final bool? garantieConstructeur;
+  final String? dureeGarantie;
+  final String? kilometrage;
+  final List<String> equipements;
+  final String? devise;
 
   ArticleVoiture({
     required this.id,
@@ -148,7 +165,56 @@ class ArticleVoiture {
     this.entreprise,
     this.statut,
     this.views = 0,
+    this.typeMoto,
+    this.typeMoteur,
+    this.puissance,
+    this.transmission,
+    this.demarrage,
+    this.refroidissement,
+    this.capaciteReservoir,
+    this.autonomie,
+    this.disponibilite,
+    this.garantieConstructeur,
+    this.dureeGarantie,
+    this.kilometrage,
+    this.equipements = const [],
+    this.devise,
   });
+
+  Map<String, dynamic> toArticleMap() => {
+        '_id': id,
+        'titre': titre,
+        'description': description,
+        'marque': marque,
+        'modele': modele,
+        'annee': annee,
+        'prix': prix,
+        'condition': condition,
+        'boiteVitesse': boiteVitesse,
+        'carburant': carburant,
+        'cylindre': cylindre,
+        'distance': distance,
+        'portes': portes,
+        'photos': images,
+        'video': video,
+        'entreprise': entreprise,
+        'statut': statut,
+        'views': views,
+        if (typeMoto != null) 'typeMoto': typeMoto,
+        if (typeMoteur != null) 'typeMoteur': typeMoteur,
+        if (puissance != null) 'puissance': puissance,
+        if (transmission != null) 'transmission': transmission,
+        if (demarrage != null) 'demarrage': demarrage,
+        if (refroidissement != null) 'refroidissement': refroidissement,
+        if (capaciteReservoir != null) 'capaciteReservoir': capaciteReservoir,
+        if (autonomie != null) 'autonomie': autonomie,
+        if (disponibilite != null) 'disponibilite': disponibilite,
+        'garantieConstructeur': garantieConstructeur ?? false,
+        if (dureeGarantie != null) 'dureeGarantie': dureeGarantie,
+        if (kilometrage != null) 'kilometrage': kilometrage,
+        if (equipements.isNotEmpty) 'equipements': equipements,
+        if (devise != null) 'devise': devise,
+      };
 
   factory ArticleVoiture.fromJson(Map<String, dynamic> json) {
     return ArticleVoiture(
@@ -173,6 +239,24 @@ class ArticleVoiture {
       entreprise: json['entreprise'],
       statut: json['statut'],
       views: (json['views'] as num?)?.toInt() ?? 0,
+      typeMoto: json['typeMoto']?.toString(),
+      typeMoteur: json['typeMoteur']?.toString(),
+      puissance: json['puissance']?.toString(),
+      transmission: json['transmission']?.toString(),
+      demarrage: json['demarrage']?.toString(),
+      refroidissement: json['refroidissement']?.toString(),
+      capaciteReservoir: json['capaciteReservoir']?.toString(),
+      autonomie: json['autonomie']?.toString(),
+      disponibilite: json['disponibilite']?.toString(),
+      garantieConstructeur: json['garantieConstructeur'] == true,
+      dureeGarantie: json['dureeGarantie']?.toString(),
+      kilometrage: (json['kilometrage'] ?? json['distance'])?.toString(),
+      equipements: (json['equipements'] as List?)
+              ?.map((e) => e.toString())
+              .where((e) => e.isNotEmpty)
+              .toList() ??
+          const [],
+      devise: json['devise']?.toString(),
     );
   }
 }
@@ -180,6 +264,10 @@ class ArticleVoiture {
 List<ArticleVoiture> voituresRecommandees = [];
 bool isLoadingVoitures = true;
 String? errorVoitures;
+
+List<ArticleVoiture> motosRecommandees = [];
+bool isLoadingMotos = true;
+String? errorMotos;
 
 // Ajout : modèle Pub pour la récupération des publicités
 class Pub {
@@ -289,6 +377,7 @@ class _MarqueState extends State<Marque>
   // Variables pour les filtres
   String? _selectedBrand;
   String? _selectedModel;
+  String? _selectedMotoBrand;
   String? _selectedLocation;
   double? _budgetMin;
   double? _budgetMax;
@@ -533,6 +622,7 @@ class _MarqueState extends State<Marque>
     _startCarouselTimer();
     fetchArticlesPieces();
     fetchVoituresRecommandees();
+    fetchMotosRecommandees();
     fetchPubs();
     fetchPubsSponsorisees();
     _loadVehicleClickStats();
@@ -599,6 +689,7 @@ class _MarqueState extends State<Marque>
     // Réinitialiser les filtres
     _selectedBrand = null;
     _selectedModel = null;
+    _selectedMotoBrand = null;
     _selectedLocation = null;
     _budgetMin = null;
     _budgetMax = null;
@@ -606,6 +697,7 @@ class _MarqueState extends State<Marque>
     // Recharger les données
     fetchArticlesPieces();
     fetchVoituresRecommandees();
+    fetchMotosRecommandees();
     fetchPubs();
     fetchPubsSponsorisees();
     if (_userService.currentRole == UserRole.vendeur) {
@@ -820,6 +912,29 @@ class _MarqueState extends State<Marque>
     }).toList();
   }
 
+  List<ArticleVoiture> _applyMotoFilters(List<ArticleVoiture> source) {
+    return source.where((m) {
+      if (_selectedMotoBrand != null && _selectedMotoBrand!.isNotEmpty) {
+        if (!catalogValueMatches(_selectedMotoBrand, m.marque)) return false;
+      }
+      if (_selectedLocation != null && _selectedLocation!.isNotEmpty) {
+        final loc = [
+          m.entreprise,
+          m.description,
+          m.titre,
+        ].map((e) => e?.toString() ?? '').join(' ');
+        if (!catalogValueMatches(_selectedLocation, loc)) return false;
+      }
+      if (_budgetMin != null || _budgetMax != null) {
+        final price =
+            double.tryParse(m.prix.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+        if (_budgetMin != null && price < _budgetMin!) return false;
+        if (_budgetMax != null && price > _budgetMax!) return false;
+      }
+      return true;
+    }).toList();
+  }
+
   List<Article> _applyPieceFilters(List<Article> source) {
     return source.where((p) {
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
@@ -906,6 +1021,56 @@ class _MarqueState extends State<Marque>
       setState(() {
         errorVoitures = 'Erreur réseau';
         isLoadingVoitures = false;
+      });
+    }
+  }
+
+  Future<void> fetchMotosRecommandees() async {
+    setState(() {
+      isLoadingMotos = true;
+      errorMotos = null;
+    });
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      final url =
+          getBaseUrl() + '/articles?type=moto&statut=en_ligne&vendu=false';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          if (idToken != null) 'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = sortArticleMapsNewestFirst(
+          json.decode(response.body) as List<dynamic>,
+        );
+        if (!mounted) return;
+        final allMotos = data.map((e) => ArticleVoiture.fromJson(e)).toList();
+        final motosFiltered = allMotos
+            .where((m) => (m.statut ?? 'en_ligne') != 'vendu')
+            .toList();
+        setState(() {
+          motosRecommandees = motosFiltered;
+          for (final m in motosFiltered) {
+            _backendViews[m.id] = m.views;
+          }
+          isLoadingMotos = false;
+        });
+        _loadBackendViews();
+      } else {
+        if (!mounted) return;
+        setState(() {
+          errorMotos = 'Erreur lors du chargement des motos';
+          isLoadingMotos = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        errorMotos = 'Erreur réseau';
+        isLoadingMotos = false;
       });
     }
   }
@@ -1204,13 +1369,13 @@ class _MarqueState extends State<Marque>
     if (isVendeur) {
       if (isTransitaire) addChip('Activités', 0);
       addChip('Marque', _marqueTabIndex);
-      addChip('Modèles', _modeleTabIndex);
+      addChip('Motos', _modeleTabIndex);
       addChip('En attente', _enAttenteTabIndex, wide: true);
       addChip('Statistiques', _statistiquesTabIndex, wide: true);
     } else {
       if (isTransitaire) addChip('Activités', 0);
       addChip('Marque', _marqueTabIndex);
-      addChip('Modèles', _modeleTabIndex);
+      addChip('Motos', _modeleTabIndex);
       addChip('Localisation', _localisationTabIndex, wide: true);
       addChip('Budget', _budgetTabIndex, wide: true);
     }
@@ -1733,6 +1898,95 @@ class _MarqueState extends State<Marque>
     );
   }
 
+  Widget _buildVoituresHorizontalList(List<ArticleVoiture> voitures) {
+    final cardWidth = MediaQuery.of(context).size.width * 0.44;
+    final cardHeight =
+        cardWidth / CatalogArticleGridCard.aspectRatioForWidth(cardWidth * 2.2);
+    return SizedBox(
+      height: cardHeight + 4,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: voitures.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final voiture = voitures[index];
+          return CatalogArticleGridCard(
+            article: voiture.toArticleMap(),
+            isMoto: false,
+            width: cardWidth,
+            conditionNewLabel: l10n.conditionNew,
+            conditionUsedLabel: l10n.usedCondition,
+            defaultTransmission: l10n.automaticTransmission,
+            onTap: () {
+              _recordVehicleInteraction(voiture.id.toString());
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CarsInfo(
+                    id: voiture.id.toString(),
+                    titre: voiture.titre,
+                    description: voiture.description,
+                    marque: voiture.marque,
+                    modele: voiture.modele,
+                    annee: voiture.annee,
+                    prix: voiture.prix,
+                    condition: voiture.condition,
+                    boiteVitesse: voiture.boiteVitesse,
+                    carburant: voiture.carburant,
+                    climatiseur: voiture.climatiseur,
+                    distance: voiture.distance,
+                    sieges: voiture.sieges,
+                    portes: voiture.portes,
+                    cylindre: voiture.cylindre,
+                    images: voiture.images,
+                    video: voiture.video,
+                    entreprise: voiture.entreprise,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMotosHorizontalList(List<ArticleVoiture> motos) {
+    final cardWidth = MediaQuery.of(context).size.width * 0.44;
+    final cardHeight =
+        cardWidth / CatalogArticleGridCard.aspectRatioForWidth(cardWidth * 2.2);
+    return SizedBox(
+      height: cardHeight + 4,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: motos.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final moto = motos[index];
+          return CatalogArticleGridCard(
+            article: moto.toArticleMap(),
+            isMoto: true,
+            width: cardWidth,
+            conditionNewLabel: l10n.conditionNew,
+            conditionUsedLabel: l10n.usedCondition,
+            onTap: () {
+              _recordVehicleInteraction(moto.id.toString());
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      MotoInfo.fromArticleMap(moto.toArticleMap()),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   Widget buildVoituresRecommandeesSection() {
     final isVendeur = _userService.currentRole == UserRole.vendeur;
     final voituresEnLigne = voituresRecommandees
@@ -1759,7 +2013,7 @@ Padding(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
       Text(
-        _userService.currentRole == UserRole.vendeur ? "Mes voitures" : "Recommandé",
+        _userService.currentRole == UserRole.vendeur ? "Mes voitures" : "Véhicules",
         style: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
@@ -1803,269 +2057,69 @@ Padding(
                     ),
                   ),
                 )
-              : Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 13.0),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    primary: false,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: sectionCardAspectRatio,
-                    ),
-                    itemCount: _applyFilters(voituresEnLigne).length > 4
-                        ? 4
-                        : _applyFilters(voituresEnLigne).length,
-                    itemBuilder: (context, index) {
-                      final list = _applyFilters(voituresEnLigne);
-                      final voiture = list[index];
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _recordVehicleInteraction(voiture.id.toString());
-                          });
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CarsInfo(
-                                id: voiture.id.toString(),
-                                titre: voiture.titre,
-                                description: voiture.description,
-                                marque: voiture.marque,
-                                modele: voiture.modele,
-                                annee: voiture.annee,
-                                prix: voiture.prix,
-                                condition: voiture.condition,
-                                boiteVitesse: voiture.boiteVitesse,
-                                carburant: voiture.carburant,
-                                climatiseur: voiture.climatiseur,
-                                distance: voiture.distance,
-                                sieges: voiture.sieges,
-                                portes: voiture.portes,
-                                cylindre: voiture.cylindre,
-                                images: voiture.images,
-                                video: voiture.video,
-                                entreprise: voiture.entreprise,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.2),
-                                spreadRadius: 2,
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 5,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Image avec overlay pour le prix
-                              Expanded(
-                                flex: 3,
-                                child: Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(12),
-                                        topRight: Radius.circular(12),
-                                      ),
-                                      child: voiture.images.isNotEmpty
-                                          ? Image.network(
-                                              voiture.images.first,
-                                              height: double.infinity,
-                                              width: double.infinity,
-                                              fit: BoxFit.cover,
-                                            )
-                                          : (voiture.video?.isNotEmpty ?? false)
-                                              ? VideoPreviewPlaceholder(
-                                                  videoUrl: voiture.video)
-                                              : Container(
-                                                  height: double.infinity,
-                                                  width: double.infinity,
-                                                  color: Colors.grey[300],
-                                                  child: const Icon(
-                                                    Icons.image_not_supported,
-                                                  ),
-                                                ),
-                                    ),
-                                    // Badge de vues
-                                    Positioned(
-                                      top: 8,
-                                      right: 8,
-                                      child: _buildViewBadge(voiture.id),
-                                    ),
-                                    // Badge condition (nouveau/occasion)
-                                    Positioned(
-                                      top: 8,
-                                      left: 8,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: (voiture.condition
-                                                          ?.toLowerCase() ==
-                                                      'nouveau' ||
-                                                  voiture.condition
-                                                          ?.toLowerCase() ==
-                                                      'neuf')
-                                              ? Colors.purple
-                                              : const Color(0xFFF8BF13),
-                                          borderRadius:
-                                              BorderRadius.circular(50),
-                                        ),
-                                        child: Text(
-                                          (voiture.condition?.toLowerCase() ==
-                                                      'nouveau' ||
-                                                  voiture.condition
-                                                          ?.toLowerCase() ==
-                                                      'neuf')
-                                              ? 'Nouveau'
-                                              : 'Occasion',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+              : _buildVoituresHorizontalList(_applyFilters(voituresEnLigne)),
+      ],
+    );
+  }
 
-                              // Informations de la voiture - PARTIE MODIFIÉE
-                              Expanded(
-                                flex: 2, // RÉDUIT de 3 à 2 pour moins d'espace
-                                child: Padding(
-                                  padding: const EdgeInsets.all(
-                                    8,
-                                  ), // RÉDUIT de 12 à 8
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _vehicleDisplayName(voiture),
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.black87,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${formatPrice(voiture.prix)} FCFA',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      // CARACTÉRISTIQUES - Espaces réduits
-                                      Flexible(
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment
-                                              .spaceAround, // RÉDUIT l'espacement
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            // Rangée 1: Boite vitesse + Année
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: _buildCaracteristic(
-                                                    Icons.settings,
-                                                    voiture.boiteVitesse ??
-                                                        'Automatique',
-                                                  ),
-                                                ),
-                                                const SizedBox(
-                                                  width: 4,
-                                                ), // RÉDUIT
-                                                Expanded(
-                                                  child: _buildCaracteristic(
-                                                    Icons.calendar_today,
-                                                    voiture.annee,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+  Widget buildMotosSection() {
+    final isVendeur = _userService.currentRole == UserRole.vendeur;
+    final motosEnLigne = _applyMotoFilters(motosRecommandees
+        .where(
+          (m) =>
+              (m.statut ?? 'en_ligne') == 'en_ligne' &&
+              (m.statut ?? '') != 'vendu',
+        )
+        .toList());
 
-                                            // Rangée 2: Carburant + Cylindre
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: _buildCaracteristic(
-                                                    Icons.local_gas_station,
-                                                    voiture.carburant ?? '',
-                                                  ),
-                                                ),
-                                                const SizedBox(
-                                                  width: 4,
-                                                ), // RÉDUIT
-                                                Expanded(
-                                                  child: _buildCaracteristic(
-                                                    Icons.speed,
-                                                    voiture.cylindre ?? '',
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-
-                                            if (voiture.distance != null &&
-                                                voiture.distance!
-                                                    .trim()
-                                                    .isNotEmpty)
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: _buildCaracteristic(
-                                                      Icons.speed,
-                                                      '${voiture.distance} KM',
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Expanded(
-                                                    child: _buildCaracteristic(
-                                                      Icons.door_front_door,
-                                                      '${voiture.portes ?? ''} portes',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isVendeur ? 'Mes motos' : 'Motos',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF040415),
                 ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MotosPage()),
+                  );
+                },
+                child: Text(l10n.seeAll,
+                    style: const TextStyle(fontSize: 16, color: Colors.grey)),
+              ),
+            ],
+          ),
+        ),
+        if (isLoadingMotos) const Center(child: CircularProgressIndicator()),
+        if (errorMotos != null) Center(child: Text(errorMotos!)),
+        if (!isLoadingMotos && errorMotos == null)
+          motosEnLigne.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      isVendeur
+                          ? "Vous n'avez aucune moto en ligne"
+                          : "Aucune moto disponible pour le moment.",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                )
+              : _buildMotosHorizontalList(motosEnLigne),
       ],
     );
   }
@@ -2677,7 +2731,7 @@ Widget buildPubsALaUneCarousel() {
                           if (_tabController.index == _marqueTabIndex)
                             _buildMarqueSection(),
                           if (_tabController.index == _modeleTabIndex)
-                            _buildModeleSection(),
+                            _buildMotosMarqueSection(),
                           if (_userService.currentRole == UserRole.vendeur &&
                               _tabController.index == _enAttenteTabIndex)
                             _buildEnAttenteSection(),
@@ -2691,6 +2745,9 @@ Widget buildPubsALaUneCarousel() {
                           if (_userService.currentRole != UserRole.vendeur ||
                               _userService.peutVendreVehicules)
                             buildVoituresRecommandeesSection(),
+                          if (_userService.currentRole != UserRole.vendeur ||
+                              _userService.peutVendreMotos)
+                            buildMotosSection(),
                           if (_userService.currentRole != UserRole.vendeur ||
                               _userService.peutVendrePieces)
                             buildPiecesSection(),
@@ -2809,11 +2866,33 @@ Widget buildPubsALaUneCarousel() {
       return const CatalogFilterHorizSkeleton();
     }
     final maps = _catalogMapsForFilters();
-    final options = buildMarqueFilterOptions(maps, isPiece: true);
+    final options = buildMarqueFilterOptions(maps, isPiece: false);
     return CatalogMarqueFilterGrid(
       options: options,
       selected: _selectedBrand,
       onSelected: (v) => setState(() => _selectedBrand = v),
+    );
+  }
+
+  List<Map<String, dynamic>> _catalogMotoMapsForFilters() {
+    return motosRecommandees
+        .map((m) => m.toArticleMap())
+        .toList();
+  }
+
+  Widget _buildMotosMarqueSection() {
+    if (isLoadingMotos && motosRecommandees.isEmpty) {
+      return const CatalogFilterHorizSkeleton();
+    }
+    final options = buildMarqueFilterOptions(
+      _catalogMotoMapsForFilters(),
+      isPiece: false,
+      isMoto: true,
+    );
+    return CatalogMarqueFilterGrid(
+      options: options,
+      selected: _selectedMotoBrand,
+      onSelected: (v) => setState(() => _selectedMotoBrand = v),
     );
   }
 

@@ -6,6 +6,7 @@ import 'package:tranoo_pro/data/screens/connexion_page.dart';
 import 'package:tranoo_pro/data/screens/create_sell.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
+import 'package:tranoo_pro/data/screens/create_sell_moto.dart';
 import 'package:tranoo_pro/data/screens/create_sell2.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
@@ -736,6 +737,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
         vendeurType.isEmpty || vendeurType == 'mixte' || vendeurType == 'vehicules';
     final canSellPieces =
         vendeurType.isEmpty || vendeurType == 'mixte' || vendeurType == 'pieces';
+    final canSellMotos = vendeurType == 'motos';
 
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -766,6 +768,18 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => CreateSellPage()),
+                );
+              },
+            ),
+          if (canSellMotos)
+            _buildListTile(
+              title: 'Vendre ma moto',
+              subtitle: l10n.becomeSellerSubtitle,
+              icon: Icons.motorcycle,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CreateSellMotoPage()),
                 );
               },
             ),

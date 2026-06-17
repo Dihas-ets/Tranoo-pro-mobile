@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../../services/user_service.dart';
 import '../../utils/role_redirect.dart';
+import '../../providers/auth_provider.dart' as myauth;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'avant_home.dart';
 
 class SettingsTypeVendeurPage extends StatefulWidget {
   const SettingsTypeVendeurPage({Key? key}) : super(key: key);
@@ -55,6 +58,8 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
         _currentType = UserRole.vendeurVehicules;
       } else if (vt == 'pieces') {
         _currentType = UserRole.vendeurPieces;
+      } else if (vt == 'motos') {
+        _currentType = UserRole.vendeurMotos;
       } else {
         _currentType = UserRole.vendeur; // mixte + compat null
       }
@@ -106,19 +111,25 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue[50],
+                      color: const Color(0xFFF8BF13).withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue[200]!),
+                      border: Border.all(
+                        color: const Color(0xFFF8BF13).withOpacity(0.45),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue[700], size: 24),
+                        const Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFB8860B),
+                          size: 24,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             "Vous pouvez modifier votre type de vendeur à tout moment. Le changement sera appliqué immédiatement.",
                             style: TextStyle(
-                              color: Colors.blue[700],
+                              color: Colors.grey[800],
                               fontSize: 14,
                             ),
                           ),
@@ -198,7 +209,8 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
                   ...UserRole.values.where((role) => 
                     role == UserRole.vendeur || 
                     role == UserRole.vendeurVehicules || 
-                    role == UserRole.vendeurPieces
+                    role == UserRole.vendeurPieces ||
+                    role == UserRole.vendeurMotos
                   ).map((type) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: GestureDetector(
@@ -276,6 +288,8 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
         return Icons.directions_car;
       case UserRole.vendeurPieces:
         return Icons.build;
+      case UserRole.vendeurMotos:
+        return Icons.motorcycle;
       default:
         return Icons.person;
     }
@@ -289,6 +303,8 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
         return "Vendeur de véhicules";
       case UserRole.vendeurPieces:
         return "Vendeur de pièces";
+      case UserRole.vendeurMotos:
+        return "Vendeur de motos";
       default:
         return "Inconnu";
     }
@@ -302,6 +318,8 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
         return "Je vends uniquement des véhicules";
       case UserRole.vendeurPieces:
         return "Je vends uniquement des pièces détachées";
+      case UserRole.vendeurMotos:
+        return "Je vends uniquement des motos";
       default:
         return "Type non défini";
     }
@@ -364,11 +382,16 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        final auth = Provider.of<myauth.AuthProvider>(context, listen: false);
+        final messenger = ScaffoldMessenger.of(context);
+        final navigator = Navigator.of(context);
         final vendeurType = newType == UserRole.vendeurVehicules
             ? 'vehicules'
             : newType == UserRole.vendeurPieces
                 ? 'pieces'
-                : 'mixte';
+                : newType == UserRole.vendeurMotos
+                    ? 'motos'
+                    : 'mixte';
         final idToken = await user.getIdToken();
         final resp = await http.patch(
           Uri.parse('${getBaseUrl()}/users/me'),
@@ -384,18 +407,32 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
 
         UserService().setVendeurType(vendeurType);
 
-        setState(() {
-          _currentType = newType;
-        });
+        if (auth.user != null) {
+          final updatedUser = Map<String, dynamic>.from(auth.user!);
+          updatedUser['vendeurType'] = vendeurType;
+          await myauth.AuthProvider.saveUserToPrefs(auth.token, updatedUser);
+        }
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+
+        messenger.showSnackBar(
           SnackBar(
             content: Text(l10n.sellerTypeUpdatedSuccess),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFFF8BF13),
+            behavior: SnackBarBehavior.floating,
           ),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AvantHome()),
+          (route) => false,
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.updateError(e.toString())),

@@ -4,8 +4,9 @@ import '../services/user_service.dart';
 
 enum UserRole { 
   vendeur,           // ← COMPATIBILITÉ EXISTANTE (mixte)
-  vendeurVehicules,  // ← NOUVEAU : uniquement véhicules
-  vendeurPieces,     // ← NOUVEAU : uniquement pièces
+  vendeurVehicules,  // ← uniquement véhicules
+  vendeurPieces,     // ← uniquement pièces
+  vendeurMotos,      // ← uniquement motos
   transitaire, 
   chauffeur, 
   agentCommercial, 
@@ -20,6 +21,8 @@ UserRole? stringToUserRole(String? role) {
       return UserRole.vendeurVehicules;
     case 'vendeurPieces':
       return UserRole.vendeurPieces;
+    case 'vendeurMotos':
+      return UserRole.vendeurMotos;
     case 'transitaire':
       return UserRole.transitaire;
     case 'chauffeur':
@@ -41,6 +44,8 @@ String userRoleToString(UserRole role) {
       return 'vendeurVehicules';
     case UserRole.vendeurPieces:
       return 'vendeurPieces';
+    case UserRole.vendeurMotos:
+      return 'vendeurMotos';
     case UserRole.transitaire:
       return 'transitaire';
     case UserRole.chauffeur:
