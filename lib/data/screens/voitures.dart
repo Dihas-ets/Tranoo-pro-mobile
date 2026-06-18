@@ -70,7 +70,6 @@ class _VoituresPageState extends State<VoituresPage>
   late int _modeleTabIndex;
   late int _localisationTabIndex;
   late int _budgetTabIndex;
-  late int _statusPendingTabIndex;
   late int _statusOnlineTabIndex;
   late int _statusRejectedTabIndex;
 
@@ -86,10 +85,9 @@ class _VoituresPageState extends State<VoituresPage>
       // Vendeur: 5 onglets (2 filtres + 3 statuts)
       _marqueTabIndex = 0;
       _modeleTabIndex = 1;
-      _statusPendingTabIndex = 2;
-      _statusOnlineTabIndex = 3;
-      _statusRejectedTabIndex = 4;
-      _tabController = TabController(length: 5, vsync: this);
+      _statusOnlineTabIndex = 2;
+      _statusRejectedTabIndex = 3;
+      _tabController = TabController(length: 4, vsync: this);
     } else {
       // Autres rôles: tous les filtres
       _marqueTabIndex = 0;
@@ -267,10 +265,6 @@ class _VoituresPageState extends State<VoituresPage>
       }
       if (isVendeur) {
         final statut = (v['statut'] ?? '').toString().toLowerCase();
-        if (_tabController.index == _statusPendingTabIndex &&
-            statut != 'en_attente') {
-          return false;
-        }
         if (_tabController.index == _statusOnlineTabIndex &&
             statut != 'en_ligne') {
           return false;
@@ -497,8 +491,6 @@ class _VoituresPageState extends State<VoituresPage>
                           tabs: [
                             _buildTabButton("Marque", _marqueTabIndex),
                             _buildTabButton("Modèles", _modeleTabIndex),
-                            if (isVendeur)
-                              _buildTabButton("En attente", _statusPendingTabIndex, isWide: true),
                             if (isVendeur)
                               _buildTabButton("En ligne", _statusOnlineTabIndex, isWide: true),
                             if (isVendeur)

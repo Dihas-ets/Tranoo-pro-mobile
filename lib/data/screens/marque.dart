@@ -341,7 +341,6 @@ class _MarqueState extends State<Marque>
       await fetchPubs();
       await fetchPubsSponsorisees();
       if (_userService.currentRole == UserRole.vendeur) {
-        await fetchVoituresEnAttente();
         await _loadSellerMarqueStats();
       }
     } finally {
@@ -354,7 +353,9 @@ class _MarqueState extends State<Marque>
   Timer? _carouselTimer;
   final UserService _userService = UserService();
   late int _marqueTabIndex;
-  late int _modeleTabIndex;
+  late int _typeTabIndex;
+  late int _statusOnlineTabIndex;
+  late int _statusRejectedTabIndex;
   late int _enAttenteTabIndex;
   late int _statistiquesTabIndex;
   late int _localisationTabIndex;
@@ -376,6 +377,7 @@ class _MarqueState extends State<Marque>
 
   // Variables pour les filtres
   String? _selectedBrand;
+  String? _selectedType;
   String? _selectedModel;
   String? _selectedMotoBrand;
   String? _selectedLocation;
@@ -587,17 +589,15 @@ class _MarqueState extends State<Marque>
     final isTransitaire = _userService.currentRole == UserRole.transitaire;
     final isVendeur = _userService.currentRole == UserRole.vendeur;
     if (isVendeur) {
-      // Vendeur: Marque, Modèles, En attente, Statistiques (+ Activités si transitaire)
       _marqueTabIndex = isTransitaire ? 1 : 0;
-      _modeleTabIndex = isTransitaire ? 2 : 1;
-      _enAttenteTabIndex = isTransitaire ? 3 : 2;
+      _statusOnlineTabIndex = isTransitaire ? 2 : 1;
+      _statusRejectedTabIndex = isTransitaire ? 3 : 2;
       _statistiquesTabIndex = isTransitaire ? 4 : 3;
       _tabController =
           TabController(length: isTransitaire ? 5 : 4, vsync: this);
     } else {
-      // Autres rôles: Localisation/Budget visibles, Statistiques cachée
-      _marqueTabIndex = isTransitaire ? 1 : 0;
-      _modeleTabIndex = isTransitaire ? 2 : 1;
+      _typeTabIndex = isTransitaire ? 1 : 0;
+      _marqueTabIndex = isTransitaire ? 2 : 1;
       _localisationTabIndex = isTransitaire ? 3 : 2;
       _budgetTabIndex = isTransitaire ? 4 : 3;
       _tabController =
@@ -627,7 +627,6 @@ class _MarqueState extends State<Marque>
     fetchPubsSponsorisees();
     _loadVehicleClickStats();
     if (_userService.currentRole == UserRole.vendeur) {
-      fetchVoituresEnAttente();
       _loadSellerMarqueStats();
     }
   }
@@ -701,7 +700,6 @@ class _MarqueState extends State<Marque>
     fetchPubs();
     fetchPubsSponsorisees();
     if (_userService.currentRole == UserRole.vendeur) {
-      fetchVoituresEnAttente();
       _loadSellerMarqueStats();
     }
     setState(() {});
@@ -715,8 +713,10 @@ class _MarqueState extends State<Marque>
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
-      String url =
-          getBaseUrl() + '/articles?type=piece&statut=en_ligne&vendu=false';
+      final isVendeur = _userService.currentRole == UserRole.vendeur;
+      String url = isVendeur
+          ? getBaseUrl() + '/articles?type=piece&vendu=false'
+          : getBaseUrl() + '/articles?type=piece&statut=en_ligne&vendu=false';
       _logger.info('[DEBUG] URL pièces: $url');
       final headers = <String, String>{
         'Content-Type': 'application/json',
@@ -940,6 +940,13 @@ class _MarqueState extends State<Marque>
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
         if (!catalogValueMatches(_selectedBrand, p.company)) return false;
       }
+      if (_selectedType != null && _selectedType!.isNotEmpty) {
+        if (!pieceMatchesTypeFilter({
+          'categorie': p.pieceType,
+          'titre': p.title,
+          'title': p.title,
+        }, _selectedType)) return false;
+      }
       if (_selectedModel != null && _selectedModel!.isNotEmpty) {
         if (!catalogValueMatches(_selectedModel, p.model ?? '')) return false;
       }
@@ -957,6 +964,63 @@ class _MarqueState extends State<Marque>
     }).toList();
   }
 
+  bool _isRejectedStatut(String? statut) {
+    final s = (statut ?? '').toLowerCase();
+    return s == 'rejeté' || s == 'rejete';
+  }
+
+  List<ArticleVoiture> _vehiclesForCurrentTab(List<ArticleVoiture> source) {
+    final isVendeur = _userService.currentRole == UserRole.vendeur;
+    return source.where((v) {
+      if ((v.statut ?? 'en_ligne') == 'vendu') return false;
+      if (!isVendeur) {
+        return (v.statut ?? 'en_ligne') == 'en_ligne';
+      }
+      final statut = (v.statut ?? '').toLowerCase();
+      if (_tabController.index == _statusOnlineTabIndex) {
+        return statut == 'en_ligne';
+      }
+      if (_tabController.index == _statusRejectedTabIndex) {
+        return _isRejectedStatut(v.statut);
+      }
+      return true;
+    }).toList();
+  }
+
+  List<Article> _piecesForCurrentTab(List<Article> source) {
+    final isVendeur = _userService.currentRole == UserRole.vendeur;
+    return source.where((p) {
+      if ((p.statut ?? 'en_ligne') == 'vendu') return false;
+      if (!isVendeur) {
+        return (p.statut ?? 'en_ligne') == 'en_ligne';
+      }
+      final statut = (p.statut ?? '').toLowerCase();
+      if (_tabController.index == _statusOnlineTabIndex) {
+        return statut == 'en_ligne';
+      }
+      if (_tabController.index == _statusRejectedTabIndex) {
+        return _isRejectedStatut(p.statut);
+      }
+      return true;
+    }).toList();
+  }
+
+  String _emptyCatalogMessage({
+    required bool isVendeur,
+    required String entityLabel,
+  }) {
+    if (!isVendeur) {
+      return 'Aucun $entityLabel disponible pour le moment.';
+    }
+    if (_tabController.index == _statusRejectedTabIndex) {
+      return 'Vous n\'avez aucun $entityLabel rejeté.';
+    }
+    if (_tabController.index == _statusOnlineTabIndex) {
+      return 'Vous n\'avez aucun $entityLabel en ligne.';
+    }
+    return 'Vous n\'avez aucun $entityLabel en ligne';
+  }
+
   Future<void> fetchVoituresRecommandees() async {
     setState(() {
       isLoadingVoitures = true;
@@ -965,8 +1029,10 @@ class _MarqueState extends State<Marque>
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
-      String url =
-          getBaseUrl() + '/articles?type=voiture&statut=en_ligne&vendu=false';
+      final isVendeur = _userService.currentRole == UserRole.vendeur;
+      String url = isVendeur
+          ? getBaseUrl() + '/articles?type=voiture&vendu=false'
+          : getBaseUrl() + '/articles?type=voiture&statut=en_ligne&vendu=false';
       _logger.info('[DEBUG] URL voitures: $url');
       final response = await http.get(
         Uri.parse(url),
@@ -1033,8 +1099,10 @@ class _MarqueState extends State<Marque>
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
-      final url =
-          getBaseUrl() + '/articles?type=moto&statut=en_ligne&vendu=false';
+      final isVendeur = _userService.currentRole == UserRole.vendeur;
+      final url = isVendeur
+          ? getBaseUrl() + '/articles?type=moto&vendu=false'
+          : getBaseUrl() + '/articles?type=moto&statut=en_ligne&vendu=false';
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -1369,13 +1437,13 @@ class _MarqueState extends State<Marque>
     if (isVendeur) {
       if (isTransitaire) addChip('Activités', 0);
       addChip('Marque', _marqueTabIndex);
-      addChip('Motos', _modeleTabIndex);
-      addChip('En attente', _enAttenteTabIndex, wide: true);
+      addChip('En ligne', _statusOnlineTabIndex);
+      addChip('Rejeté', _statusRejectedTabIndex, wide: true);
       addChip('Statistiques', _statistiquesTabIndex, wide: true);
     } else {
       if (isTransitaire) addChip('Activités', 0);
+      addChip('Type', _typeTabIndex);
       addChip('Marque', _marqueTabIndex);
-      addChip('Motos', _modeleTabIndex);
       addChip('Localisation', _localisationTabIndex, wide: true);
       addChip('Budget', _budgetTabIndex, wide: true);
     }
@@ -1411,19 +1479,14 @@ class _MarqueState extends State<Marque>
     // Filtrer les voitures avec statut 'en_ligne' et non vendues
     final userService = _userService;
     final isVendeur = userService.currentRole == UserRole.vendeur;
-    final voituresEnLigne = voituresRecommandees
-        .where(
-          (v) =>
-              (v.statut ?? 'en_ligne') == 'en_ligne' &&
-              (v.statut ?? '') != 'vendu',
-        )
-        .toList();
+    final voituresEnLigne = _vehiclesForCurrentTab(voituresRecommandees);
     if (voituresEnLigne.isEmpty) {
       return Center(
         child: Text(
-          isVendeur
-              ? "Vous n'avez aucune voiture en ligne"
-              : "Aucune voiture disponible pour le moment.",
+          _emptyCatalogMessage(
+            isVendeur: isVendeur,
+            entityLabel: 'véhicule',
+          ),
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.grey,
@@ -1724,13 +1787,7 @@ class _MarqueState extends State<Marque>
     final userService = _userService;
     final isVendeur = userService.currentRole == UserRole.vendeur;
     final piecesEnLigne = _applyPieceFilters(
-      articlesPieces
-          .where(
-            (p) =>
-                (p.statut ?? 'en_ligne') == 'en_ligne' &&
-                (p.statut ?? '') != 'vendu',
-          )
-          .toList(),
+      _piecesForCurrentTab(articlesPieces),
     );
     // Filtrage recherche
     final filteredPieces = piecesEnLigne.where((p) {
@@ -1744,9 +1801,10 @@ class _MarqueState extends State<Marque>
     if (filteredPieces.isEmpty) {
       return Center(
         child: Text(
-          isVendeur
-              ? "Vous n'avez aucune pièce en ligne actuellement"
-              : "Aucune pièce en ligne actuellement",
+          _emptyCatalogMessage(
+            isVendeur: isVendeur,
+            entityLabel: 'pièce',
+          ),
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.grey,
@@ -1989,13 +2047,7 @@ class _MarqueState extends State<Marque>
 
   Widget buildVoituresRecommandeesSection() {
     final isVendeur = _userService.currentRole == UserRole.vendeur;
-    final voituresEnLigne = voituresRecommandees
-        .where(
-          (v) =>
-              (v.statut ?? 'en_ligne') == 'en_ligne' &&
-              (v.statut ?? '') != 'vendu',
-        )
-        .toList();
+    final voituresEnLigne = _vehiclesForCurrentTab(voituresRecommandees);
     final screenWidth = MediaQuery.of(context).size.width;
     final sectionCardAspectRatio = screenWidth < 360
         ? 0.64
@@ -2047,9 +2099,10 @@ Padding(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      isVendeur
-                          ? "Vous n'avez aucune voiture en ligne"
-                          : "Aucune voiture disponible pour le moment.",
+                      _emptyCatalogMessage(
+                        isVendeur: isVendeur,
+                        entityLabel: 'voiture',
+                      ),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.grey,
@@ -2064,13 +2117,9 @@ Padding(
 
   Widget buildMotosSection() {
     final isVendeur = _userService.currentRole == UserRole.vendeur;
-    final motosEnLigne = _applyMotoFilters(motosRecommandees
-        .where(
-          (m) =>
-              (m.statut ?? 'en_ligne') == 'en_ligne' &&
-              (m.statut ?? '') != 'vendu',
-        )
-        .toList());
+    final motosEnLigne = _applyMotoFilters(
+      _vehiclesForCurrentTab(motosRecommandees),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2109,9 +2158,10 @@ Padding(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      isVendeur
-                          ? "Vous n'avez aucune moto en ligne"
-                          : "Aucune moto disponible pour le moment.",
+                      _emptyCatalogMessage(
+                        isVendeur: isVendeur,
+                        entityLabel: 'moto',
+                      ),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.grey,
@@ -2127,13 +2177,7 @@ Padding(
   Widget buildPiecesSection() {
     final isVendeur = _userService.currentRole == UserRole.vendeur;
     final piecesEnLigne = _applyPieceFilters(
-      articlesPieces
-          .where(
-            (p) =>
-                (p.statut ?? 'en_ligne') == 'en_ligne' &&
-                (p.statut ?? '') != 'vendu',
-          )
-          .toList(),
+      _piecesForCurrentTab(articlesPieces),
     );
 
     return Column(
@@ -2181,9 +2225,10 @@ Padding(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      isVendeur
-                          ? "Vous n'avez aucune pièce en ligne actuellement"
-                          : "Aucune pièce en ligne actuellement",
+                      _emptyCatalogMessage(
+                        isVendeur: isVendeur,
+                        entityLabel: 'pièce',
+                      ),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.grey,
@@ -2729,12 +2774,19 @@ Widget buildPubsALaUneCarousel() {
                           if (_tabController.index == 0 && isTransitaire)
                             _buildActivitesSection(),
                           if (_tabController.index == _marqueTabIndex)
-                            _buildMarqueSection(),
-                          if (_tabController.index == _modeleTabIndex)
-                            _buildMotosMarqueSection(),
-                          if (_userService.currentRole == UserRole.vendeur &&
-                              _tabController.index == _enAttenteTabIndex)
-                            _buildEnAttenteSection(),
+                            (_userService.currentRole == UserRole.vendeur &&
+                                    _userService.peutVendreMotos &&
+                                    !_userService.peutVendreVehicules)
+                                ? _buildMotosMarqueSection()
+                                : (_userService.currentRole ==
+                                            UserRole.vendeur &&
+                                        _userService.peutVendrePieces &&
+                                        !_userService.peutVendreVehicules)
+                                    ? _buildPiecesMarqueSection()
+                                    : _buildMarqueSection(),
+                          if (_userService.currentRole != UserRole.vendeur &&
+                              _tabController.index == _typeTabIndex)
+                            _buildTypeSection(),
                           if (_userService.currentRole == UserRole.vendeur &&
                               _tabController.index == _statistiquesTabIndex)
                             _buildStatistiquesSection(),
@@ -2896,6 +2948,36 @@ Widget buildPubsALaUneCarousel() {
     );
   }
 
+  Widget _buildPiecesMarqueSection() {
+    if (isLoadingPieces && articlesPieces.isEmpty) {
+      return const CatalogFilterHorizSkeleton();
+    }
+    final pieceMaps = articlesPieces
+        .map((p) => {
+              'marque': p.company,
+              'pieceType': p.pieceType,
+              'condition': p.condition,
+              'entreprise': p.company,
+            })
+        .toList();
+    final options = buildMarqueFilterOptions(pieceMaps, isPiece: true);
+    return CatalogMarqueFilterGrid(
+      options: options,
+      selected: _selectedBrand,
+      onSelected: (v) => setState(() => _selectedBrand = v),
+    );
+  }
+
+  Widget _buildTypeSection() {
+    if (isLoadingPieces && articlesPieces.isEmpty) {
+      return const CatalogFilterHorizSkeleton(itemWidth: 76, height: 86);
+    }
+    return CatalogPieceTypeFilterGrid(
+      selected: _selectedType,
+      onSelected: (v) => setState(() => _selectedType = v),
+    );
+  }
+
   Widget _buildModeleSection() {
     if (isLoadingVoitures && voituresRecommandees.isEmpty) {
       return const CatalogFilterHorizSkeleton(itemWidth: 88, height: 60);
@@ -3054,16 +3136,29 @@ Widget buildPubsALaUneCarousel() {
     final showVehicules =
         vt.isEmpty || vt == 'mixte' || vt == 'vehicules' || vt == 'véhicules';
     final showPieces = vt.isEmpty || vt == 'mixte' || vt == 'pieces';
+    final showMotos = vt == 'motos';
+
+    final motosEnLigne = motosRecommandees
+        .where(
+          (m) =>
+              (m.statut ?? 'en_ligne') == 'en_ligne' &&
+              (m.statut ?? '') != 'vendu',
+        )
+        .length;
 
     final totalViewsVehicles = voituresRecommandees.fold<int>(
       0,
       (sum, v) => sum + (_backendViews[v.id] ?? 0),
     );
+    final totalViewsMotos = motosRecommandees.fold<int>(
+      0,
+      (sum, m) => sum + (_backendViews[m.id] ?? 0),
+    );
     final totalViewsPieces = articlesPieces.fold<int>(
       0,
       (sum, p) => sum + (_backendViews[p.id] ?? 0),
     );
-    final totalViews = totalViewsVehicles + totalViewsPieces;
+    final totalViews = totalViewsVehicles + totalViewsMotos + totalViewsPieces;
 
     final statsCards = <Map<String, Object?>>[
       if (showVehicules)
@@ -3072,6 +3167,15 @@ Widget buildPubsALaUneCarousel() {
           'label': 'Véhicules en ligne',
           'value': _statsVehiclesOnline,
           'icon': Icons.directions_car_filled,
+          'color': const Color(0xFFF8BF13),
+          'description': 'Annonces visibles',
+        },
+      if (showMotos)
+        {
+          'kind': 'plain',
+          'label': 'Motos en ligne',
+          'value': motosEnLigne,
+          'icon': Icons.two_wheeler,
           'color': const Color(0xFFF8BF13),
           'description': 'Annonces visibles',
         },
@@ -3123,6 +3227,7 @@ Widget buildPubsALaUneCarousel() {
 
     final viewPoints = <double>[
       ...voituresRecommandees.map((v) => (_backendViews[v.id] ?? 0).toDouble()),
+      ...motosRecommandees.map((m) => (_backendViews[m.id] ?? 0).toDouble()),
       ...articlesPieces.map((p) => (_backendViews[p.id] ?? 0).toDouble()),
     ]..sort((a, b) => b.compareTo(a));
     while (viewPoints.length < 8) {
@@ -3147,6 +3252,12 @@ Widget buildPubsALaUneCarousel() {
           label: 'Véhicules',
           value: totalViewsVehicles.toDouble(),
           color: const Color(0xFFF8BF13),
+        ),
+      if (showMotos && totalViewsMotos > 0)
+        SellerStatsDonutSlice(
+          label: 'Motos',
+          value: totalViewsMotos.toDouble(),
+          color: const Color(0xFF1565C0),
         ),
       if (showPieces && totalViewsPieces > 0)
         SellerStatsDonutSlice(

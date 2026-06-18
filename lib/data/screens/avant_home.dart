@@ -656,15 +656,15 @@ class _AvantHomeState extends State<AvantHome>
     );
   }
 
-  Widget _buildMotoNavIcon(double size) {
-    final motoSize = size * 1.25;
-    return Image.asset(
-      'assets/images/motorbike.png',
-      width: motoSize,
-      height: motoSize,
-      fit: BoxFit.contain,
-    );
-  }
+  // Widget _buildMotoNavIcon(double size) {
+  //   final motoSize = size * 1.25;
+  //   return Image.asset(
+  //     'assets/images/motorbike.png',
+  //     width: motoSize,
+  //     height: motoSize,
+  //     fit: BoxFit.contain,
+  //   );
+  // }
 
   // Menu vendeur dynamique selon vendeurType (motos avant pièces)
   List<BottomNavigationBarItem> _buildVendeurMenuItems(
@@ -688,7 +688,8 @@ class _AvantHomeState extends State<AvantHome>
     }
     if (userService.peutVendreMotos) {
       items.add(BottomNavigationBarItem(
-        icon: _buildMotoNavIcon(iconSize),
+        // icon: _buildMotoNavIcon(iconSize),
+        icon: const Icon(Icons.motorcycle),
         label: 'Motos',
       ));
     }

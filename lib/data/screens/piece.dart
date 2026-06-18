@@ -70,7 +70,6 @@ class _PieceState extends State<Piece>
   late int _marqueTabIndex;
   late int _localisationTabIndex;
   late int _budgetTabIndex;
-  late int _statusPendingTabIndex;
   late int _statusOnlineTabIndex;
   late int _statusRejectedTabIndex;
 
@@ -89,10 +88,9 @@ class _PieceState extends State<Piece>
     if (isVendeur) {
       _typeTabIndex = 0;
       _marqueTabIndex = 1;
-      _statusPendingTabIndex = 2;
-      _statusOnlineTabIndex = 3;
-      _statusRejectedTabIndex = 4;
-      _tabController = TabController(length: 5, vsync: this);
+      _statusOnlineTabIndex = 2;
+      _statusRejectedTabIndex = 3;
+      _tabController = TabController(length: 4, vsync: this);
     } else {
       _typeTabIndex = 0;
       _marqueTabIndex = 1;
@@ -437,10 +435,6 @@ class _PieceState extends State<Piece>
       }
       if (isVendeur) {
         final statut = (p['statut'] ?? '').toString().toLowerCase();
-        if (_tabController.index == _statusPendingTabIndex &&
-            statut != 'en_attente') {
-          return false;
-        }
         if (_tabController.index == _statusOnlineTabIndex &&
             statut != 'en_ligne') {
           return false;
@@ -695,10 +689,6 @@ class _PieceState extends State<Piece>
                                 l10n.filterBrandTab,
                                 _marqueTabIndex,
                               ),
-                              if (isVendeur)
-                                _buildTabButton(
-                                    "En attente", _statusPendingTabIndex,
-                                    isWide: true),
                               if (isVendeur)
                                 _buildTabButton(
                                     "En ligne", _statusOnlineTabIndex,
