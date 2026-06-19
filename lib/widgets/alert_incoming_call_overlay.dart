@@ -7,6 +7,7 @@ import 'package:tranoo_pro/services/alert_message_utils.dart';
 import 'package:tranoo_pro/services/alert_pending_store.dart';
 import 'package:tranoo_pro/services/notification_ringtone_player.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
+import 'package:tranoo_pro/utils/locale_helper.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 /// Écran plein écran style appel entrant pour les alertes acheteur (vendeurs).
@@ -462,8 +463,9 @@ class AlertIncomingCallService {
     RemoteMessage message, {
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
+    final locale = await LocaleHelper.storedLanguageCode();
     await showPayload(
-      AlertCallPayload.fromRemoteMessage(message),
+      AlertCallPayload.fromRemoteMessage(message, locale: locale),
       navigatorKey: navigatorKey,
     );
   }

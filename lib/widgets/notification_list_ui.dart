@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/utils/notification_i18n.dart';
 
 /// Type d'icône pour la liste style YouTube.
 enum NotificationVisualKind {
@@ -86,20 +87,42 @@ Widget buildNotificationLeadingAvatar({
   );
 }
 
+String resolveNotificationTitle(
+  Map<String, dynamic> notif,
+  String locale, {
+  String fallback = '',
+}) =>
+    NotificationI18n.resolveTitle(notif, locale: locale, fallback: fallback);
+
+String resolveNotificationMessage(
+  Map<String, dynamic> notif,
+  String locale, {
+  String fallback = '',
+}) =>
+    NotificationI18n.resolveMessage(notif, locale: locale, fallback: fallback);
+
 String notificationPreviewText(
   Map<String, dynamic> notif, [
   AppLocalizations? l10n,
+  String? locale,
 ]) {
   final data = notif['data'] is Map
       ? Map<String, dynamic>.from(notif['data'])
       : <String, dynamic>{};
-  final message = (notif['message'] ?? '').toString().trim();
+  final defaultLabel = l10n?.notificationDefault ?? 'Notification';
+  final message = locale != null
+      ? NotificationI18n.resolveMessage(
+          notif,
+          locale: locale,
+          fallback: defaultLabel,
+        ).trim()
+      : (notif['message'] ?? '').toString().trim();
   final articleTitle = (data['articleTitle'] ?? '').toString().trim();
   if (articleTitle.isNotEmpty) return articleTitle;
   if (message.length > 90) return '${message.substring(0, 90)}...';
   return message.isNotEmpty
       ? message
-      : (l10n?.notificationDefault ?? 'Notification');
+      : defaultLabel;
 }
 
 String? notificationThumbUrl(Map<String, dynamic> notif) {

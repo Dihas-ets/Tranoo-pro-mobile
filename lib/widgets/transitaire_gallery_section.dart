@@ -8,6 +8,7 @@ import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
+import 'package:tranoo_pro/utils/api_error_message.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 import 'package:video_player/video_player.dart';
 
@@ -211,8 +212,7 @@ Future<void> showTransitaireGalleryUploadSheet(
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          e.response?.data?['message']?.toString() ??
-              l10n.transitaireGallerySaveError,
+          ApiErrorMessage.fromDio(l10n, e),
         ),
       ),
     );
@@ -361,12 +361,10 @@ class TransitaireGalleryGrid extends StatelessWidget {
       onItemsChanged!(updated);
     } on DioException catch (e) {
       if (!context.mounted) return;
+      final dlgL10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.response?.data?['message']?.toString() ??
-                AppLocalizations.of(context)!.transitaireGalleryDeleteFailed,
-          ),
+          content: Text(ApiErrorMessage.fromDio(dlgL10n, e)),
         ),
       );
     }

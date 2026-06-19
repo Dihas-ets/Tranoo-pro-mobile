@@ -13,6 +13,8 @@ import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart' as flutter_html;
+import 'package:tranoo_pro/utils/notification_i18n.dart';
+import 'package:tranoo_pro/utils/locale_helper.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
 import 'package:tranoo_pro/services/user_service.dart';
@@ -47,16 +49,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   Logger('FCM').info('Message reçu en arrière-plan: ${message.messageId}');
   if (isAlertFcmMessage(message)) {
     await LocalNotificationService.initialize();
+    final locale = await LocaleHelper.storedLanguageCode();
+    final push = NotificationI18n.resolvePush(
+      message,
+      locale,
+      defaultTitle: 'Nouvelle alerte Tranoo',
+    );
     final data = message.data.map(
       (k, v) => MapEntry(k, v?.toString() ?? ''),
     );
     await LocalNotificationService.showAlertIncomingCallNotification(
-      title: message.notification?.title ??
-          data['title'] ??
-          'Nouvelle alerte Tranoo',
-      body: message.notification?.body ??
-          data['message'] ??
-          'Un acheteur recherche un article',
+      title: push.title,
+      body: push.body,
       data: data,
     );
   }
@@ -197,7 +201,7 @@ class NotificationService {
     }
   }
 
-  void _showLocalNotification(RemoteMessage message) {
+  void _showLocalNotification(RemoteMessage message) async {
     _logger.info('Notification locale: ${message.notification?.title}');
 
     // Afficher une notification locale visible même en foreground
@@ -214,15 +218,17 @@ class NotificationService {
         }
       }
     } else {
+      final locale = await LocaleHelper.storedLanguageCode();
+      final push = NotificationI18n.resolvePush(message, locale);
       if (message.data['type'] == 'tricycle') {
         LocalNotificationService.showTricycleNotification(
-          message.notification?.title ?? 'Tranoo',
-          message.notification?.body ?? '',
+          push.title,
+          push.body,
         );
       } else {
         LocalNotificationService.showNotification(
-          message.notification?.title ?? 'Tranoo',
-          message.notification?.body ?? '',
+          push.title,
+          push.body,
         );
       }
     }

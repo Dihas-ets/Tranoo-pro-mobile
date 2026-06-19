@@ -1,4 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:tranoo_pro/utils/notification_i18n.dart';
 
 class AlertCallPayload {
   final String title;
@@ -11,17 +12,23 @@ class AlertCallPayload {
     required this.data,
   });
 
-  factory AlertCallPayload.fromRemoteMessage(RemoteMessage message) {
+  factory AlertCallPayload.fromRemoteMessage(
+    RemoteMessage message, {
+    String locale = 'fr',
+  }) {
     final data = message.data.map(
       (k, v) => MapEntry(k, v?.toString() ?? ''),
     );
+    final push = NotificationI18n.resolvePushFromData(
+      notificationTitle: message.notification?.title,
+      notificationBody: message.notification?.body,
+      data: data,
+      locale: locale,
+      defaultTitle: 'Nouvelle alerte',
+    );
     return AlertCallPayload(
-      title: message.notification?.title ??
-          data['title'] ??
-          'Nouvelle alerte',
-      body: message.notification?.body ??
-          data['message'] ??
-          'Un acheteur recherche un article',
+      title: push.title,
+      body: push.body,
       data: data,
     );
   }
