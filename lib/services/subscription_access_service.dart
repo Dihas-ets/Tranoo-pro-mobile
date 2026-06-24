@@ -95,6 +95,7 @@ class SubscriptionAccessService {
 
   Future<SellerAccessStatus> getSellerAccessStatus({
     DateTime? inscriptionDateOverride,
+    bool forTransitaire = false,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -176,21 +177,26 @@ class SubscriptionAccessService {
       }(),
       () async {
         try {
+          final pricingPath = forTransitaire
+              ? '/admin/transitaire-subscription-pricing'
+              : '/admin/subscription-pricing';
           developer.log(
-            '[SUB_ACCESS] GET /admin/subscription-pricing baseUrl=${_userService.dio.options.baseUrl}',
+            '[SUB_ACCESS] GET $pricingPath baseUrl=${_userService.dio.options.baseUrl}',
           );
-          final pricingResponse = await dio.get('/admin/subscription-pricing');
-          developer.log('[SUB_ACCESS] /admin/subscription-pricing status=${pricingResponse.statusCode} data=${pricingResponse.data}');
+          final pricingResponse = await dio.get(pricingPath);
+          developer.log('[SUB_ACCESS] $pricingPath status=${pricingResponse.statusCode} data=${pricingResponse.data}');
           final data = pricingResponse.data is Map<String, dynamic>
               ? pricingResponse.data as Map<String, dynamic>
               : <String, dynamic>{};
           monthlyPrice = _extractMonthlyPrice(data, fallback: monthlyPrice);
-          freeTrialDays = _extractFreeTrialDays(data, fallback: freeTrialDays);
+          if (!forTransitaire) {
+            freeTrialDays = _extractFreeTrialDays(data, fallback: freeTrialDays);
+          }
           developer.log(
-            '[SUB_ACCESS] extracted from /admin/subscription-pricing => monthlyPrice=$monthlyPrice freeTrialDays=$freeTrialDays',
+            '[SUB_ACCESS] extracted from $pricingPath => monthlyPrice=$monthlyPrice freeTrialDays=$freeTrialDays',
           );
         } catch (e) {
-          developer.log('[SUB_ACCESS] /admin/subscription-pricing error=$e');
+          developer.log('[SUB_ACCESS] pricing fetch error=$e');
         }
       }(),
     ];

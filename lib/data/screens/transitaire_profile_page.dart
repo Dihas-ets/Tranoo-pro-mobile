@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 
-/// Profil public transitaire — visible par les acheteurs depuis cars_info.
+/// Profil transitaire — public (acheteur) ou propriétaire (accueil pro).
 class TransitaireProfilePage extends StatelessWidget {
   final Map<String, dynamic> transitaire;
+  final bool isOwner;
 
-  const TransitaireProfilePage({super.key, required this.transitaire});
+  const TransitaireProfilePage({
+    super.key,
+    required this.transitaire,
+    this.isOwner = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +20,7 @@ class TransitaireProfilePage extends StatelessWidget {
         title: Text(
           TransitaireProfileHelpers.displayName(transitaire),
           style: const TextStyle(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             fontSize: 16,
             color: kTransitaireNavy,
           ),
@@ -27,7 +32,7 @@ class TransitaireProfilePage extends StatelessWidget {
       ),
       body: TransitaireProfileView(
         user: transitaire,
-        isOwner: false,
+        isOwner: isOwner,
       ),
     );
   }

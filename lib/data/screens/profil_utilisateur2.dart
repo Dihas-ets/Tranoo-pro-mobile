@@ -269,20 +269,6 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
     final profileMap = Map<String, dynamic>.from(userData!);
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(
-          l10n.myProfile,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: kTransitaireNavy,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: kTransitaireNavy,
-        elevation: 0,
-        centerTitle: true,
-      ),
       body: TransitaireProfileView(
         user: profileMap,
         isOwner: true,

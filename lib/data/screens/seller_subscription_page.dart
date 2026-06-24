@@ -48,7 +48,9 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       _error = null;
     });
     try {
-      final status = await _subscriptionService.getSellerAccessStatus();
+      final status = await _subscriptionService.getSellerAccessStatus(
+        forTransitaire: widget.forTransitaire,
+      );
       if (!mounted) return;
       setState(() {
         _status = status;
@@ -250,20 +252,6 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(
-          widget.forTransitaire ? 'Abonnement Transitaire' : 'Abonnement Vendeur',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            color: Colors.black87,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black87,
-      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(

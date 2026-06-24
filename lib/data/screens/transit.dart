@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import '../../services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tranoo_pro/data/screens/cars_info.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/services/transit_mission_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class Transit extends StatefulWidget {
   const Transit({super.key});
@@ -12,125 +16,249 @@ class Transit extends StatefulWidget {
 }
 
 class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
-  AppLocalizations get l10n => AppLocalizations.of(context)!;
-
   late TabController _tabController;
-  final UserService _userService = UserService();
+  final TransitMissionService _missionService = TransitMissionService.instance;
   String? currentUserId;
-  Map<String, dynamic>? currentUserData;
 
-  List<Map<String, dynamic>> inTransit = [];
-  List<Map<String, dynamic>> inConsumption = [];
+  List<Map<String, dynamic>> enCours = [];
+  List<Map<String, dynamic>> transferer = [];
+  List<Map<String, dynamic>> traite = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _getCurrentUserId();
-    _loadArticles();
+    _loadMissions();
   }
 
   Future<void> _getCurrentUserId() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        // Récupérer l'ID MongoDB du transitaire connecté
-        final response = await _userService.dio.get(
-          '/protected/me',
-          options: Options(
-            headers: {'Authorization': 'Bearer ${await user.getIdToken()}'},
-          ),
-        );
-        if (response.statusCode == 200) {
-          final userData = response.data['user'];
-          setState(() {
-            currentUserId = userData['_id'];
-            currentUserData = userData;
-          });
-        }
-      } catch (e) {
-        print('Erreur lors de la récupération des données utilisateur: $e');
-        // Fallback vers Firebase UID si erreur
-        setState(() {
-          currentUserId = user.uid;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadArticles() async {
+    if (user == null) return;
     try {
-      setState(() {
-        isLoading = true;
-      });
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        setState(() {
-          isLoading = false;
-        });
-        return;
-      }
-      final idToken = await user.getIdToken();
-      final String baseUrl = getBaseUrl();
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          headers: {'Authorization': 'Bearer $idToken'},
+      final response = await UserService().dio.get(
+        '/protected/me',
+        options: Options(
+          headers: {'Authorization': 'Bearer ${await user.getIdToken()}'},
         ),
       );
-      // Articles acceptés par le transitaire (proposition validée), statutVente = en_attente
-      final resp = await dio.get('/transit/acceptes');
-      final List data = resp.data is List ? resp.data : [];
-      final items =
-          data.map<Map<String, dynamic>>((a) => _mapArticle(a)).toList();
-      // Partition selon type (faute d’un flag dédié achat, on se base sur type)
-      final transit =
-          items.where((e) => (e['type'] ?? '') == 'voiture').toList();
-      final consommation =
-          items.where((e) => (e['type'] ?? '') == 'piece').toList();
-      if (mounted) {
+      if (response.statusCode == 200 && mounted) {
         setState(() {
-          inTransit = transit;
-          inConsumption = consommation;
-          isLoading = false;
+          currentUserId = response.data['user']['_id']?.toString();
         });
       }
-    } catch (e) {
-      print('Erreur lors du chargement des articles: $e');
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+    } catch (_) {
+      if (mounted) setState(() => currentUserId = user.uid);
     }
   }
 
-  Map<String, dynamic> _mapArticle(dynamic a) {
-    final List photos = (a['photos'] is List) ? a['photos'] : [];
-    final String? image = photos.isNotEmpty ? photos.first?.toString() : null;
-    final type = (a['type'] ?? '').toString();
+  Future<void> _loadMissions() async {
+    setState(() => isLoading = true);
+    try {
+      final results = await Future.wait([
+        _missionService.listMissions('en_cours'),
+        _missionService.listMissions('transferer'),
+        _missionService.listMissions('traite'),
+      ]);
+      if (mounted) {
+        setState(() {
+          enCours = results[0];
+          transferer = results[1];
+          traite = results[2];
+          isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Map<String, dynamic> _mapMission(Map<String, dynamic> mission) {
+    final article = mission['article'];
+    final acheteur = mission['acheteur'];
+    final photos = article is Map ? (article['photos'] as List?) : null;
+    final image = photos != null && photos.isNotEmpty
+        ? photos.first?.toString()
+        : null;
+    final titre = article is Map ? (article['titre'] ?? '') : '';
+    final marque = article is Map ? (article['marque'] ?? '') : '';
+    final modele = article is Map ? (article['modele'] ?? '') : '';
+    final annee = article is Map ? (article['annee'] ?? '') : '';
+    final prix = article is Map ? article['prix'] : null;
+    final acheteurNom = acheteur is Map
+        ? '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim()
+        : '';
+    final acheteurPhone =
+        acheteur is Map ? (acheteur['telephone'] ?? '').toString().trim() : '';
+
     return {
-      '_id': a['_id'],
-      'id': a['_id'],
-      'title': a['titre'] ?? '',
-      'description': _buildDescriptionFromArticle(a),
-      'price': a['prix'] != null ? '${a['prix']} f' : '',
+      'mission': mission,
+      'missionId': mission['_id'],
+      'article': article,
+      'title': titre.toString().isNotEmpty ? titre : '$marque $modele'.trim(),
+      'description': [annee, marque, modele]
+          .where((e) => e.toString().trim().isNotEmpty)
+          .join(' · '),
+      'price': prix != null ? '$prix f' : '',
       'image': image,
-      'type': type,
-      'vendeur': a['vendeur'],
+      'client': acheteurNom,
+      'clientPhone': acheteurPhone,
     };
   }
 
-  String _buildDescriptionFromArticle(dynamic a) {
-    final parts = <String>[];
-    if (a['annee'] != null) parts.add('${a['annee']}');
-    if (a['marque'] != null) parts.add('${a['marque']}');
-    if (a['modele'] != null) parts.add('${a['modele']}');
-    if (a['lieu'] != null) parts.add('${a['lieu']}');
-    return parts.where((e) => e.toString().trim().isNotEmpty).join(', ');
+  Future<void> _rejeterMission(Map<String, dynamic> item) async {
+    final missionId = item['missionId']?.toString();
+    if (missionId == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Refuser cette mission ?'),
+        content: const Text(
+          'L\'acheteur sera notifié et pourra choisir un autre transitaire.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Refuser'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final result = await withTranooLoading(
+      context,
+      () => _missionService.rejeterAttribution(missionId),
+    );
+    if (!mounted) return;
+
+    if (result.ok) {
+      showTranooToast(context, message: 'Mission refusée — acheteur notifié');
+      _loadMissions();
+    } else {
+      showTranooToast(
+        context,
+        message: result.error ?? 'Impossible de refuser la mission',
+        isError: true,
+      );
+    }
   }
 
+  Future<void> _openDetails(Map<String, dynamic> item) async {
+    final mission = item['mission'];
+    if (mission is! Map) return;
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CarsInfo.fromTransitMission(
+          Map<String, dynamic>.from(mission),
+        ),
+      ),
+    );
+    if (updated == true) _loadMissions();
+  }
+
+  Future<void> _callBuyer(Map<String, dynamic> item) async {
+    final phone = (item['clientPhone'] ?? '').toString().trim();
+    if (phone.isEmpty) {
+      showTranooToast(
+        context,
+        message: 'Numéro de l\'acheteur indisponible',
+        isError: true,
+      );
+      return;
+    }
+
+    final digits = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  item['client']?.toString().isNotEmpty == true
+                      ? item['client'].toString()
+                      : 'Contacter l\'acheteur',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: kTransitaireNavy,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.phone_rounded, color: kTransitaireNavy),
+                  title: const Text('Appeler'),
+                  subtitle: Text(phone),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final uri = Uri.parse('tel:$digits');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
+                  title: const Text('WhatsApp'),
+                  subtitle: Text(phone),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final waDigits = digits.replaceAll(RegExp(r'[^0-9]'), '');
+                    final uri = Uri.parse('https://wa.me/$waDigits');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _marquerTraite(Map<String, dynamic> item) async {
+    final missionId = item['missionId']?.toString();
+    if (missionId == null) return;
+    final ok = await _missionService.marquerTraite(missionId);
+    if (!mounted) return;
+    if (ok) {
+      showTranooToast(context, message: 'Mission marquée comme traitée');
+      _loadMissions();
+    } else {
+      showTranooToast(
+        context,
+        message: 'Impossible de marquer la mission',
+        isError: true,
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -140,103 +268,267 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(l10n.myTransits),
-        backgroundColor: const Color(0xFFF8BF13),
-        foregroundColor: Colors.black,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.black,
-          unselectedLabelColor: Colors.grey[600],
-          indicatorColor: Colors.black,
-          tabs: const [Tab(text: 'En Transit'), Tab(text: 'En Consommation')],
-        ),
-      ),
-      backgroundColor: Colors.white,
-      body: TabBarView(
-        controller: _tabController,
+    return Container(
+      color: Colors.white,
+      child: Column(
         children: [
-          _buildTransitList(inTransit),
-          _buildTransitList(inConsumption),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: kTransitaireAmber,
+              indicatorWeight: 3,
+              labelColor: kTransitaireNavy,
+              unselectedLabelColor: Colors.grey.shade500,
+              labelStyle:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              unselectedLabelStyle:
+                  const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              tabs: const [
+                Tab(text: 'En cours'),
+                Tab(text: 'Transférer'),
+                Tab(text: 'Traité'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              color: kTransitaireAmber,
+              onRefresh: _loadMissions,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildMissionList(enCours, 'en_cours'),
+                  _buildMissionList(transferer, 'transferer'),
+                  _buildMissionList(traite, 'traite'),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTransitList(List<Map<String, dynamic>> list) {
+  Widget _buildMissionList(List<Map<String, dynamic>> list, String statut) {
+    final l10n = AppLocalizations.of(context)!;
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-
     if (list.isEmpty) {
-      return Center(child: Text(l10n.noArticlesInCategory));
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: Center(child: Text(l10n.noArticlesInCategory)),
+          ),
+        ],
+      );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: list.length,
       itemBuilder: (context, index) {
-        final item = list[index];
+        final item = _mapMission(list[index]);
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           elevation: 2,
-          child: ListTile(
-            leading:
-                item['image'] != null
-                    ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        item['image'],
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.image, color: Colors.grey),
-                          );
-                        },
-                      ),
-                    )
-                    : Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.image, color: Colors.grey),
-                    ),
-            title: Text(
-              item['title'] ?? '',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Column(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item['description'] ?? ''),
-                const SizedBox(height: 4),
-                Text(
-                  'Prix: ${item['price'] ?? 'Non spécifié'}',
-                  style: const TextStyle(
-                    color: Colors.amber,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildThumb(item['image']?.toString()),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['title'] ?? '',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(item['description'] ?? ''),
+                          if ((item['client'] ?? '').toString().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text('Client : ${item['client']}'),
+                          ],
+                          if ((item['price'] ?? '').toString().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              item['price'].toString(),
+                              style: const TextStyle(
+                                color: kTransitaireAmber,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 10),
+                _buildActions(item, statut),
               ],
             ),
-            isThreeLine: true,
           ),
         );
       },
+    );
+  }
+
+  Widget _buildThumb(String? image) {
+    if (image != null && image.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          image,
+          width: 72,
+          height: 72,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _thumbPlaceholder(),
+        ),
+      );
+    }
+    return _thumbPlaceholder();
+  }
+
+  Widget _thumbPlaceholder() {
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.directions_car, color: Colors.grey),
+    );
+  }
+
+  Widget _actionBtn({
+    required String label,
+    required VoidCallback onPressed,
+    bool primary = false,
+    bool outline = false,
+  }) {
+    if (outline) {
+      return OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: kTransitaireNavy,
+          side: const BorderSide(color: kTransitaireAmber),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+        child: Text(label),
+      );
+    }
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary ? kTransitaireAmber : kTransitaireNavy,
+        foregroundColor: primary ? kTransitaireNavy : Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+      ),
+      child: Text(label),
+    );
+  }
+
+  Widget _buildActions(Map<String, dynamic> item, String statut) {
+    if (statut == 'en_cours') {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _actionBtn(
+                  label: 'Voir détails',
+                  onPressed: () => _openDetails(item),
+                  outline: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _actionBtn(
+                  label: 'Appeler l\'acheteur',
+                  onPressed: () => _callBuyer(item),
+                  primary: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => _rejeterMission(item),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kTransitaireNavy,
+                side: const BorderSide(color: kTransitaireAmber),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: const Text('Refuser la mission'),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (statut == 'transferer') {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _actionBtn(
+                  label: 'Voir détails',
+                  onPressed: () => _openDetails(item),
+                  outline: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _actionBtn(
+                  label: 'Appeler l\'acheteur',
+                  onPressed: () => _callBuyer(item),
+                  primary: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: _actionBtn(
+              label: 'Marquer traité',
+              onPressed: () => _marquerTraite(item),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: _actionBtn(
+        label: 'Voir détails',
+        onPressed: () => _openDetails(item),
+        outline: true,
+      ),
     );
   }
 }

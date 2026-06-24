@@ -1,10 +1,203 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/services/transitaire_review_service.dart';
 import 'package:tranoo_pro/widgets/transitaire_gallery_section.dart';
+import 'package:tranoo_pro/widgets/transitaire_reviews_section.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const Color kTransitaireNavy = Color(0xFF1B2B4B);
 const Color kTransitaireAmber = Color(0xFFF8BF13);
+
+Widget _tranooLoadingBody() {
+  return PopScope(
+    canPop: false,
+    child: Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+          decoration: BoxDecoration(
+            color: kTransitaireNavy,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kTransitaireAmber.withOpacity(0.45)),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: kTransitaireAmber,
+                ),
+              ),
+              SizedBox(height: 14),
+              Text(
+                'Veuillez patienter…',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Future<T> withTranooLoading<T>(
+  BuildContext context,
+  Future<T> Function() action,
+) async {
+  if (!context.mounted) return action();
+
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    useRootNavigator: true,
+    builder: (_) => _tranooLoadingBody(),
+  );
+
+  try {
+    return await action();
+  } finally {
+    if (context.mounted) {
+      final navigator = Navigator.of(context, rootNavigator: true);
+      if (navigator.canPop()) navigator.pop();
+    }
+  }
+}
+
+void showTranooToast(
+  BuildContext context, {
+  required String message,
+  bool isError = false,
+  bool isSuccess = false,
+}) {
+  final overlay = Overlay.of(context);
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (ctx) {
+      return Positioned(
+        top: MediaQuery.of(ctx).padding.top + 16,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            builder: (_, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, (1 - value) * -12),
+                child: child,
+              ),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: isError ? const Color(0xFFB3261E) : kTransitaireNavy,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+                border: Border.all(
+                  color: isError
+                      ? Colors.white.withOpacity(0.2)
+                      : kTransitaireAmber.withOpacity(0.45),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isError
+                        ? Icons.error_outline_rounded
+                        : isSuccess
+                            ? Icons.check_circle_rounded
+                            : Icons.info_outline_rounded,
+                    color: isError ? Colors.white : kTransitaireAmber,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+  overlay.insert(entry);
+  Future.delayed(const Duration(seconds: 3), () {
+    if (entry.mounted) entry.remove();
+  });
+}
+
+class TransitaireStarRating extends StatelessWidget {
+  final double rating;
+  final bool compact;
+
+  const TransitaireStarRating({
+    super.key,
+    required this.rating,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final safeRating = rating.clamp(0, 5).toDouble();
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 2 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: kTransitaireAmber.withOpacity(compact ? 0.35 : 0.22),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kTransitaireAmber.withOpacity(0.55)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.star_rounded,
+            color: compact ? kTransitaireNavy : kTransitaireAmber,
+            size: compact ? 14 : 17,
+          ),
+          SizedBox(width: compact ? 2 : 4),
+          Text(
+            safeRating.toStringAsFixed(1),
+            style: TextStyle(
+              fontSize: compact ? 11 : 13,
+              fontWeight: FontWeight.bold,
+              color: kTransitaireNavy,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class TransitaireProfileHelpers {
   static String displayName(
@@ -208,14 +401,35 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late List<TransitaireGalleryItem> _galleryItems;
+  double _ratingAverage = 0;
+  int _reviewCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() => setState(() {}));
     _galleryItems = parseTransitaireGallery(widget.user['transitaireGallery']);
+    _ratingAverage =
+        (widget.user['ratingAverage'] as num?)?.toDouble() ?? 0;
+    _reviewCount = (widget.user['reviewCount'] as num?)?.toInt() ?? 0;
+    _loadReviews();
   }
+
+  Future<void> _loadReviews() async {
+    if (!widget.isOwner) return;
+    try {
+      final payload = await TransitaireReviewService.instance.fetchReceived();
+      if (!mounted) return;
+      setState(() {
+        _ratingAverage = payload.ratingAverage;
+        _reviewCount = payload.reviewCount;
+      });
+    } catch (_) {}
+  }
+
+  String get _transitaireId =>
+      (widget.user['_id'] ?? widget.user['uid'] ?? '').toString();
 
   @override
   void didUpdateWidget(TransitaireProfileView oldWidget) {
@@ -266,6 +480,9 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
     final subtitle = TransitaireProfileHelpers.subtitle(user, l10n: l10n);
     final subscribed = user['hasSubscription'] == true ||
         user['subscriptionStatus'] == 'active';
+    final rating = _ratingAverage > 0
+        ? _ratingAverage
+        : (user['ratingAverage'] as num?)?.toDouble() ?? 0;
     final onGalleryTab = _tabController.index == 1;
     final navLift = widget.embeddedInMainNav
         ? kBottomNavigationBarHeight + MediaQuery.paddingOf(context).bottom
@@ -282,6 +499,9 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
               subtitle: subtitle,
               location: location,
               premium: subscribed,
+              showRating: true,
+              rating: rating,
+              reviewCount: _reviewCount,
             ),
             _ProfileTabBar(controller: _tabController, l10n: l10n),
             Expanded(
@@ -311,6 +531,17 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
                         widget.isOwner ? _onGalleryUpdated : null,
                     emptyMessage: l10n.transitaireGalleryEmpty,
                     bottomPadding: widget.isOwner ? navLift + 72 : navLift + 24,
+                  ),
+                  ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(20, 16, 20, navLift + 24),
+                    children: [
+                      if (_transitaireId.isNotEmpty)
+                        TransitaireReviewsSection(
+                          transitaireId: _transitaireId,
+                          isOwner: widget.isOwner,
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -351,6 +582,9 @@ class _ProfileCoverHeader extends StatelessWidget {
   final String subtitle;
   final String location;
   final bool premium;
+  final bool showRating;
+  final double rating;
+  final int reviewCount;
 
   const _ProfileCoverHeader({
     required this.photoUrl,
@@ -359,6 +593,9 @@ class _ProfileCoverHeader extends StatelessWidget {
     required this.subtitle,
     required this.location,
     required this.premium,
+    this.showRating = false,
+    this.rating = 0,
+    this.reviewCount = 0,
   });
 
   Widget _defaultCover() {
@@ -469,7 +706,10 @@ class _ProfileCoverHeader extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if (premium) ...[
+                      if (showRating) ...[
+                        const SizedBox(height: 10),
+                        TransitaireStarRating(rating: rating),
+                      ] else if (premium) ...[
                         const SizedBox(height: 10),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -545,6 +785,7 @@ class _ProfileTabBar extends StatelessWidget {
         tabs: [
           Tab(text: l10n.details),
           Tab(text: l10n.transitaireProfileTabGallery),
+          const Tab(text: 'Avis'),
         ],
       ),
     );

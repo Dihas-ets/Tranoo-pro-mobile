@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart' as myauth;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/utils/api_error_message.dart';
 import 'avant_home.dart';
 
 class SettingsTypeVendeurPage extends StatefulWidget {
@@ -402,6 +403,10 @@ class _SettingsTypeVendeurPageState extends State<SettingsTypeVendeurPage> {
           body: jsonEncode({'vendeurType': vendeurType}),
         );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
+          final decoded = jsonDecode(resp.body);
+          if (decoded is Map<String, dynamic>) {
+            throw Exception(ApiErrorMessage.fromMap(l10n, decoded));
+          }
           throw Exception('Erreur mise à jour (${resp.statusCode})');
         }
 

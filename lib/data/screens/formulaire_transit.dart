@@ -1,191 +1,377 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'historique_transit.dart'; // Importez la page HistoriqueTransitPage
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/services/transit_mission_service.dart';
+import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 
 class FormulaireTransitPage extends StatefulWidget {
-  const FormulaireTransitPage({super.key});
+  final Map<String, dynamic>? mission;
+
+  const FormulaireTransitPage({super.key, this.mission});
 
   @override
   State<FormulaireTransitPage> createState() => _FormulaireTransitPageState();
 }
 
 class _FormulaireTransitPageState extends State<FormulaireTransitPage> {
-  AppLocalizations get l10n => AppLocalizations.of(context)!;
+  final TransitMissionService _missionService = TransitMissionService.instance;
+  final _formKey = GlobalKey<FormState>();
 
-  // Contrôleurs pour les champs de texte
-  final TextEditingController _voitureController = TextEditingController();
-  final TextEditingController _clientController = TextEditingController();
-  final TextEditingController _portDepartController = TextEditingController();
-  final TextEditingController _portArriveeController = TextEditingController();
-  final TextEditingController _dateTransitController = TextEditingController();
-  final TextEditingController _statutController = TextEditingController();
+  List<Map<String, dynamic>> _missions = [];
+  Map<String, dynamic>? _selectedMission;
+  bool _loadingMissions = true;
+  bool _submitting = false;
 
-  // Liste des fichiers téléchargés
-  final List<File> _documents = [];
+  late final TextEditingController _portDepartController;
+  late final TextEditingController _portArriveeController;
+  late final TextEditingController _notesController;
 
-  // Fonction pour sélectionner un fichier
-  Future<void> _pickFile() async {
-    final picker = ImagePicker();
-    final pickedFile =
-        await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      setState(() {
-        _documents.add(File(pickedFile.path));
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    _portDepartController = TextEditingController();
+    _portArriveeController = TextEditingController();
+    _notesController = TextEditingController();
+    _selectedMission = widget.mission;
+    _loadMissions();
   }
 
-  // Fonction pour soumettre le formulaire
-  void _submitForm() {
-    // Ajoutez ici la logique pour mettre à jour les données dans historique_transit
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const HistoriqueTransitPage()),
+  @override
+  void dispose() {
+    _portDepartController.dispose();
+    _portArriveeController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMissions() async {
+    final missions = await _missionService.listAllMissions();
+    if (!mounted) return;
+    setState(() {
+      _missions = missions
+          .where((m) => m['statut'] != 'traite')
+          .toList();
+      _loadingMissions = false;
+      if (_selectedMission == null && _missions.isNotEmpty) {
+        _selectedMission = _missions.first;
+      }
+      _fillFromMission(_selectedMission);
+    });
+  }
+
+  void _fillFromMission(Map<String, dynamic>? mission) {
+    if (mission == null) {
+      _portDepartController.clear();
+      _portArriveeController.clear();
+      _notesController.clear();
+      return;
+    }
+    final article = mission['article'];
+    final lieu = article is Map ? (article['lieu'] ?? '').toString() : '';
+    _portDepartController.text = lieu;
+    _portArriveeController.text =
+        (mission['paysDestination'] ?? '').toString();
+    _notesController.text =
+        (mission['detailsSupplementaires'] ?? '').toString();
+  }
+
+  String _missionTitle(Map<String, dynamic> mission) {
+    final article = mission['article'];
+    if (article is! Map) return 'Mission';
+    final titre = (article['titre'] ?? '').toString().trim();
+    if (titre.isNotEmpty) return titre;
+    final marque = (article['marque'] ?? '').toString().trim();
+    final modele = (article['modele'] ?? '').toString().trim();
+    return '$marque $modele'.trim();
+  }
+
+  String _clientName(Map<String, dynamic> mission) {
+    final acheteur = mission['acheteur'];
+    if (acheteur is! Map) return '';
+    return '${acheteur['prenoms'] ?? ''} ${acheteur['nom'] ?? ''}'.trim();
+  }
+
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+    final mission = _selectedMission;
+    if (mission == null) {
+      showTranooToast(
+        context,
+        message: 'Sélectionnez une mission à renseigner',
+        isError: true,
+      );
+      return;
+    }
+
+    final missionId = mission['_id']?.toString();
+    if (missionId == null) return;
+
+    setState(() => _submitting = true);
+    final result = await _missionService.updateMissionDetails(
+      missionId: missionId,
+      paysDestination: _portArriveeController.text.trim(),
+      detailsSupplementaires: _notesController.text.trim(),
     );
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (result != null) {
+      showTranooToast(context, message: 'Informations de transit enregistrées');
+      Navigator.pop(context, true);
+    } else {
+      showTranooToast(
+        context,
+        message: 'Impossible d\'enregistrer les informations',
+        isError: true,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final mission = _selectedMission;
+    final article = mission?['article'];
+    final voiture = mission != null ? _missionTitle(mission) : '';
+    final client = mission != null ? _clientName(mission) : '';
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6F8),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        foregroundColor: Colors.black,
+        scrolledUnderElevation: 0,
+        foregroundColor: kTransitaireNavy,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          icon: const Icon(Icons.arrow_back_rounded, color: kTransitaireNavy),
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          "Formulaires de transit",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          'Renseigner un transit',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: kTransitaireNavy,
+          ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Champ "Nom de la voiture"
-            _buildTextField(
-              controller: _voitureController,
-              label: "Nom de la voiture",
-              hintText: "Toyota Corolla 2018",
-            ),
-            const SizedBox(height: 16),
-
-            // Champ "Client"
-            _buildTextField(
-              controller: _clientController,
-              label: "Client",
-              hintText: "Marcel T",
-            ),
-            const SizedBox(height: 16),
-
-            // Champ "Port de départ"
-            _buildTextField(
-              controller: _portDepartController,
-              label: "Port de départ",
-              hintText: "Anvers, Belgique",
-            ),
-            const SizedBox(height: 16),
-
-            // Champ "Port d'arrivée"
-            _buildTextField(
-              controller: _portArriveeController,
-              label: "Port d'arrivée",
-              hintText: "Cotonou, Bénin",
-            ),
-            const SizedBox(height: 16),
-
-            // Champ "Date de transit"
-            _buildTextField(
-              controller: _dateTransitController,
-              label: "Date de transit",
-              hintText: "10 avril 2025",
-            ),
-            const SizedBox(height: 16),
-
-            // Champ "Statut"
-            _buildTextField(
-              controller: _statutController,
-              label: "Statut",
-              hintText: l10n.inTransit,
-            ),
-            const SizedBox(height: 24),
-
-            // Section pour télécharger les documents
-            Center(
-              child: Column(
-                children: [
-                  IconButton(
-                    onPressed: _pickFile,
-                    icon: const Icon(Icons.camera_alt, color: Colors.black),
-                  ),
-                  const Text(
-                    "Télécharger les documents",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Liste des documents téléchargés
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: _documents.map((file) {
-                return GestureDetector(
-                  onTap: () {
-                    // Action pour ouvrir le fichier
-                  },
-                  child: Text(
-                    file.path.split('/').last,
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      decoration: TextDecoration.underline,
+      body: _loadingMissions
+          ? const Center(child: CircularProgressIndicator(color: kTransitaireAmber))
+          : _missions.isEmpty && widget.mission == null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.inbox_outlined,
+                            size: 56, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Aucune mission active',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Les transits sont créés lorsqu\'un acheteur vous sélectionne sur l\'application.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-
-            // Bouton "Soumettre"
-            Center(
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (widget.mission == null) ...[
+                          _buildSectionTitle('Mission'),
+                          const SizedBox(height: 8),
+                          _buildMissionDropdown(),
+                          const SizedBox(height: 20),
+                        ],
+                        _buildSectionTitle('Véhicule & client'),
+                        const SizedBox(height: 8),
+                        _buildReadOnlyField('Véhicule', voiture),
+                        const SizedBox(height: 12),
+                        _buildReadOnlyField('Client', client),
+                        const SizedBox(height: 20),
+                        _buildSectionTitle('Itinéraire'),
+                        const SizedBox(height: 8),
+                        _buildTextField(
+                          controller: _portDepartController,
+                          label: 'Lieu de départ',
+                          hint: 'Anvers, Belgique',
+                          readOnly: true,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _portArriveeController,
+                          label: 'Pays / port d\'arrivée',
+                          hint: 'Cotonou, Bénin',
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty)
+                                  ? 'Champ requis'
+                                  : null,
+                        ),
+                        const SizedBox(height: 20),
+                        _buildSectionTitle('Notes & documents'),
+                        const SizedBox(height: 8),
+                        _buildTextField(
+                          controller: _notesController,
+                          label: 'Détails supplémentaires',
+                          hint: 'Connaissement, certificat, remarques…',
+                          maxLines: 4,
+                        ),
+                        if (article is Map &&
+                            (article['photos'] as List?)?.isNotEmpty == true) ...[
+                          const SizedBox(height: 16),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              article['photos'][0].toString(),
+                              height: 140,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 28),
+                        SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _submitting ? null : _submitForm,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kTransitaireNavy,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor:
+                                  kTransitaireNavy.withOpacity(0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _submitting
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    l10n.submit,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  child: Text(l10n.submit,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
-              ),
-            ),
-          ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+        color: kTransitaireNavy,
+      ),
+    );
+  }
+
+  Widget _buildMissionDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<Map<String, dynamic>>(
+          isExpanded: true,
+          value: _selectedMission,
+          hint: const Text('Choisir une mission'),
+          items: _missions
+              .map(
+                (m) => DropdownMenuItem(
+                  value: m,
+                  child: Text(
+                    '${_missionTitle(m)} — ${_clientName(m)}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (m) {
+            setState(() {
+              _selectedMission = m;
+              _fillFromMission(m);
+            });
+          },
         ),
       ),
     );
   }
 
-  // Widget pour construire un champ de texte
+  Widget _buildReadOnlyField(String label, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value.isNotEmpty ? value : '—',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: kTransitaireNavy,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
-    required String hintText,
+    required String hint,
+    bool readOnly = false,
+    int maxLines = 1,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,21 +380,40 @@ class _FormulaireTransitPageState extends State<FormulaireTransitPage> {
           children: [
             Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: kTransitaireNavy,
+                fontSize: 13,
+              ),
             ),
-            const Text(
-              " *",
-              style: TextStyle(color: Colors.red),
-            ),
+            if (validator != null)
+              const Text(' *', style: TextStyle(color: Colors.red)),
           ],
         ),
         const SizedBox(height: 8),
-        TextField(
+        TextFormField(
           controller: controller,
+          readOnly: readOnly,
+          maxLines: maxLines,
+          validator: validator,
           decoration: InputDecoration(
-            hintText: hintText,
-            contentPadding: const EdgeInsets.symmetric(vertical: 8),
-            border: const UnderlineInputBorder(),
+            hintText: hint,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: kTransitaireAmber, width: 1.5),
+            ),
           ),
         ),
       ],

@@ -19,7 +19,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/widgets/spec_info_card.dart';
+import 'package:tranoo_pro/services/transit_mission_service.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
+import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 
 class CarsInfo extends StatefulWidget {
   final String? id;
@@ -51,6 +53,12 @@ class CarsInfo extends StatefulWidget {
   final String? alertNotificationId;
   final String? alertBuyerId;
   final String? alertRequestType;
+  final bool transitaireMissionView;
+  final String? missionModeLivraison;
+  final String? missionPaysDestination;
+  final String? missionDetailsSupplementaires;
+  final String? missionId;
+  final String? missionStatut;
 
   const CarsInfo({
     super.key,
@@ -83,7 +91,58 @@ class CarsInfo extends StatefulWidget {
     this.alertNotificationId,
     this.alertBuyerId,
     this.alertRequestType,
+    this.transitaireMissionView = false,
+    this.missionModeLivraison,
+    this.missionPaysDestination,
+    this.missionDetailsSupplementaires,
+    this.missionId,
+    this.missionStatut,
   });
+
+  factory CarsInfo.fromTransitMission(Map<String, dynamic> mission) {
+    final article = mission['article'];
+    final map = article is Map
+        ? Map<String, dynamic>.from(article)
+        : <String, dynamic>{};
+    final photos = (map['photos'] is List)
+        ? (map['photos'] as List)
+            .map((e) => e?.toString() ?? '')
+            .where((e) => e.isNotEmpty)
+            .toList()
+        : <String>[];
+
+    return CarsInfo(
+      id: map['_id']?.toString(),
+      titre: map['titre']?.toString(),
+      description: map['description']?.toString(),
+      marque: map['marque']?.toString(),
+      modele: map['modele']?.toString(),
+      annee: map['annee']?.toString(),
+      prix: map['prix']?.toString(),
+      condition: map['condition']?.toString(),
+      boiteVitesse: map['boiteVitesse']?.toString(),
+      carburant: map['carburant']?.toString(),
+      climatiseur: map['climatiseur']?.toString(),
+      distance: map['distance']?.toString(),
+      sieges: map['sieges']?.toString(),
+      portes: map['portes']?.toString(),
+      cylindre: map['cylindre']?.toString(),
+      couleur: map['couleur']?.toString(),
+      dedouanement: map['dedouanement'] == true,
+      lieu: (map['lieu'] ?? map['localisation'])?.toString(),
+      images: photos,
+      videos: const [],
+      video: map['video']?.toString(),
+      entreprise: map['entreprise']?.toString(),
+      transitaireMissionView: true,
+      missionModeLivraison: mission['modeLivraison']?.toString(),
+      missionPaysDestination: mission['paysDestination']?.toString(),
+      missionDetailsSupplementaires:
+          mission['detailsSupplementaires']?.toString(),
+      missionId: mission['_id']?.toString(),
+      missionStatut: mission['statut']?.toString(),
+    );
+  }
 
   @override
   State<CarsInfo> createState() => _CarsinfoState();
@@ -128,6 +187,8 @@ class _CarsinfoState extends State<CarsInfo> {
   bool _isOnline = false;
   bool _isPublishing = false;
   int _verificationPrice = 20000;
+  double _slideConfirmOffset = 0;
+  bool _markingTraite = false;
   String _formatFcfa(int value) {
     final priceStr = value.toString();
     final reversed = priceStr.split('').reversed.join('');
@@ -326,7 +387,266 @@ class _CarsinfoState extends State<CarsInfo> {
           _buildContentSection(screenWidth, isChauffeur),
         ],
       ),
+      bottomNavigationBar:
+          widget.transitaireMissionView ? _buildTransitaireBottomBar() : null,
     );
+  }
+
+  Widget? _buildTransitaireBottomBar() {
+    final statut = widget.missionStatut ?? '';
+    if (statut == 'traite') {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: SafeArea(
+          top: false,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.green.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'Mission traitée',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.green.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (statut == 'en_cours') {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Text(
+                  'En attente : l\'acheteur doit terminer la vérification et le paiement. '
+                  'La mission passera ensuite à « Transférer ».',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _markingTraite ? null : _confirmRejectMission,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kTransitaireNavy,
+                    side: const BorderSide(color: kTransitaireAmber),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Refuser cette mission'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (statut != 'transferer') return null;
+
+    const thumbSize = 52.0;
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Voiture transférée — confirmez la réception',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final dragMax =
+                    (constraints.maxWidth - thumbSize - 8).clamp(120.0, 280.0);
+                return GestureDetector(
+                  onHorizontalDragUpdate: _markingTraite
+                      ? null
+                      : (d) {
+                          setState(() {
+                            _slideConfirmOffset =
+                                (_slideConfirmOffset + d.delta.dx)
+                                    .clamp(0.0, dragMax);
+                          });
+                        },
+                  onHorizontalDragEnd: _markingTraite
+                      ? null
+                      : (_) async {
+                          if (_slideConfirmOffset >= dragMax * 0.88) {
+                            await _confirmMissionTraite();
+                          } else {
+                            setState(() => _slideConfirmOffset = 0);
+                          }
+                        },
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: kTransitaireNavy.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: kTransitaireAmber.withOpacity(0.5),
+                      ),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        Center(
+                          child: Text(
+                            _markingTraite
+                                ? 'Enregistrement…'
+                                : 'Glisser → Marquer comme traité',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: kTransitaireNavy.withOpacity(0.75),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 4 + _slideConfirmOffset,
+                          child: Container(
+                            width: thumbSize,
+                            height: thumbSize,
+                            decoration: BoxDecoration(
+                              color: kTransitaireAmber,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.12),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: _markingTraite
+                                ? const Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: kTransitaireNavy,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.local_shipping_rounded,
+                                    color: kTransitaireNavy,
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmRejectMission() async {
+    final missionId = widget.missionId;
+    if (missionId == null || missionId.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Refuser cette mission ?'),
+        content: const Text(
+          'L\'acheteur sera notifié et pourra choisir un autre transitaire.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Refuser'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    final result = await withTranooLoading(
+      context,
+      () => TransitMissionService.instance.rejeterAttribution(missionId),
+    );
+    if (!mounted) return;
+
+    if (result.ok) {
+      showTranooToast(context, message: 'Mission refusée — acheteur notifié');
+      Navigator.pop(context, true);
+    } else {
+      showTranooToast(
+        context,
+        message: result.error ?? 'Impossible de refuser la mission',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _confirmMissionTraite() async {
+    final missionId = widget.missionId;
+    if (missionId == null || missionId.isEmpty) return;
+    setState(() => _markingTraite = true);
+    final ok =
+        await TransitMissionService.instance.marquerTraite(missionId);
+    if (!mounted) return;
+    setState(() => _markingTraite = false);
+    if (ok) {
+      showTranooToast(context, message: 'Mission marquée comme traitée');
+      Navigator.pop(context, true);
+    } else {
+      setState(() => _slideConfirmOffset = 0);
+      showTranooToast(
+        context,
+        message: 'Impossible de confirmer la mission',
+        isError: true,
+      );
+    }
   }
 
   // Barre d'application avec bouton de retour et partage
@@ -663,24 +983,99 @@ class _CarsinfoState extends State<CarsInfo> {
   // Section des détails et spécifications
   Widget _buildContentSection(double screenWidth, bool isChauffeur) {
     final bool shouldShowDeliveryOptions =
-        isChauffeur || (widget.fromPub == true);
+        !widget.transitaireMissionView &&
+        (isChauffeur || (widget.fromPub == true));
     return Padding(
-      padding: EdgeInsets.all(screenWidth * 0.04), // Espacement ajusté
+      padding: EdgeInsets.all(screenWidth * 0.04),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(screenWidth), // En-tête avec le modèle et le prix
+          _buildHeader(screenWidth),
           const SizedBox(height: 16),
-          _buildDescription(screenWidth), // Description de la voiture
+          _buildDescription(screenWidth),
           const SizedBox(height: 24),
-          _buildSpecifications(screenWidth), // Liste des spécifications
+          _buildSpecifications(screenWidth),
           const SizedBox(height: 24),
-          _buildCheckboxes(
-            screenWidth,
-            shouldShowDeliveryOptions,
-          ), // Cases à cocher (si applicable)
-          const SizedBox(height: 24),
-          _buildActionButton(isChauffeur), // Bouton d'action dynamique
+          if (widget.transitaireMissionView) ...[
+            _buildBuyerTransitInfoPanel(),
+          ] else ...[
+            _buildCheckboxes(screenWidth, shouldShowDeliveryOptions),
+            const SizedBox(height: 24),
+            _buildActionButton(isChauffeur),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBuyerTransitInfoPanel() {
+    final mode = widget.missionModeLivraison ?? '';
+    final modeLabel = mode == 'transit'
+        ? 'En transit'
+        : mode == 'consommation'
+            ? 'En consommation'
+            : 'Non renseigné';
+    final destination = (widget.missionPaysDestination ?? '').trim();
+    final details = (widget.missionDetailsSupplementaires ?? '').trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF8BF13).withOpacity(0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Informations saisies par l\'acheteur',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              color: Color(0xFF1B2B4B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buyerInfoRow('Mode de livraison', modeLabel),
+          _buyerInfoRow(
+            'Destination',
+            destination.isNotEmpty ? destination : 'Non renseignée',
+          ),
+          if (details.isNotEmpty) _buyerInfoRow('Détails', details),
+        ],
+      ),
+    );
+  }
+
+  Widget _buyerInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Color(0xFF1B2B4B),
+              ),
+            ),
+          ),
         ],
       ),
     );

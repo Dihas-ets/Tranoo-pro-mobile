@@ -6,6 +6,8 @@ import 'package:tranoo_pro/data/screens/marque.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/piece.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
+import 'package:tranoo_pro/data/screens/transitaire_home.dart';
+import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 // import 'package:tranoo_pro/data/screens/une.dart'; // Masqué temporairement (onglet Publicité)
@@ -148,8 +150,10 @@ class _AvantHomeState extends State<AvantHome>
   ];
 
   final List<Widget> _pagesTransitaire = [
-    Marque(),
-    Transit(),
+    const TransitaireHome(),
+    const SellerSubscriptionPage(forTransitaire: true),
+    const Transit(),
+    const ProfilUtilisateur2(),
   ];
 
   List<Widget> _buildVendeurPages() {
@@ -314,6 +318,15 @@ class _AvantHomeState extends State<AvantHome>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             setState(() {
               _selectedIndex = vendeurItemsCount - 1;
+            });
+          });
+        }
+
+        if (role == 'transitaire' &&
+            _selectedIndex > _pagesTransitaire.length - 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            setState(() {
+              _selectedIndex = _pagesTransitaire.length - 1;
             });
           });
         }
@@ -577,13 +590,22 @@ class _AvantHomeState extends State<AvantHome>
                       : role == 'transitaire'
                           ? [
                               BottomNavigationBarItem(
-                                icon: Icon(Icons.home, size: iconSize),
+                                icon: Icon(Icons.home_outlined, size: iconSize),
                                 label: 'Accueil',
                               ),
                               BottomNavigationBarItem(
-                                icon:
-                                    Icon(Icons.local_shipping, size: iconSize),
-                                label: 'Transits',
+                                icon: Icon(Icons.card_membership_outlined,
+                                    size: iconSize),
+                                label: 'Abonnement',
+                              ),
+                              BottomNavigationBarItem(
+                                icon: Icon(Icons.local_shipping_outlined,
+                                    size: iconSize),
+                                label: 'Transit',
+                              ),
+                              BottomNavigationBarItem(
+                                icon: Icon(Icons.person_outline, size: iconSize),
+                                label: l10n.profile,
                               ),
                             ]
                           : role == 'livreur'

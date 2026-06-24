@@ -8,7 +8,9 @@ import 'package:tranoo_pro/utils/phone_country_config.dart';
 import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:tranoo_pro/widgets/registration_location_section.dart';
 import 'avant_home.dart';
+import 'package:dio/dio.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/utils/api_error_message.dart';
 
 import 'connexion_page.dart'; // Assurez-vous que ce fichier existe
 
@@ -1165,7 +1167,13 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                 } catch (e) {
                                   var title = 'Une erreur est survenue.';
                                   String? subtitle;
-                                  if (e.toString().contains(
+                                  if (e is DioException &&
+                                      e.response?.data is Map) {
+                                    final data = Map<String, dynamic>.from(
+                                      e.response!.data as Map,
+                                    );
+                                    title = ApiErrorMessage.fromMap(l10n, data);
+                                  } else if (e.toString().contains(
                                         'email-already-in-use',
                                       )) {
                                     title =
