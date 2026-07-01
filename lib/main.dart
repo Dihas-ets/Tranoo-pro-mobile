@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
@@ -22,7 +23,7 @@ import 'package:tranoo_pro/services/blocked_user_service.dart';
 import 'package:tranoo_pro/services/push_otp_service.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
 import 'package:tranoo_pro/providers/locale_provider.dart';
-import 'package:tranoo_pro/widgets/location_permission_dialog.dart';
+import 'package:tranoo_pro/widgets/video_splash_screen.dart';
 import 'package:tranoo_pro/widgets/first_launch_location_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:tranoo_pro/utils/feexpay_choice_callback_page.dart';
@@ -295,7 +296,8 @@ class NotificationService {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   try {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -396,7 +398,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const AppInitializer(),
+      home: const SplashFlow(),
       routes: {
         '/marque': (context) => const Marque(),
         '/payment-success': (context) =>
@@ -554,6 +556,30 @@ class _VerificationErrorPageState extends State<VerificationErrorPage> {
   }
 }
 
+class SplashFlow extends StatefulWidget {
+  const SplashFlow({super.key});
+
+  @override
+  State<SplashFlow> createState() => _SplashFlowState();
+}
+
+class _SplashFlowState extends State<SplashFlow> {
+  bool _showVideo = true;
+
+  void _onVideoFinished() {
+    if (!mounted) return;
+    setState(() => _showVideo = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showVideo) {
+      return VideoSplashScreen(onFinished: _onVideoFinished);
+    }
+    return const AppInitializer();
+  }
+}
+
 class AppInitializer extends StatefulWidget {
   const AppInitializer({super.key});
 
@@ -561,32 +587,14 @@ class AppInitializer extends StatefulWidget {
   State<AppInitializer> createState() => _AppInitializerState();
 }
 
-class _AppInitializerState extends State<AppInitializer>
-    with SingleTickerProviderStateMixin {
+class _AppInitializerState extends State<AppInitializer> {
   static const String _welcomeSeenKey = 'tranoo_pro_has_seen_welcome';
   static bool _welcomeFlowStarted = false;
-
-  late final AnimationController _carController;
-  late final Animation<double> _carOffset;
 
   @override
   void initState() {
     super.initState();
-    _carController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-    _carOffset = Tween<double>(begin: -0.3, end: 0.3).animate(
-      CurvedAnimation(parent: _carController, curve: Curves.easeInOut),
-    );
-    _carController.repeat(reverse: true);
     _checkUserStatus();
-  }
-
-  @override
-  void dispose() {
-    _carController.dispose();
-    super.dispose();
   }
 
   Future<void> _checkUserStatus() async {
@@ -783,71 +791,17 @@ class _AppInitializerState extends State<AppInitializer>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
-    return Scaffold(
+    return const Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  color: Colors.white,
-                  child: Image.asset(
-                    'assets/images/logo_tramoo.png',
-                    width: size.width * 0.4,
-                    cacheWidth: (size.width * 0.4).toInt(),
-                    filterQuality: FilterQuality.low,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Tranoo Pro',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-              ],
-            ),
+      body: Center(
+        child: SizedBox(
+          width: 120,
+          child: LinearProgressIndicator(
+            backgroundColor: Color(0xFFE0E0E0),
+            color: Colors.black87,
+            minHeight: 4,
           ),
-          Positioned(
-            bottom: size.height * 0.18,
-            left: 0,
-            right: 0,
-            child: SizedBox(
-              height: size.height * 0.16,
-              child: AnimatedBuilder(
-                animation: _carController,
-                builder: (context, _) {
-                  return Transform.translate(
-                    offset: Offset(_carOffset.value * size.width, 0),
-                    child: Icon(
-                      Icons.directions_car,
-                      size: size.width * 0.2,
-                      color: Colors.black,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: size.height * 0.08,
-            left: size.width * 0.2,
-            right: size.width * 0.2,
-            child: const LinearProgressIndicator(
-              backgroundColor: Colors.grey,
-              color: Colors.black87,
-              minHeight: 4,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

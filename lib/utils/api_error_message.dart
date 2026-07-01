@@ -142,6 +142,16 @@ class ApiErrorMessage {
         return l10n.errorTransitaireVerifDocsMissing;
       case 'TRANSITAIRE_VERIF_REFERENCE_PHONE_INVALID':
         return l10n.errorTransitaireVerifReferencePhoneInvalid;
+      case 'CAPTCHA_INVALID':
+        return l10n.errorCaptchaInvalid;
+      case 'CAPTCHA_TOKEN_MISSING':
+        return l10n.errorCaptchaRequired;
+      case 'TRANSITAIRE_ONLY':
+        return l10n.errorTransitaireOnly;
+      case 'TRANSITAIRE_VERIF_SUBMIT_SUCCESS':
+        return l10n.errorTransitaireVerifSubmitSuccess;
+      case 'TRANSITAIRE_VERIF_SUBMIT_FAILED':
+        return l10n.errorTransitaireVerifSubmitFailed;
       case 'VENDEUR_TYPE_SELLERS_ONLY':
         return l10n.errorVendeurTypeSellersOnly;
       case 'VENDEUR_TYPE_INVALID':

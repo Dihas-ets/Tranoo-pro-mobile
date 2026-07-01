@@ -4683,6 +4683,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'The reference person\'s phone number is invalid.';
 
   @override
+  String get errorCaptchaInvalid => 'Security check failed. Try again.';
+
+  @override
+  String get errorCaptchaRequired => 'Security check required.';
+
+  @override
+  String get errorTransitaireOnly => 'Reserved for forwarders.';
+
+  @override
+  String get errorTransitaireVerifSubmitSuccess =>
+      'Verification request sent. Review within 24h.';
+
+  @override
+  String get errorTransitaireVerifSubmitFailed =>
+      'Failed to submit verification request.';
+
+  @override
   String get transitMissionPurchaseCancelled =>
       'Purchase cancelled by the buyer after verification. This mission is closed.';
 }

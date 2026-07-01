@@ -2436,5 +2436,10 @@
   "errorTransitaireVerifCompanyRequired": "Le nom et le numéro de référence de l'entreprise de provenance sont requis.",
   "errorTransitaireVerifDocsMissing": "Le dossier doit contenir les photos recto et verso de la carte.",
   "errorTransitaireVerifReferencePhoneInvalid": "Le téléphone de la personne de référence est invalide.",
+  "errorCaptchaInvalid": "Échec du contrôle de sécurité. Réessayez.",
+  "errorCaptchaRequired": "Contrôle de sécurité requis.",
+  "errorTransitaireOnly": "Réservé aux transitaires.",
+  "errorTransitaireVerifSubmitSuccess": "Demande de vérification envoyée. Délai d'examen : 24h.",
+  "errorTransitaireVerifSubmitFailed": "Erreur lors de l'envoi de la demande de vérification.",
   "transitMissionPurchaseCancelled": "Achat annulé par l'acheteur après vérification. Cette mission est clôturée."
 }

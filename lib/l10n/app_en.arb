@@ -2436,5 +2436,10 @@
   "errorTransitaireVerifCompanyRequired": "Source company name and reference number are required.",
   "errorTransitaireVerifDocsMissing": "The file must include front and back card photos.",
   "errorTransitaireVerifReferencePhoneInvalid": "The reference person's phone number is invalid.",
+  "errorCaptchaInvalid": "Security check failed. Try again.",
+  "errorCaptchaRequired": "Security check required.",
+  "errorTransitaireOnly": "Reserved for forwarders.",
+  "errorTransitaireVerifSubmitSuccess": "Verification request sent. Review within 24h.",
+  "errorTransitaireVerifSubmitFailed": "Failed to submit verification request.",
   "transitMissionPurchaseCancelled": "Purchase cancelled by the buyer after verification. This mission is closed."
 }

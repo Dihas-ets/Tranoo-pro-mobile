@@ -8542,6 +8542,36 @@ abstract class AppLocalizations {
   /// **'The reference person\'s phone number is invalid.'**
   String get errorTransitaireVerifReferencePhoneInvalid;
 
+  /// No description provided for @errorCaptchaInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Security check failed. Try again.'**
+  String get errorCaptchaInvalid;
+
+  /// No description provided for @errorCaptchaRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Security check required.'**
+  String get errorCaptchaRequired;
+
+  /// No description provided for @errorTransitaireOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserved for forwarders.'**
+  String get errorTransitaireOnly;
+
+  /// No description provided for @errorTransitaireVerifSubmitSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification request sent. Review within 24h.'**
+  String get errorTransitaireVerifSubmitSuccess;
+
+  /// No description provided for @errorTransitaireVerifSubmitFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to submit verification request.'**
+  String get errorTransitaireVerifSubmitFailed;
+
   /// No description provided for @transitMissionPurchaseCancelled.
   ///
   /// In en, this message translates to:

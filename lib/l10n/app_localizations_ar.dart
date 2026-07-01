@@ -4638,6 +4638,22 @@ class AppLocalizationsAr extends AppLocalizations {
       'رقم هاتف الشخص المرجعي غير صالح.';
 
   @override
+  String get errorCaptchaInvalid => 'فشل التحقق الأمني. أعد المحاولة.';
+
+  @override
+  String get errorCaptchaRequired => 'التحقق الأمني مطلوب.';
+
+  @override
+  String get errorTransitaireOnly => 'مخصص لوسطاء الشحن.';
+
+  @override
+  String get errorTransitaireVerifSubmitSuccess =>
+      'تم إرسال طلب التحقق. المراجعة خلال 24 ساعة.';
+
+  @override
+  String get errorTransitaireVerifSubmitFailed => 'تعذر إرسال طلب التحقق.';
+
+  @override
   String get transitMissionPurchaseCancelled =>
       'ألغى المشتري الشراء بعد التحقق. تم إغلاق هذه المهمة.';
 }

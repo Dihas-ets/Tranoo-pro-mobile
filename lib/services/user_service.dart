@@ -119,6 +119,7 @@ class UserService extends ChangeNotifier {
     String? vehiculeModele,
     String? vehiculeAnnee,
     String? vehiculeCouleur,
+    String? captchaToken,
   }) async {
     UserCredential? credential;
     try {
@@ -154,6 +155,9 @@ class UserService extends ChangeNotifier {
       if (ville != null && ville.isNotEmpty) data['ville'] = ville;
       if (fournisseurProfil != null) data['fournisseurProfil'] = fournisseurProfil;
       if (referralCode != null) data['referralCode'] = referralCode;
+      if (captchaToken != null && captchaToken.isNotEmpty) {
+        data['captchaToken'] = captchaToken;
+      }
       
       // Ajouter les données véhicule (livreur/chauffeur)
       if (vehiculeImmatriculation != null || vehiculeType != null || vehiculeMarque != null) {

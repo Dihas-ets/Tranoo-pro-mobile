@@ -4749,6 +4749,23 @@ class AppLocalizationsFr extends AppLocalizations {
       'Le téléphone de la personne de référence est invalide.';
 
   @override
+  String get errorCaptchaInvalid => 'Échec du contrôle de sécurité. Réessayez.';
+
+  @override
+  String get errorCaptchaRequired => 'Contrôle de sécurité requis.';
+
+  @override
+  String get errorTransitaireOnly => 'Réservé aux transitaires.';
+
+  @override
+  String get errorTransitaireVerifSubmitSuccess =>
+      'Demande de vérification envoyée. Délai d\'examen : 24h.';
+
+  @override
+  String get errorTransitaireVerifSubmitFailed =>
+      'Erreur lors de l\'envoi de la demande de vérification.';
+
+  @override
   String get transitMissionPurchaseCancelled =>
       'Achat annulé par l\'acheteur après vérification. Cette mission est clôturée.';
 }

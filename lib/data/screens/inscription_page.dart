@@ -11,6 +11,9 @@ import 'avant_home.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/utils/api_error_message.dart';
+// CAPTCHA mobile désactivé — web uniquement pour l'instant.
+// import 'package:tranoo_pro/config/turnstile_config.dart';
+// import 'package:tranoo_pro/utils/turnstile_captcha.dart';
 
 import 'connexion_page.dart'; // Assurez-vous que ce fichier existe
 
@@ -1010,6 +1013,23 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
                                 setState(() => _isLoading = true);
                                 try {
+                                  // --- CAPTCHA mobile (désactivé, web uniquement) ---
+                                  // final captchaToken =
+                                  //     await TurnstileCaptcha.requestToken(
+                                  //   context,
+                                  // );
+                                  // if (isTurnstileConfigured &&
+                                  //     (captchaToken == null ||
+                                  //         captchaToken.isEmpty)) {
+                                  //   AuthMessagePopup.showError(
+                                  //     context,
+                                  //     title: 'Contrôle de sécurité requis',
+                                  //     subtitle:
+                                  //         'Veuillez valider le contrôle de sécurité pour continuer.',
+                                  //   );
+                                  //   return;
+                                  // }
+
                                   final fullPhone =
                                       (selectedCountryCode ?? '+229') + phone;
                                   final loc = _profileLocation;
@@ -1068,6 +1088,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     ville: loc?.city,
                                     fournisseurProfil: fournisseurProfil,
                                     referralCode: pendingReferral,
+                                    // captchaToken: captchaToken,
                                     vehiculeImmatriculation:
                                         (selectedRole == 'Livreur' ||
                                                 selectedRole == 'Chauffeur')

@@ -2436,5 +2436,10 @@
   "errorTransitaireVerifCompanyRequired": "اسم شركة المصدر ورقم المرجع مطلوبان.",
   "errorTransitaireVerifDocsMissing": "يجب أن يتضمن الملف صور وجه وظهر البطاقة.",
   "errorTransitaireVerifReferencePhoneInvalid": "رقم هاتف الشخص المرجعي غير صالح.",
+  "errorCaptchaInvalid": "فشل التحقق الأمني. أعد المحاولة.",
+  "errorCaptchaRequired": "التحقق الأمني مطلوب.",
+  "errorTransitaireOnly": "مخصص لوسطاء الشحن.",
+  "errorTransitaireVerifSubmitSuccess": "تم إرسال طلب التحقق. المراجعة خلال 24 ساعة.",
+  "errorTransitaireVerifSubmitFailed": "تعذر إرسال طلب التحقق.",
   "transitMissionPurchaseCancelled": "ألغى المشتري الشراء بعد التحقق. تم إغلاق هذه المهمة."
 }
