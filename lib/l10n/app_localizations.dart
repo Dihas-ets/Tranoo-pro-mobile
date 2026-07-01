@@ -8283,6 +8283,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save error: {error}'**
   String registrationSaveError(String error);
+
+  /// No description provided for @transitaireVerificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Forwarder verification'**
+  String get transitaireVerificationTitle;
+
+  /// No description provided for @transitaireVerificationLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load verification status.'**
+  String get transitaireVerificationLoadError;
+
+  /// No description provided for @transitaireVerificationCompanyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the source company and its reference number.'**
+  String get transitaireVerificationCompanyRequired;
+
+  /// No description provided for @transitaireVerificationCardsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add front and back photos of your card.'**
+  String get transitaireVerificationCardsRequired;
+
+  /// No description provided for @transitaireVerificationUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Image upload failed.'**
+  String get transitaireVerificationUploadFailed;
+
+  /// No description provided for @transitaireVerificationUploadInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait while the cards are uploading.'**
+  String get transitaireVerificationUploadInProgress;
+
+  /// No description provided for @transitaireVerificationSubmitFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not submit. Please try again.'**
+  String get transitaireVerificationSubmitFailed;
+
+  /// No description provided for @transitaireVerificationSubmitSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Request sent. Review within 24 hours.'**
+  String get transitaireVerificationSubmitSuccess;
+
+  /// No description provided for @transitaireVerificationFrontUploadSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Front card uploaded successfully.'**
+  String get transitaireVerificationFrontUploadSuccess;
+
+  /// No description provided for @transitaireVerificationBackUploadSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Back card uploaded successfully.'**
+  String get transitaireVerificationBackUploadSuccess;
+
+  /// No description provided for @transitaireVerificationFrontUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload the front card.'**
+  String get transitaireVerificationFrontUploadFailed;
+
+  /// No description provided for @transitaireVerificationBackUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload the back card.'**
+  String get transitaireVerificationBackUploadFailed;
+
+  /// No description provided for @transitaireVerificationCardSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Forwarder card'**
+  String get transitaireVerificationCardSectionTitle;
+
+  /// No description provided for @transitaireVerificationCardSectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload the front and back of your professional card.'**
+  String get transitaireVerificationCardSectionHint;
+
+  /// No description provided for @transitaireVerificationCardFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Front'**
+  String get transitaireVerificationCardFront;
+
+  /// No description provided for @transitaireVerificationCardBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get transitaireVerificationCardBack;
+
+  /// No description provided for @transitaireVerificationCompanySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source company'**
+  String get transitaireVerificationCompanySectionTitle;
+
+  /// No description provided for @transitaireVerificationCompanyNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Company name'**
+  String get transitaireVerificationCompanyNameHint;
+
+  /// No description provided for @transitaireVerificationCompanyRefHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference person\'s phone number'**
+  String get transitaireVerificationCompanyRefHint;
+
+  /// No description provided for @transitaireVerificationReferencePhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid phone number for the reference person.'**
+  String get transitaireVerificationReferencePhoneInvalid;
+
+  /// No description provided for @transitaireVerificationSubmitButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit request'**
+  String get transitaireVerificationSubmitButton;
+
+  /// No description provided for @transitaireVerificationResubmitButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Resubmit request'**
+  String get transitaireVerificationResubmitButton;
+
+  /// No description provided for @transitaireVerificationBannerPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request under review'**
+  String get transitaireVerificationBannerPendingTitle;
+
+  /// No description provided for @transitaireVerificationBannerPendingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Our team will review your file within 24 hours. You will be notified once a decision is made.'**
+  String get transitaireVerificationBannerPendingSubtitle;
+
+  /// No description provided for @transitaireVerificationBannerResubmitPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resubmitted file under review'**
+  String get transitaireVerificationBannerResubmitPendingTitle;
+
+  /// No description provided for @transitaireVerificationBannerResubmitPendingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your corrected file was received. Our team will review it within 24 hours.'**
+  String get transitaireVerificationBannerResubmitPendingSubtitle;
+
+  /// No description provided for @transitaireVerificationBannerApprovedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification approved'**
+  String get transitaireVerificationBannerApprovedTitle;
+
+  /// No description provided for @transitaireVerificationBannerApprovedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is approved. Continue to your Tranoo Pro subscription to activate access.'**
+  String get transitaireVerificationBannerApprovedSubtitle;
+
+  /// No description provided for @transitaireVerificationPendingReadOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your file is read-only while under review. Pull down to refresh the status. Tap a photo to enlarge it.'**
+  String get transitaireVerificationPendingReadOnlyHint;
+
+  /// No description provided for @transitaireVerificationBannerRejectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request rejected'**
+  String get transitaireVerificationBannerRejectedTitle;
+
+  /// No description provided for @transitaireVerificationBannerRejectedWithMotif.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {motif}\nFix the issues and resubmit your file.'**
+  String transitaireVerificationBannerRejectedWithMotif(String motif);
+
+  /// No description provided for @transitaireVerificationBannerRejectedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix your file and submit a new request.'**
+  String get transitaireVerificationBannerRejectedSubtitle;
+
+  /// No description provided for @transitaireVerificationBannerRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification required'**
+  String get transitaireVerificationBannerRequiredTitle;
+
+  /// No description provided for @transitaireVerificationBannerRequiredSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'To activate your forwarder account, complete your file. Review time: 24 hours after submission.'**
+  String get transitaireVerificationBannerRequiredSubtitle;
+
+  /// No description provided for @transitaireVerificationLegacyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'All forwarders, including existing accounts, must upload front/back card photos to continue.'**
+  String get transitaireVerificationLegacyHint;
+
+  /// No description provided for @transitaireSubscriptionExpiredToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Your subscription has expired. Renew to continue.'**
+  String get transitaireSubscriptionExpiredToast;
+
+  /// No description provided for @transitaireSubscriptionBlockerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Forwarder subscription'**
+  String get transitaireSubscriptionBlockerTitle;
+
+  /// No description provided for @errorTransitaireVerifAlreadyVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is already verified.'**
+  String get errorTransitaireVerifAlreadyVerified;
+
+  /// No description provided for @errorTransitaireVerifPending.
+  ///
+  /// In en, this message translates to:
+  /// **'A request is already under review (24h processing time).'**
+  String get errorTransitaireVerifPending;
+
+  /// No description provided for @errorTransitaireVerifCardsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Front and back photos of your forwarder card are required.'**
+  String get errorTransitaireVerifCardsRequired;
+
+  /// No description provided for @errorTransitaireVerifCompanyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Source company name and reference number are required.'**
+  String get errorTransitaireVerifCompanyRequired;
+
+  /// No description provided for @errorTransitaireVerifDocsMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The file must include front and back card photos.'**
+  String get errorTransitaireVerifDocsMissing;
+
+  /// No description provided for @errorTransitaireVerifReferencePhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The reference person\'s phone number is invalid.'**
+  String get errorTransitaireVerifReferencePhoneInvalid;
+
+  /// No description provided for @transitMissionPurchaseCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase cancelled by the buyer after verification. This mission is closed.'**
+  String get transitMissionPurchaseCancelled;
 }
 
 class _AppLocalizationsDelegate

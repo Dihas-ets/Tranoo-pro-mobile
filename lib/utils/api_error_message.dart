@@ -130,6 +130,18 @@ class ApiErrorMessage {
         return l10n.errorGalleryInvalidItem;
       case 'GALLERY_ITEM_TYPE_URL':
         return l10n.errorGalleryItemTypeUrl;
+      case 'TRANSITAIRE_VERIF_ALREADY_VERIFIED':
+        return l10n.errorTransitaireVerifAlreadyVerified;
+      case 'TRANSITAIRE_VERIF_PENDING':
+        return l10n.errorTransitaireVerifPending;
+      case 'TRANSITAIRE_VERIF_CARDS_REQUIRED':
+        return l10n.errorTransitaireVerifCardsRequired;
+      case 'TRANSITAIRE_VERIF_COMPANY_REQUIRED':
+        return l10n.errorTransitaireVerifCompanyRequired;
+      case 'TRANSITAIRE_VERIF_DOCS_MISSING':
+        return l10n.errorTransitaireVerifDocsMissing;
+      case 'TRANSITAIRE_VERIF_REFERENCE_PHONE_INVALID':
+        return l10n.errorTransitaireVerifReferencePhoneInvalid;
       case 'VENDEUR_TYPE_SELLERS_ONLY':
         return l10n.errorVendeurTypeSellersOnly;
       case 'VENDEUR_TYPE_INVALID':

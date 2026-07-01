@@ -2387,5 +2387,54 @@
         "type": "String"
       }
     }
-  }
+  },
+  "transitaireVerificationTitle": "التحقق من الوسيط",
+  "transitaireVerificationLoadError": "تعذر تحميل حالة التحقق.",
+  "transitaireVerificationCompanyRequired": "أدخل شركة المصدر ورقم المرجع.",
+  "transitaireVerificationCardsRequired": "أضف صورتي الوجه والظهر للبطاقة.",
+  "transitaireVerificationUploadFailed": "فشل رفع الصور.",
+  "transitaireVerificationUploadInProgress": "يرجى الانتظار أثناء رفع البطاقات.",
+  "transitaireVerificationSubmitFailed": "تعذر الإرسال. أعد المحاولة.",
+  "transitaireVerificationSubmitSuccess": "تم إرسال الطلب. المراجعة خلال 24 ساعة.",
+  "transitaireVerificationFrontUploadSuccess": "تم رفع صورة الوجه بنجاح.",
+  "transitaireVerificationBackUploadSuccess": "تم رفع صورة الظهر بنجاح.",
+  "transitaireVerificationFrontUploadFailed": "فشل رفع صورة الوجه.",
+  "transitaireVerificationBackUploadFailed": "فشل رفع صورة الظهر.",
+  "transitaireVerificationCardSectionTitle": "بطاقة الوسيط",
+  "transitaireVerificationCardSectionHint": "ارفع صورة الوجه والظهر لبطاقتك المهنية.",
+  "transitaireVerificationCardFront": "الوجه",
+  "transitaireVerificationCardBack": "الظهر",
+  "transitaireVerificationCompanySectionTitle": "شركة المصدر",
+  "transitaireVerificationCompanyNameHint": "اسم الشركة",
+  "transitaireVerificationCompanyRefHint": "هاتف الشخص المرجعي",
+  "transitaireVerificationReferencePhoneInvalid": "أدخل رقم هاتف صالحاً للشخص المرجعي.",
+  "transitaireVerificationSubmitButton": "إرسال الطلب",
+  "transitaireVerificationResubmitButton": "إعادة إرسال الطلب",
+  "transitaireVerificationBannerPendingTitle": "الطلب قيد المراجعة",
+  "transitaireVerificationBannerPendingSubtitle": "سيراجع فريقنا ملفك خلال 24 ساعة. ستتلقى إشعاراً عند اتخاذ القرار.",
+  "transitaireVerificationBannerResubmitPendingTitle": "ملف مُعاد قيد المراجعة",
+  "transitaireVerificationBannerResubmitPendingSubtitle": "تم استلام ملفك المُصحَّح. سيراجعه فريقنا خلال 24 ساعة.",
+  "transitaireVerificationBannerApprovedTitle": "تم التحقق بنجاح",
+  "transitaireVerificationBannerApprovedSubtitle": "تمت الموافقة على حسابك. انتقل إلى الاشتراك في Tranoo Pro لتفعيل الوصول.",
+  "transitaireVerificationPendingReadOnlyHint": "ملفك للقراءة فقط أثناء المراجعة. اسحب للأسفل لتحديث الحالة. المس الصورة لتكبيرها.",
+  "transitaireVerificationBannerRejectedTitle": "تم رفض الطلب",
+  "transitaireVerificationBannerRejectedWithMotif": "السبب: {motif}\nصحّح العناصر المذكورة ثم أعد إرسال ملفك.",
+  "@transitaireVerificationBannerRejectedWithMotif": {
+    "placeholders": {
+      "motif": { "type": "String" }
+    }
+  },
+  "transitaireVerificationBannerRejectedSubtitle": "صحّح ملفك ثم أعد إرسال طلب جديد.",
+  "transitaireVerificationBannerRequiredTitle": "التحقق مطلوب",
+  "transitaireVerificationBannerRequiredSubtitle": "لتفعيل حساب الوسيط، أكمل ملفك. مدة المراجعة: 24 ساعة بعد الإرسال.",
+  "transitaireVerificationLegacyHint": "يجب على جميع الوسطاء، بما في ذلك الحسابات القديمة، رفع صور البطاقة (وجه/ظهر) للمتابعة.",
+  "transitaireSubscriptionExpiredToast": "انتهى اشتراكك. جدّد للمتابعة.",
+  "transitaireSubscriptionBlockerTitle": "اشتراك الوسيط",
+  "errorTransitaireVerifAlreadyVerified": "حسابك موثّق بالفعل.",
+  "errorTransitaireVerifPending": "طلب قيد المراجعة بالفعل (24 ساعة).",
+  "errorTransitaireVerifCardsRequired": "صور وجه وظهر بطاقة الوسيط مطلوبة.",
+  "errorTransitaireVerifCompanyRequired": "اسم شركة المصدر ورقم المرجع مطلوبان.",
+  "errorTransitaireVerifDocsMissing": "يجب أن يتضمن الملف صور وجه وظهر البطاقة.",
+  "errorTransitaireVerifReferencePhoneInvalid": "رقم هاتف الشخص المرجعي غير صالح.",
+  "transitMissionPurchaseCancelled": "ألغى المشتري الشراء بعد التحقق. تم إغلاق هذه المهمة."
 }

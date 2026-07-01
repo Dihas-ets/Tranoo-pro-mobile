@@ -4583,4 +4583,172 @@ class AppLocalizationsFr extends AppLocalizations {
   String registrationSaveError(String error) {
     return 'Erreur lors de l\'enregistrement: $error';
   }
+
+  @override
+  String get transitaireVerificationTitle => 'Vérification transitaire';
+
+  @override
+  String get transitaireVerificationLoadError =>
+      'Impossible de charger le statut de vérification.';
+
+  @override
+  String get transitaireVerificationCompanyRequired =>
+      'Renseignez l\'entreprise de provenance et sa référence.';
+
+  @override
+  String get transitaireVerificationCardsRequired =>
+      'Ajoutez les photos recto et verso de votre carte.';
+
+  @override
+  String get transitaireVerificationUploadFailed =>
+      'Échec de l\'envoi des images.';
+
+  @override
+  String get transitaireVerificationUploadInProgress =>
+      'Patientez pendant l\'envoi des cartes.';
+
+  @override
+  String get transitaireVerificationSubmitFailed =>
+      'Envoi impossible. Réessayez.';
+
+  @override
+  String get transitaireVerificationSubmitSuccess =>
+      'Demande envoyée. Examen sous 24h.';
+
+  @override
+  String get transitaireVerificationFrontUploadSuccess =>
+      'Carte recto envoyée avec succès.';
+
+  @override
+  String get transitaireVerificationBackUploadSuccess =>
+      'Carte verso envoyée avec succès.';
+
+  @override
+  String get transitaireVerificationFrontUploadFailed =>
+      'Échec de l\'envoi de la carte recto.';
+
+  @override
+  String get transitaireVerificationBackUploadFailed =>
+      'Échec de l\'envoi de la carte verso.';
+
+  @override
+  String get transitaireVerificationCardSectionTitle => 'Carte de transitaire';
+
+  @override
+  String get transitaireVerificationCardSectionHint =>
+      'Téléversez le recto et le verso de votre carte professionnelle.';
+
+  @override
+  String get transitaireVerificationCardFront => 'Recto';
+
+  @override
+  String get transitaireVerificationCardBack => 'Verso';
+
+  @override
+  String get transitaireVerificationCompanySectionTitle =>
+      'Entreprise de provenance';
+
+  @override
+  String get transitaireVerificationCompanyNameHint => 'Nom de l\'entreprise';
+
+  @override
+  String get transitaireVerificationCompanyRefHint =>
+      'Téléphone de la personne de référence';
+
+  @override
+  String get transitaireVerificationReferencePhoneInvalid =>
+      'Saisissez un numéro de téléphone valide pour la personne de référence.';
+
+  @override
+  String get transitaireVerificationSubmitButton => 'Envoyer la demande';
+
+  @override
+  String get transitaireVerificationResubmitButton => 'Renvoyer la demande';
+
+  @override
+  String get transitaireVerificationBannerPendingTitle =>
+      'Demande en cours d\'examen';
+
+  @override
+  String get transitaireVerificationBannerPendingSubtitle =>
+      'Notre équipe vérifie votre dossier sous 24h. Vous serez notifié dès la décision.';
+
+  @override
+  String get transitaireVerificationBannerResubmitPendingTitle =>
+      'Nouveau dossier en cours d\'examen';
+
+  @override
+  String get transitaireVerificationBannerResubmitPendingSubtitle =>
+      'Votre dossier corrigé a bien été reçu. Notre équipe l\'examine sous 24h.';
+
+  @override
+  String get transitaireVerificationBannerApprovedTitle =>
+      'Vérification validée';
+
+  @override
+  String get transitaireVerificationBannerApprovedSubtitle =>
+      'Votre compte est approuvé. Passez à l\'abonnement Tranoo Pro pour activer l\'accès.';
+
+  @override
+  String get transitaireVerificationPendingReadOnlyHint =>
+      'Votre dossier est en lecture seule pendant l\'examen. Faites glisser vers le bas pour actualiser le statut. Touchez une photo pour l\'agrandir.';
+
+  @override
+  String get transitaireVerificationBannerRejectedTitle => 'Demande rejetée';
+
+  @override
+  String transitaireVerificationBannerRejectedWithMotif(String motif) {
+    return 'Motif : $motif\nCorrigez les éléments indiqués puis renvoyez votre dossier.';
+  }
+
+  @override
+  String get transitaireVerificationBannerRejectedSubtitle =>
+      'Corrigez votre dossier puis renvoyez une nouvelle demande.';
+
+  @override
+  String get transitaireVerificationBannerRequiredTitle =>
+      'Vérification requise';
+
+  @override
+  String get transitaireVerificationBannerRequiredSubtitle =>
+      'Pour activer votre compte transitaire, complétez votre dossier. Délai d\'examen : 24h après envoi.';
+
+  @override
+  String get transitaireVerificationLegacyHint =>
+      'Tous les transitaires, y compris les comptes existants, doivent téléverser leur carte recto/verso pour continuer.';
+
+  @override
+  String get transitaireSubscriptionExpiredToast =>
+      'Votre abonnement a expiré. Renouvelez pour continuer.';
+
+  @override
+  String get transitaireSubscriptionBlockerTitle => 'Abonnement transitaire';
+
+  @override
+  String get errorTransitaireVerifAlreadyVerified =>
+      'Votre compte est déjà vérifié.';
+
+  @override
+  String get errorTransitaireVerifPending =>
+      'Une demande est déjà en cours d\'examen (délai 24h).';
+
+  @override
+  String get errorTransitaireVerifCardsRequired =>
+      'Les photos recto et verso de la carte transitaire sont requises.';
+
+  @override
+  String get errorTransitaireVerifCompanyRequired =>
+      'Le nom et le numéro de référence de l\'entreprise de provenance sont requis.';
+
+  @override
+  String get errorTransitaireVerifDocsMissing =>
+      'Le dossier doit contenir les photos recto et verso de la carte.';
+
+  @override
+  String get errorTransitaireVerifReferencePhoneInvalid =>
+      'Le téléphone de la personne de référence est invalide.';
+
+  @override
+  String get transitMissionPurchaseCancelled =>
+      'Achat annulé par l\'acheteur après vérification. Cette mission est clôturée.';
 }

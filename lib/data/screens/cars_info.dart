@@ -394,6 +394,40 @@ class _CarsinfoState extends State<CarsInfo> {
 
   Widget? _buildTransitaireBottomBar() {
     final statut = widget.missionStatut ?? '';
+    if (statut == 'annule') {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: SafeArea(
+          top: false,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFB3261E).withOpacity(0.35)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.cancel_outlined, color: Color(0xFFB3261E)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    AppLocalizations.of(context)!.transitMissionPurchaseCancelled,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB3261E),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (statut == 'traite') {
       return Container(
         color: Colors.white,

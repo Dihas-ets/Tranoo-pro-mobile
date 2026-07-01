@@ -188,9 +188,47 @@ class NotificationI18n {
     },
     'verification.resultAdmin.message': {
       'fr':
-          '{buyerName} a {actionLabel} la demande liée à l’article {articleTitle}.',
-      'en': '{buyerName} {actionLabel} the request for item {articleTitle}.',
-      'ar': '{buyerName} {actionLabel} الطلب المتعلق بالمنتج {articleTitle}.',
+          '{buyerName} {actionLabel} la demande de vérification pour l’article « {articleTitle} ».',
+      'en':
+          '{buyerName} {actionLabel} the verification request for item "{articleTitle}".',
+      'ar':
+          '{buyerName} {actionLabel} طلب التحقق للمنتج « {articleTitle} ».',
+    },
+    'transitaireVerification.approved.title': {
+      'fr': 'Vérification transitaire approuvée',
+      'en': 'Forwarder verification approved',
+      'ar': 'تمت الموافقة على التحقق من الوسيط',
+    },
+    'transitaireVerification.approved.message': {
+      'fr':
+          'Votre compte transitaire a été vérifié. Souscrivez à un abonnement pour être visible sur Tranoo.',
+      'en':
+          'Your forwarder account has been verified. Subscribe to appear on Tranoo.',
+      'ar': 'تم التحقق من حساب الوسيط. اشترك ليظهر حسابك على Tranoo.',
+    },
+    'transitaireVerification.rejected.title': {
+      'fr': 'Vérification transitaire refusée',
+      'en': 'Forwarder verification rejected',
+      'ar': 'تم رفض التحقق من الوسيط',
+    },
+    'transitaireVerification.rejected.message': {
+      'fr':
+          'Votre demande a été rejetée : {rejectionMotif}. Corrigez et renvoyez votre dossier.',
+      'en':
+          'Your request was rejected: {rejectionMotif}. Please fix and resubmit your file.',
+      'ar': 'تم رفض طلبك: {rejectionMotif}. صحّح الملف وأعد إرساله.',
+    },
+    'transit.purchaseCancelled.title': {
+      'fr': 'Achat annulé',
+      'en': 'Purchase cancelled',
+      'ar': 'تم إلغاء الشراء',
+    },
+    'transit.purchaseCancelled.message': {
+      'fr':
+          'L\'acheteur a annulé l\'achat du véhicule « {articleTitle} » après vérification.',
+      'en':
+          'The buyer cancelled the purchase of "{articleTitle}" after verification.',
+      'ar': 'ألغى المشتري شراء « {articleTitle} » بعد التحقق.',
     },
     'alert.vehicle.title': {
       'fr': 'Nouvelle alerte véhicule',

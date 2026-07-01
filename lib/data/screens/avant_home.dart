@@ -32,6 +32,9 @@ import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/main.dart';
 import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
 import 'package:tranoo_pro/widgets/alert_display_permission_dialog.dart';
+import 'package:tranoo_pro/data/screens/transitaire_verification_page.dart';
+import 'package:tranoo_pro/services/transitaire_access_service.dart';
+import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 
 class AvantHome extends StatefulWidget {
   const AvantHome({super.key});
@@ -49,6 +52,11 @@ class _AvantHomeState extends State<AvantHome>
   bool _didRedirectToLogin = false;
   bool _didCheckOnboarding = false;
   bool _didCheckTypeVendeurMigration = false;
+  bool _didCheckTransitaireAccess = false;
+  bool _transitaireAccessLoading = false;
+  TransitaireAccessState? _transitaireAccess;
+  final TransitaireAccessService _transitaireAccessService =
+      TransitaireAccessService();
   Timer? _lightRefreshTimer;
   DateTime? _lastLightRefreshAt;
 
@@ -81,6 +89,13 @@ class _AvantHomeState extends State<AvantHome>
     if (state == AppLifecycleState.resumed) {
       _runLightRefresh(force: true);
       AlertDisplayPermissionDialog.showIfNeeded(context);
+      if (mounted) {
+        final role = Provider.of<myauth.AuthProvider>(context, listen: false)
+            .user?['role'] as String?;
+        if (role == 'transitaire') {
+          _loadTransitaireAccess(force: true);
+        }
+      }
     }
   }
 
@@ -122,7 +137,35 @@ class _AvantHomeState extends State<AvantHome>
     await prefs.setInt('lastLoginTime', DateTime.now().millisecondsSinceEpoch);
   }
 
+  Future<void> _loadTransitaireAccess({bool force = false}) async {
+    if (!mounted) return;
+    setState(() => _transitaireAccessLoading = true);
+    try {
+      final state = await _transitaireAccessService.fetchAccessState();
+      if (!mounted) return;
+      setState(() => _transitaireAccess = state);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _transitaireAccess = null);
+    } finally {
+      if (mounted) setState(() => _transitaireAccessLoading = false);
+    }
+  }
+
   void _onItemTapped(int index, String? role) {
+    if (role == 'transitaire' &&
+        _transitaireAccess?.subscriptionExpiredRedirect == true &&
+        index != 3) {
+      showTranooToast(
+        context,
+        message: AppLocalizations.of(context)!.transitaireSubscriptionExpiredToast,
+        isError: true,
+      );
+      setState(() {
+        _selectedIndex = 1;
+      });
+      return;
+    }
     setState(() {
       _selectedIndex = index;
     });
@@ -329,6 +372,51 @@ class _AvantHomeState extends State<AvantHome>
               _selectedIndex = _pagesTransitaire.length - 1;
             });
           });
+        }
+
+        if (!loading &&
+            user != null &&
+            role == 'transitaire' &&
+            !_didCheckTransitaireAccess) {
+          _didCheckTransitaireAccess = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _loadTransitaireAccess(force: true);
+          });
+        }
+
+        if (!loading &&
+            user != null &&
+            role == 'transitaire' &&
+            _transitaireAccessLoading &&
+            _transitaireAccess == null) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFFF8BF13)),
+            ),
+          );
+        }
+
+        if (!loading &&
+            user != null &&
+            role == 'transitaire' &&
+            _transitaireAccess != null &&
+            _transitaireAccess!.needsVerificationBlock) {
+          return TransitaireVerificationPage(
+            initialState: _transitaireAccess,
+            onAccessChanged: () => _loadTransitaireAccess(force: true),
+          );
+        }
+
+        if (!loading &&
+            user != null &&
+            role == 'transitaire' &&
+            _transitaireAccess != null &&
+            _transitaireAccess!.needsSubscriptionBlock) {
+          return SellerSubscriptionPage(
+            forTransitaire: true,
+            blockerMode: true,
+            onSubscriptionChanged: () => _loadTransitaireAccess(force: true),
+          );
         }
 
         return Scaffold(

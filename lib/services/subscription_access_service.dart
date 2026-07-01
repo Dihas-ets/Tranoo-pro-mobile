@@ -24,11 +24,17 @@ class SellerAccessStatus {
 
   bool get canCreateArticle => freeTrialActive || paidPlanActive;
 
-  String get currentPlanLabel {
-    if (paidPlanActive) return 'Plan Pro Mensuel';
-    if (freeTrialActive) return 'Plan Decouverte (45 jours gratuits)';
-    return 'Aucun plan actif';
+  String planLabel({bool forTransitaire = false}) {
+    if (paidPlanActive) {
+      return forTransitaire ? 'Abonnement Tranoo Pro' : 'Plan Pro Mensuel';
+    }
+    if (!forTransitaire && freeTrialActive) {
+      return 'Plan Decouverte (45 jours gratuits)';
+    }
+    return forTransitaire ? 'Aucun abonnement actif' : 'Aucun plan actif';
   }
+
+  String get currentPlanLabel => planLabel();
 
   int get freeTrialRemainingDays {
     if (!freeTrialActive || freeTrialEndsAt == null) return 0;
@@ -207,7 +213,7 @@ class SubscriptionAccessService {
     );
 
     final trialStartDate = inscriptionDateOverride ?? inscriptionDate;
-    if (trialStartDate != null) {
+    if (!forTransitaire && trialStartDate != null) {
       freeTrialEndsAt = trialStartDate.add(Duration(days: freeTrialDays));
       final now = DateTime.now();
       freeTrialActive = now.isBefore(
@@ -216,6 +222,10 @@ class SubscriptionAccessService {
       developer.log(
         '[SUB_ACCESS] trial start=$trialStartDate end=$freeTrialEndsAt now=$now active=$freeTrialActive',
       );
+    } else if (forTransitaire) {
+      freeTrialActive = false;
+      freeTrialEndsAt = null;
+      developer.log('[SUB_ACCESS] transitaire: pas d\'essai gratuit');
     } else {
       developer.log('[SUB_ACCESS] Aucune date inscription trouvee');
     }

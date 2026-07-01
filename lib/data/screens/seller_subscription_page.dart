@@ -13,8 +13,15 @@ import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 class SellerSubscriptionPage extends StatefulWidget {
   final bool forTransitaire;
+  final bool blockerMode;
+  final VoidCallback? onSubscriptionChanged;
 
-  const SellerSubscriptionPage({super.key, this.forTransitaire = false});
+  const SellerSubscriptionPage({
+    super.key,
+    this.forTransitaire = false,
+    this.blockerMode = false,
+    this.onSubscriptionChanged,
+  });
 
   @override
   State<SellerSubscriptionPage> createState() => _SellerSubscriptionPageState();
@@ -184,6 +191,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         months: _selectedMonths,
       );
       await _loadStatus();
+      widget.onSubscriptionChanged?.call();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.subscriptionPaymentSuccess),
@@ -192,10 +200,12 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       );
       await Future.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AvantHome()),
-        (route) => false,
-      );
+      if (widget.blockerMode) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AvantHome()),
+          (route) => false,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -252,6 +262,22 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: widget.blockerMode
+          ? AppBar(
+              backgroundColor: const Color(0xFF1B2B4B),
+              foregroundColor: Colors.white,
+              automaticallyImplyLeading: false,
+              centerTitle: true,
+              title: Text(
+                widget.forTransitaire
+                    ? AppLocalizations.of(context)!
+                        .transitaireSubscriptionBlockerTitle
+                    : l10n.sellerSubscription,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            )
+          : null,
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
@@ -302,7 +328,10 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          status?.currentPlanLabel ?? 'Inconnu',
+                          status?.planLabel(
+                                forTransitaire: widget.forTransitaire,
+                              ) ??
+                              'Inconnu',
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -310,7 +339,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        if (status?.freeTrialActive == true)
+                        if (!widget.forTransitaire &&
+                            status?.freeTrialActive == true)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -340,12 +370,14 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                               ],
                             ),
                           ),
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          icon: Icons.calendar_today,
-                          label: 'Fin de l\'essai gratuit',
-                          value: _formatDate(status?.freeTrialEndsAt),
-                        ),
+                        if (!widget.forTransitaire) ...[
+                          const SizedBox(height: 12),
+                          _buildInfoRow(
+                            icon: Icons.calendar_today,
+                            label: 'Fin de l\'essai gratuit',
+                            value: _formatDate(status?.freeTrialEndsAt),
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         _buildInfoRow(
                           icon: Icons.verified,

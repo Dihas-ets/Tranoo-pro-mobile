@@ -2387,5 +2387,54 @@
         "type": "String"
       }
     }
-  }
+  },
+  "transitaireVerificationTitle": "Forwarder verification",
+  "transitaireVerificationLoadError": "Unable to load verification status.",
+  "transitaireVerificationCompanyRequired": "Enter the source company and its reference number.",
+  "transitaireVerificationCardsRequired": "Add front and back photos of your card.",
+  "transitaireVerificationUploadFailed": "Image upload failed.",
+  "transitaireVerificationUploadInProgress": "Please wait while the cards are uploading.",
+  "transitaireVerificationSubmitFailed": "Could not submit. Please try again.",
+  "transitaireVerificationSubmitSuccess": "Request sent. Review within 24 hours.",
+  "transitaireVerificationFrontUploadSuccess": "Front card uploaded successfully.",
+  "transitaireVerificationBackUploadSuccess": "Back card uploaded successfully.",
+  "transitaireVerificationFrontUploadFailed": "Failed to upload the front card.",
+  "transitaireVerificationBackUploadFailed": "Failed to upload the back card.",
+  "transitaireVerificationCardSectionTitle": "Forwarder card",
+  "transitaireVerificationCardSectionHint": "Upload the front and back of your professional card.",
+  "transitaireVerificationCardFront": "Front",
+  "transitaireVerificationCardBack": "Back",
+  "transitaireVerificationCompanySectionTitle": "Source company",
+  "transitaireVerificationCompanyNameHint": "Company name",
+  "transitaireVerificationCompanyRefHint": "Reference person's phone number",
+  "transitaireVerificationReferencePhoneInvalid": "Enter a valid phone number for the reference person.",
+  "transitaireVerificationSubmitButton": "Submit request",
+  "transitaireVerificationResubmitButton": "Resubmit request",
+  "transitaireVerificationBannerPendingTitle": "Request under review",
+  "transitaireVerificationBannerPendingSubtitle": "Our team will review your file within 24 hours. You will be notified once a decision is made.",
+  "transitaireVerificationBannerResubmitPendingTitle": "Resubmitted file under review",
+  "transitaireVerificationBannerResubmitPendingSubtitle": "Your corrected file was received. Our team will review it within 24 hours.",
+  "transitaireVerificationBannerApprovedTitle": "Verification approved",
+  "transitaireVerificationBannerApprovedSubtitle": "Your account is approved. Continue to your Tranoo Pro subscription to activate access.",
+  "transitaireVerificationPendingReadOnlyHint": "Your file is read-only while under review. Pull down to refresh the status. Tap a photo to enlarge it.",
+  "transitaireVerificationBannerRejectedTitle": "Request rejected",
+  "transitaireVerificationBannerRejectedWithMotif": "Reason: {motif}\nFix the issues and resubmit your file.",
+  "@transitaireVerificationBannerRejectedWithMotif": {
+    "placeholders": {
+      "motif": { "type": "String" }
+    }
+  },
+  "transitaireVerificationBannerRejectedSubtitle": "Fix your file and submit a new request.",
+  "transitaireVerificationBannerRequiredTitle": "Verification required",
+  "transitaireVerificationBannerRequiredSubtitle": "To activate your forwarder account, complete your file. Review time: 24 hours after submission.",
+  "transitaireVerificationLegacyHint": "All forwarders, including existing accounts, must upload front/back card photos to continue.",
+  "transitaireSubscriptionExpiredToast": "Your subscription has expired. Renew to continue.",
+  "transitaireSubscriptionBlockerTitle": "Forwarder subscription",
+  "errorTransitaireVerifAlreadyVerified": "Your account is already verified.",
+  "errorTransitaireVerifPending": "A request is already under review (24h processing time).",
+  "errorTransitaireVerifCardsRequired": "Front and back photos of your forwarder card are required.",
+  "errorTransitaireVerifCompanyRequired": "Source company name and reference number are required.",
+  "errorTransitaireVerifDocsMissing": "The file must include front and back card photos.",
+  "errorTransitaireVerifReferencePhoneInvalid": "The reference person's phone number is invalid.",
+  "transitMissionPurchaseCancelled": "Purchase cancelled by the buyer after verification. This mission is closed."
 }

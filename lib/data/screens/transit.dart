@@ -60,10 +60,11 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
         _missionService.listMissions('en_cours'),
         _missionService.listMissions('transferer'),
         _missionService.listMissions('traite'),
+        _missionService.listMissions('annule'),
       ]);
       if (mounted) {
         setState(() {
-          enCours = results[0];
+          enCours = [...results[0], ...results[3]];
           transferer = results[1];
           traite = results[2];
           isLoading = false;
@@ -449,6 +450,39 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
   }
 
   Widget _buildActions(Map<String, dynamic> item, String statut) {
+    final mission = item['mission'];
+    final missionStatut = mission is Map
+        ? (mission['statut'] ?? statut).toString()
+        : statut;
+    if (missionStatut == 'annule') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFB3261E).withOpacity(0.3)),
+            ),
+            child: Text(
+              AppLocalizations.of(context)!.transitMissionPurchaseCancelled,
+              style: const TextStyle(
+                color: Color(0xFFB3261E),
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _actionBtn(
+            label: 'Voir détails',
+            onPressed: () => _openDetails(item),
+            outline: true,
+          ),
+        ],
+      );
+    }
     if (statut == 'en_cours') {
       return Column(
         children: [

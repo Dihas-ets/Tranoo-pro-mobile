@@ -4482,4 +4482,162 @@ class AppLocalizationsAr extends AppLocalizations {
   String registrationSaveError(String error) {
     return 'خطأ في الحفظ: $error';
   }
+
+  @override
+  String get transitaireVerificationTitle => 'التحقق من الوسيط';
+
+  @override
+  String get transitaireVerificationLoadError => 'تعذر تحميل حالة التحقق.';
+
+  @override
+  String get transitaireVerificationCompanyRequired =>
+      'أدخل شركة المصدر ورقم المرجع.';
+
+  @override
+  String get transitaireVerificationCardsRequired =>
+      'أضف صورتي الوجه والظهر للبطاقة.';
+
+  @override
+  String get transitaireVerificationUploadFailed => 'فشل رفع الصور.';
+
+  @override
+  String get transitaireVerificationUploadInProgress =>
+      'يرجى الانتظار أثناء رفع البطاقات.';
+
+  @override
+  String get transitaireVerificationSubmitFailed =>
+      'تعذر الإرسال. أعد المحاولة.';
+
+  @override
+  String get transitaireVerificationSubmitSuccess =>
+      'تم إرسال الطلب. المراجعة خلال 24 ساعة.';
+
+  @override
+  String get transitaireVerificationFrontUploadSuccess =>
+      'تم رفع صورة الوجه بنجاح.';
+
+  @override
+  String get transitaireVerificationBackUploadSuccess =>
+      'تم رفع صورة الظهر بنجاح.';
+
+  @override
+  String get transitaireVerificationFrontUploadFailed => 'فشل رفع صورة الوجه.';
+
+  @override
+  String get transitaireVerificationBackUploadFailed => 'فشل رفع صورة الظهر.';
+
+  @override
+  String get transitaireVerificationCardSectionTitle => 'بطاقة الوسيط';
+
+  @override
+  String get transitaireVerificationCardSectionHint =>
+      'ارفع صورة الوجه والظهر لبطاقتك المهنية.';
+
+  @override
+  String get transitaireVerificationCardFront => 'الوجه';
+
+  @override
+  String get transitaireVerificationCardBack => 'الظهر';
+
+  @override
+  String get transitaireVerificationCompanySectionTitle => 'شركة المصدر';
+
+  @override
+  String get transitaireVerificationCompanyNameHint => 'اسم الشركة';
+
+  @override
+  String get transitaireVerificationCompanyRefHint => 'هاتف الشخص المرجعي';
+
+  @override
+  String get transitaireVerificationReferencePhoneInvalid =>
+      'أدخل رقم هاتف صالحاً للشخص المرجعي.';
+
+  @override
+  String get transitaireVerificationSubmitButton => 'إرسال الطلب';
+
+  @override
+  String get transitaireVerificationResubmitButton => 'إعادة إرسال الطلب';
+
+  @override
+  String get transitaireVerificationBannerPendingTitle => 'الطلب قيد المراجعة';
+
+  @override
+  String get transitaireVerificationBannerPendingSubtitle =>
+      'سيراجع فريقنا ملفك خلال 24 ساعة. ستتلقى إشعاراً عند اتخاذ القرار.';
+
+  @override
+  String get transitaireVerificationBannerResubmitPendingTitle =>
+      'ملف مُعاد قيد المراجعة';
+
+  @override
+  String get transitaireVerificationBannerResubmitPendingSubtitle =>
+      'تم استلام ملفك المُصحَّح. سيراجعه فريقنا خلال 24 ساعة.';
+
+  @override
+  String get transitaireVerificationBannerApprovedTitle => 'تم التحقق بنجاح';
+
+  @override
+  String get transitaireVerificationBannerApprovedSubtitle =>
+      'تمت الموافقة على حسابك. انتقل إلى الاشتراك في Tranoo Pro لتفعيل الوصول.';
+
+  @override
+  String get transitaireVerificationPendingReadOnlyHint =>
+      'ملفك للقراءة فقط أثناء المراجعة. اسحب للأسفل لتحديث الحالة. المس الصورة لتكبيرها.';
+
+  @override
+  String get transitaireVerificationBannerRejectedTitle => 'تم رفض الطلب';
+
+  @override
+  String transitaireVerificationBannerRejectedWithMotif(String motif) {
+    return 'السبب: $motif\nصحّح العناصر المذكورة ثم أعد إرسال ملفك.';
+  }
+
+  @override
+  String get transitaireVerificationBannerRejectedSubtitle =>
+      'صحّح ملفك ثم أعد إرسال طلب جديد.';
+
+  @override
+  String get transitaireVerificationBannerRequiredTitle => 'التحقق مطلوب';
+
+  @override
+  String get transitaireVerificationBannerRequiredSubtitle =>
+      'لتفعيل حساب الوسيط، أكمل ملفك. مدة المراجعة: 24 ساعة بعد الإرسال.';
+
+  @override
+  String get transitaireVerificationLegacyHint =>
+      'يجب على جميع الوسطاء، بما في ذلك الحسابات القديمة، رفع صور البطاقة (وجه/ظهر) للمتابعة.';
+
+  @override
+  String get transitaireSubscriptionExpiredToast =>
+      'انتهى اشتراكك. جدّد للمتابعة.';
+
+  @override
+  String get transitaireSubscriptionBlockerTitle => 'اشتراك الوسيط';
+
+  @override
+  String get errorTransitaireVerifAlreadyVerified => 'حسابك موثّق بالفعل.';
+
+  @override
+  String get errorTransitaireVerifPending =>
+      'طلب قيد المراجعة بالفعل (24 ساعة).';
+
+  @override
+  String get errorTransitaireVerifCardsRequired =>
+      'صور وجه وظهر بطاقة الوسيط مطلوبة.';
+
+  @override
+  String get errorTransitaireVerifCompanyRequired =>
+      'اسم شركة المصدر ورقم المرجع مطلوبان.';
+
+  @override
+  String get errorTransitaireVerifDocsMissing =>
+      'يجب أن يتضمن الملف صور وجه وظهر البطاقة.';
+
+  @override
+  String get errorTransitaireVerifReferencePhoneInvalid =>
+      'رقم هاتف الشخص المرجعي غير صالح.';
+
+  @override
+  String get transitMissionPurchaseCancelled =>
+      'ألغى المشتري الشراء بعد التحقق. تم إغلاق هذه المهمة.';
 }

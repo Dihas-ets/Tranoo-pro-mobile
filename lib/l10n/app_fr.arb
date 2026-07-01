@@ -2387,5 +2387,54 @@
         "type": "String"
       }
     }
-  }
+  },
+  "transitaireVerificationTitle": "Vérification transitaire",
+  "transitaireVerificationLoadError": "Impossible de charger le statut de vérification.",
+  "transitaireVerificationCompanyRequired": "Renseignez l'entreprise de provenance et sa référence.",
+  "transitaireVerificationCardsRequired": "Ajoutez les photos recto et verso de votre carte.",
+  "transitaireVerificationUploadFailed": "Échec de l'envoi des images.",
+  "transitaireVerificationUploadInProgress": "Patientez pendant l'envoi des cartes.",
+  "transitaireVerificationSubmitFailed": "Envoi impossible. Réessayez.",
+  "transitaireVerificationSubmitSuccess": "Demande envoyée. Examen sous 24h.",
+  "transitaireVerificationFrontUploadSuccess": "Carte recto envoyée avec succès.",
+  "transitaireVerificationBackUploadSuccess": "Carte verso envoyée avec succès.",
+  "transitaireVerificationFrontUploadFailed": "Échec de l'envoi de la carte recto.",
+  "transitaireVerificationBackUploadFailed": "Échec de l'envoi de la carte verso.",
+  "transitaireVerificationCardSectionTitle": "Carte de transitaire",
+  "transitaireVerificationCardSectionHint": "Téléversez le recto et le verso de votre carte professionnelle.",
+  "transitaireVerificationCardFront": "Recto",
+  "transitaireVerificationCardBack": "Verso",
+  "transitaireVerificationCompanySectionTitle": "Entreprise de provenance",
+  "transitaireVerificationCompanyNameHint": "Nom de l'entreprise",
+  "transitaireVerificationCompanyRefHint": "Téléphone de la personne de référence",
+  "transitaireVerificationReferencePhoneInvalid": "Saisissez un numéro de téléphone valide pour la personne de référence.",
+  "transitaireVerificationSubmitButton": "Envoyer la demande",
+  "transitaireVerificationResubmitButton": "Renvoyer la demande",
+  "transitaireVerificationBannerPendingTitle": "Demande en cours d'examen",
+  "transitaireVerificationBannerPendingSubtitle": "Notre équipe vérifie votre dossier sous 24h. Vous serez notifié dès la décision.",
+  "transitaireVerificationBannerResubmitPendingTitle": "Nouveau dossier en cours d'examen",
+  "transitaireVerificationBannerResubmitPendingSubtitle": "Votre dossier corrigé a bien été reçu. Notre équipe l'examine sous 24h.",
+  "transitaireVerificationBannerApprovedTitle": "Vérification validée",
+  "transitaireVerificationBannerApprovedSubtitle": "Votre compte est approuvé. Passez à l'abonnement Tranoo Pro pour activer l'accès.",
+  "transitaireVerificationPendingReadOnlyHint": "Votre dossier est en lecture seule pendant l'examen. Faites glisser vers le bas pour actualiser le statut. Touchez une photo pour l'agrandir.",
+  "transitaireVerificationBannerRejectedTitle": "Demande rejetée",
+  "transitaireVerificationBannerRejectedWithMotif": "Motif : {motif}\nCorrigez les éléments indiqués puis renvoyez votre dossier.",
+  "@transitaireVerificationBannerRejectedWithMotif": {
+    "placeholders": {
+      "motif": { "type": "String" }
+    }
+  },
+  "transitaireVerificationBannerRejectedSubtitle": "Corrigez votre dossier puis renvoyez une nouvelle demande.",
+  "transitaireVerificationBannerRequiredTitle": "Vérification requise",
+  "transitaireVerificationBannerRequiredSubtitle": "Pour activer votre compte transitaire, complétez votre dossier. Délai d'examen : 24h après envoi.",
+  "transitaireVerificationLegacyHint": "Tous les transitaires, y compris les comptes existants, doivent téléverser leur carte recto/verso pour continuer.",
+  "transitaireSubscriptionExpiredToast": "Votre abonnement a expiré. Renouvelez pour continuer.",
+  "transitaireSubscriptionBlockerTitle": "Abonnement transitaire",
+  "errorTransitaireVerifAlreadyVerified": "Votre compte est déjà vérifié.",
+  "errorTransitaireVerifPending": "Une demande est déjà en cours d'examen (délai 24h).",
+  "errorTransitaireVerifCardsRequired": "Les photos recto et verso de la carte transitaire sont requises.",
+  "errorTransitaireVerifCompanyRequired": "Le nom et le numéro de référence de l'entreprise de provenance sont requis.",
+  "errorTransitaireVerifDocsMissing": "Le dossier doit contenir les photos recto et verso de la carte.",
+  "errorTransitaireVerifReferencePhoneInvalid": "Le téléphone de la personne de référence est invalide.",
+  "transitMissionPurchaseCancelled": "Achat annulé par l'acheteur après vérification. Cette mission est clôturée."
 }

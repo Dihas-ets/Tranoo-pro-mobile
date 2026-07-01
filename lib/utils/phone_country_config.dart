@@ -90,6 +90,36 @@ String buildInternationalPhone(String countryCode, String nationalRaw) {
   return '+$cc$national';
 }
 
+/// Chiffres canoniques (indicatif + national) pour l'API.
+String canonicalPhoneDigitsFromInput(String countryCode, String nationalRaw) {
+  return phoneDigitsOnly(buildInternationalPhone(countryCode, nationalRaw));
+}
+
+/// Décompose un numéro stocké (ex. 22959399349) en pays + saisie nationale.
+({PhoneCountryConfig country, String national}) splitCanonicalPhone(
+  String? stored,
+) {
+  final digits = phoneDigitsOnly(stored ?? '');
+  if (digits.isEmpty) {
+    return (country: kPhoneCountries.first, national: '');
+  }
+
+  final sorted = List<PhoneCountryConfig>.from(kPhoneCountries)
+    ..sort(
+      (a, b) => phoneDigitsOnly(b.code).length
+          .compareTo(phoneDigitsOnly(a.code).length),
+    );
+
+  for (final c in sorted) {
+    final cc = phoneDigitsOnly(c.code);
+    if (digits.startsWith(cc) && digits.length > cc.length) {
+      return (country: c, national: digits.substring(cc.length));
+    }
+  }
+
+  return (country: kPhoneCountries.first, national: digits);
+}
+
 bool isTranooBuyerAppRole(String? role) =>
     (role ?? '').toLowerCase() == 'acheteur';
 

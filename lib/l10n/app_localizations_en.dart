@@ -4519,4 +4519,170 @@ class AppLocalizationsEn extends AppLocalizations {
   String registrationSaveError(String error) {
     return 'Save error: $error';
   }
+
+  @override
+  String get transitaireVerificationTitle => 'Forwarder verification';
+
+  @override
+  String get transitaireVerificationLoadError =>
+      'Unable to load verification status.';
+
+  @override
+  String get transitaireVerificationCompanyRequired =>
+      'Enter the source company and its reference number.';
+
+  @override
+  String get transitaireVerificationCardsRequired =>
+      'Add front and back photos of your card.';
+
+  @override
+  String get transitaireVerificationUploadFailed => 'Image upload failed.';
+
+  @override
+  String get transitaireVerificationUploadInProgress =>
+      'Please wait while the cards are uploading.';
+
+  @override
+  String get transitaireVerificationSubmitFailed =>
+      'Could not submit. Please try again.';
+
+  @override
+  String get transitaireVerificationSubmitSuccess =>
+      'Request sent. Review within 24 hours.';
+
+  @override
+  String get transitaireVerificationFrontUploadSuccess =>
+      'Front card uploaded successfully.';
+
+  @override
+  String get transitaireVerificationBackUploadSuccess =>
+      'Back card uploaded successfully.';
+
+  @override
+  String get transitaireVerificationFrontUploadFailed =>
+      'Failed to upload the front card.';
+
+  @override
+  String get transitaireVerificationBackUploadFailed =>
+      'Failed to upload the back card.';
+
+  @override
+  String get transitaireVerificationCardSectionTitle => 'Forwarder card';
+
+  @override
+  String get transitaireVerificationCardSectionHint =>
+      'Upload the front and back of your professional card.';
+
+  @override
+  String get transitaireVerificationCardFront => 'Front';
+
+  @override
+  String get transitaireVerificationCardBack => 'Back';
+
+  @override
+  String get transitaireVerificationCompanySectionTitle => 'Source company';
+
+  @override
+  String get transitaireVerificationCompanyNameHint => 'Company name';
+
+  @override
+  String get transitaireVerificationCompanyRefHint =>
+      'Reference person\'s phone number';
+
+  @override
+  String get transitaireVerificationReferencePhoneInvalid =>
+      'Enter a valid phone number for the reference person.';
+
+  @override
+  String get transitaireVerificationSubmitButton => 'Submit request';
+
+  @override
+  String get transitaireVerificationResubmitButton => 'Resubmit request';
+
+  @override
+  String get transitaireVerificationBannerPendingTitle =>
+      'Request under review';
+
+  @override
+  String get transitaireVerificationBannerPendingSubtitle =>
+      'Our team will review your file within 24 hours. You will be notified once a decision is made.';
+
+  @override
+  String get transitaireVerificationBannerResubmitPendingTitle =>
+      'Resubmitted file under review';
+
+  @override
+  String get transitaireVerificationBannerResubmitPendingSubtitle =>
+      'Your corrected file was received. Our team will review it within 24 hours.';
+
+  @override
+  String get transitaireVerificationBannerApprovedTitle =>
+      'Verification approved';
+
+  @override
+  String get transitaireVerificationBannerApprovedSubtitle =>
+      'Your account is approved. Continue to your Tranoo Pro subscription to activate access.';
+
+  @override
+  String get transitaireVerificationPendingReadOnlyHint =>
+      'Your file is read-only while under review. Pull down to refresh the status. Tap a photo to enlarge it.';
+
+  @override
+  String get transitaireVerificationBannerRejectedTitle => 'Request rejected';
+
+  @override
+  String transitaireVerificationBannerRejectedWithMotif(String motif) {
+    return 'Reason: $motif\nFix the issues and resubmit your file.';
+  }
+
+  @override
+  String get transitaireVerificationBannerRejectedSubtitle =>
+      'Fix your file and submit a new request.';
+
+  @override
+  String get transitaireVerificationBannerRequiredTitle =>
+      'Verification required';
+
+  @override
+  String get transitaireVerificationBannerRequiredSubtitle =>
+      'To activate your forwarder account, complete your file. Review time: 24 hours after submission.';
+
+  @override
+  String get transitaireVerificationLegacyHint =>
+      'All forwarders, including existing accounts, must upload front/back card photos to continue.';
+
+  @override
+  String get transitaireSubscriptionExpiredToast =>
+      'Your subscription has expired. Renew to continue.';
+
+  @override
+  String get transitaireSubscriptionBlockerTitle => 'Forwarder subscription';
+
+  @override
+  String get errorTransitaireVerifAlreadyVerified =>
+      'Your account is already verified.';
+
+  @override
+  String get errorTransitaireVerifPending =>
+      'A request is already under review (24h processing time).';
+
+  @override
+  String get errorTransitaireVerifCardsRequired =>
+      'Front and back photos of your forwarder card are required.';
+
+  @override
+  String get errorTransitaireVerifCompanyRequired =>
+      'Source company name and reference number are required.';
+
+  @override
+  String get errorTransitaireVerifDocsMissing =>
+      'The file must include front and back card photos.';
+
+  @override
+  String get errorTransitaireVerifReferencePhoneInvalid =>
+      'The reference person\'s phone number is invalid.';
+
+  @override
+  String get transitMissionPurchaseCancelled =>
+      'Purchase cancelled by the buyer after verification. This mission is closed.';
 }

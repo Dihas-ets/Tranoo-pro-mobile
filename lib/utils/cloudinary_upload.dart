@@ -21,6 +21,8 @@ class CloudinaryFolders {
       '$root/transitaires/gallery/images';
   static const String transitaireGalleryVideos =
       '$root/transitaires/gallery/videos';
+  static const String transitaireVerificationCards =
+      '$root/transitaires/verification/cartes';
 }
 
 Future<String?> uploadImageToCloudinary(
@@ -36,11 +38,16 @@ Future<String?> uploadImageToCloudinary(
     ..fields['upload_preset'] = uploadPreset
     ..fields['folder'] = folder;
 
-  if (kIsWeb && image is Uint8List) {
+  if (image is Uint8List) {
     request.files.add(
       http.MultipartFile.fromBytes('file', image, filename: 'upload.jpg'),
     );
   } else if (image is File) {
+    if (!await image.exists()) {
+      _logger
+          .warning('Fichier introuvable pour upload Cloudinary: ${image.path}');
+      return null;
+    }
     request.files.add(await http.MultipartFile.fromPath('file', image.path));
   } else {
     return null;
@@ -48,12 +55,14 @@ Future<String?> uploadImageToCloudinary(
 
   try {
     final response = await request.send().timeout(const Duration(seconds: 60));
+    final responseData = await response.stream.bytesToString();
     if (response.statusCode == 200) {
-      final responseData = await response.stream.bytesToString();
       final jsonData = jsonDecode(responseData);
       return jsonData['secure_url'];
     } else {
-      _logger.warning('Erreur upload Cloudinary: ${response.statusCode}');
+      _logger.warning(
+        'Erreur upload Cloudinary: ${response.statusCode} -> $responseData',
+      );
       return null;
     }
   } catch (e) {
@@ -72,12 +81,12 @@ Future<String?> uploadVideoToCloudinary(
     print('[UploadBackend] ERREUR: Le fichier n\'existe pas!');
     return null;
   }
-  
+
   final fileSize = await videoFile.length();
   final request = http.MultipartRequest('POST', backendUrl);
   request.files.add(await http.MultipartFile.fromPath('video', videoFile.path));
   request.fields['folder'] = folder;
-  
+
   try {
     // Simuler la progression pendant l'upload (approximation)
     if (onProgress != null) {
@@ -92,19 +101,20 @@ Future<String?> uploadVideoToCloudinary(
       await Future.delayed(const Duration(milliseconds: 100));
       onProgress(0.8);
     }
-    
-    final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
-    
+
+    final streamedResponse =
+        await request.send().timeout(const Duration(minutes: 10));
+
     if (onProgress != null) {
       onProgress(0.85); // Upload terminé, traitement serveur
     }
-    
+
     final respStr = await streamedResponse.stream.bytesToString();
-    
+
     if (onProgress != null) {
       onProgress(0.95); // Compression/traitement presque terminé
     }
-    
+
     if (streamedResponse.statusCode == 200) {
       final data = jsonDecode(respStr);
       final videoUrl = data['optimizedUrl'] ?? data['url'] as String?;
@@ -112,7 +122,8 @@ Future<String?> uploadVideoToCloudinary(
       if (onProgress != null) onProgress(1.0); // 100%
       return videoUrl;
     }
-    print('[UploadBackend] ERREUR HTTP: ${streamedResponse.statusCode} -> $respStr');
+    print(
+        '[UploadBackend] ERREUR HTTP: ${streamedResponse.statusCode} -> $respStr');
     return null;
   } catch (e) {
     print('[UploadBackend] EXCEPTION lors de l\'envoi: $e');
