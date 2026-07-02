@@ -291,22 +291,37 @@ abstract final class SkeletonPresets {
   }
 
   static Widget profile() {
+    return proSellerProfile();
+  }
+
+  /// Profil vendeur Tranoo Pro (carte jaune + options).
+  static Widget proSellerProfile() {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(10),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SkeletonCircle(size: 88),
-          const SizedBox(height: 16),
-          const SkeletonLine(widthFactor: 0.5, height: 16),
-          const SizedBox(height: 24),
+          const SizedBox(height: 15),
+          const SkeletonBox(
+            width: double.infinity,
+            height: 56,
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+          const SizedBox(height: 12),
+          const SkeletonBox(
+            width: double.infinity,
+            height: 104,
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+          const SizedBox(height: 20),
           ...List.generate(
-            5,
+            6,
             (_) => const Padding(
-              padding: EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.only(bottom: 10),
               child: SkeletonBox(
                 width: double.infinity,
-                height: 52,
+                height: 48,
                 borderRadius: BorderRadius.all(Radius.circular(12)),
               ),
             ),

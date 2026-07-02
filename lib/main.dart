@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:core';
 
@@ -18,13 +19,12 @@ import 'package:tranoo_pro/utils/notification_i18n.dart';
 import 'package:tranoo_pro/utils/locale_helper.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
-import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/services/blocked_user_service.dart';
 import 'package:tranoo_pro/services/push_otp_service.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
 import 'package:tranoo_pro/providers/locale_provider.dart';
 import 'package:tranoo_pro/widgets/video_splash_screen.dart';
-import 'package:tranoo_pro/widgets/first_launch_location_dialog.dart';
+import 'package:tranoo_pro/services/app_bootstrap.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:tranoo_pro/utils/feexpay_choice_callback_page.dart';
 import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
@@ -350,12 +350,17 @@ void main() async {
     // Continuer même si OTP Push échoue
   }
 
+  await AppBootstrap.warmUp();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) {
           try {
-            return myauth.AuthProvider();
+            return myauth.AuthProvider(
+              initialUser: AppBootstrap.cachedUser,
+              initialToken: AppBootstrap.cachedToken,
+            );
           } catch (e) {
             print('ERREUR AuthProvider: $e');
             rethrow;
@@ -396,6 +401,8 @@ class MyApp extends StatelessWidget {
       },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        scaffoldBackgroundColor: Colors.white,
+        canvasColor: Colors.white,
         useMaterial3: true,
       ),
       home: const SplashFlow(),
@@ -564,246 +571,45 @@ class SplashFlow extends StatefulWidget {
 }
 
 class _SplashFlowState extends State<SplashFlow> {
-  bool _showVideo = true;
-
-  void _onVideoFinished() {
-    if (!mounted) return;
-    setState(() => _showVideo = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_showVideo) {
-      return VideoSplashScreen(onFinished: _onVideoFinished);
-    }
-    return const AppInitializer();
-  }
-}
-
-class AppInitializer extends StatefulWidget {
-  const AppInitializer({super.key});
-
-  @override
-  State<AppInitializer> createState() => _AppInitializerState();
-}
-
-class _AppInitializerState extends State<AppInitializer> {
-  static const String _welcomeSeenKey = 'tranoo_pro_has_seen_welcome';
-  static bool _welcomeFlowStarted = false;
+  bool _showApp = false;
+  Widget? _destination;
+  bool _transitioning = false;
 
   @override
   void initState() {
     super.initState();
-    _checkUserStatus();
+    // Filet : si la vidéo ne signale jamais la fin (bug codec Samsung, etc.)
+    Future.delayed(const Duration(seconds: 14), () {
+      if (!mounted || _showApp) return;
+      _goToApp();
+    });
   }
 
-  Future<void> _checkUserStatus() async {
-    // Attendre un peu pour que le contexte soit disponible
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Définir le contexte pour BlockedUserService
-    BlockedUserService.setContext(context);
-
-    // Popup bienvenue / localisation : une seule fois (première installation)
-    if (!_welcomeFlowStarted && mounted) {
-      _welcomeFlowStarted = true;
-      final prefs = await SharedPreferences.getInstance();
-      final hasSeenWelcome = prefs.getBool(_welcomeSeenKey) ?? false;
-      // Compat ancienne clé
-      final legacySeen = prefs.getBool('is_first_launch') == false;
-
-      if (!hasSeenWelcome && !legacySeen) {
-        if (mounted) {
-          await _showLocationDisclosure();
-        }
-      } else if (!hasSeenWelcome && legacySeen) {
-        await prefs.setBool(_welcomeSeenKey, true);
-        await prefs.setBool('is_first_launch', false);
-      }
-    }
-
-    // Vérifier le statut de blocage
-    final userService = UserService();
-    final isBlocked = await userService.checkUserBlockedStatus();
-
-    if (isBlocked) {
-      // L'utilisateur est bloqué, le dialogue sera affiché automatiquement
-      return;
-    }
-
-    // Détecter le code de parrainage depuis l'URL
-    await _handleReferralCode();
-
-    // Vérifier le type de vendeur pour la migration
-    if (mounted) {
-      final authProvider =
-          Provider.of<myauth.AuthProvider>(context, listen: false);
-      await authProvider.checkTypeVendeurMigration(context);
-
-      // Naviguer vers l'écran principal
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const AvantHome()),
-      );
-    }
-  }
-
-  Future<void> _handleReferralCode() async {
+  Future<void> _goToApp() async {
+    if (_transitioning || !mounted) return;
+    _transitioning = true;
     try {
-      // Vérifier s'il y a un code de parrainage en attente
-      final prefs = await SharedPreferences.getInstance();
-      final pendingReferral = prefs.getString('pending_referral');
-
-      if (pendingReferral != null && pendingReferral.isNotEmpty) {
-        print('Code de parrainage en attente: $pendingReferral');
-
-        // Afficher une notification HTML standard
-        if (mounted) {
-          _showReferralNotification(pendingReferral);
-        }
-      }
-    } catch (e) {
-      print('Erreur lors de la détection du parrainage: $e');
+      final dest = await AppBootstrap.resolveEntryWidget(context);
+      if (!mounted) return;
+      setState(() {
+        _destination = dest;
+        _showApp = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _destination = AppBootstrap.fallbackEntry();
+        _showApp = true;
+      });
     }
-  }
-
-  Future<void> _showLocationDisclosure() async {
-    // Afficher la divulgation de localisation au premier lancement
-    await showDialog(
-      context: context,
-      barrierDismissible: false, // Empêcher la fermeture par clic extérieur
-      builder: (context) => FirstLaunchLocationDialog(
-        onDismissed: () {
-          // Continuer le processus normal après que l'utilisateur ait fait son choix
-        },
-      ),
-    );
-  }
-
-  void _showReferralNotification(String referralCode) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.card_giftcard, color: Colors.amber[700], size: 28),
-              SizedBox(width: 10),
-              Text(
-                'Code de Parrainage Détecté',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          content: Container(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.amber[50],
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.amber[200]!),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.celebration,
-                        color: Colors.amber[700],
-                        size: 40,
-                      ),
-                      SizedBox(height: 10),
-                      Text(
-                        'Félicitations !',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber[800],
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Vous avez été invité par un ami avec le code:',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                      ),
-                      SizedBox(height: 10),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 15,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.amber[700],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          referralCode,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 15),
-                Text(
-                  'Ce code sera automatiquement appliqué lors de votre inscription.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                'Compris',
-                style: TextStyle(
-                  color: Colors.amber[700],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SizedBox(
-          width: 120,
-          child: LinearProgressIndicator(
-            backgroundColor: Color(0xFFE0E0E0),
-            color: Colors.black87,
-            minHeight: 4,
-          ),
-        ),
-      ),
-    );
+    if (_showApp) {
+      return _destination ?? AppBootstrap.fallbackEntry();
+    }
+    return VideoSplashScreen(onFinished: _goToApp);
   }
 }
 

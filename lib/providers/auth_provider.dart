@@ -16,21 +16,30 @@ import 'package:tranoo_pro/widgets/type_vendeur_migration_dialog.dart';
 class AuthProvider with ChangeNotifier {
   String? _token;
   Map<String, dynamic>? _user;
-  bool _loading = true;
+  bool _loading = false;
   final Logger _logger = Logger('AuthProvider');
   bool _isTypeVendeurDialogOpen = false;
 
   static const String _tokenKey = 'token';
   static const String _userKey = 'user';
 
-  String? get token => _token;
-  Map<String, dynamic>? get user => _user;
-  bool get loading => _loading;
+  /// Clés prefs partagées avec [AppBootstrap].
+  static String get tokenPrefsKey => _tokenKey;
+  static String get userPrefsKey => _userKey;
 
-  AuthProvider() {
+  AuthProvider({
+    Map<String, dynamic>? initialUser,
+    String? initialToken,
+  }) {
+    _user = initialUser;
+    _token = initialToken;
     debugPrint('[AuthProvider] CONSTRUCTEUR appelé');
     _init();
   }
+
+  String? get token => _token;
+  Map<String, dynamic>? get user => _user;
+  bool get loading => _loading;
 
   // --- PERSISTENCE SHARED PREFERENCES ---
   static Future<void> saveUserToPrefs(
@@ -128,9 +137,12 @@ class AuthProvider with ChangeNotifier {
     // 2. Ensuite, écouter FirebaseAuth pour les changements d'état
     FirebaseAuth.instance.authStateChanges().listen((firebaseUser) async {
       debugPrint('[AuthProvider] Firebase user: $firebaseUser');
-      _loading = true;
-      notifyListeners();
-      debugPrint('[AuthProvider] notifyListeners() loading=true');
+      final blockUi = firebaseUser != null && _user == null;
+      if (blockUi) {
+        _loading = true;
+        notifyListeners();
+        debugPrint('[AuthProvider] notifyListeners() loading=true (première sync)');
+      }
       if (firebaseUser != null) {
         debugPrint(
           '[AuthProvider] Firebase user (avant getIdToken): $firebaseUser',
@@ -213,9 +225,12 @@ class AuthProvider with ChangeNotifier {
         }
       } else {
         debugPrint('[AuthProvider] Utilisateur Firebase null, clearRole');
+        final hadLocalUser = _user != null;
         _token = null;
         _user = null;
-        await clearUserFromPrefs();
+        if (hadLocalUser) {
+          await clearUserFromPrefs();
+        }
         UserService().clearRole();
 
         _loading = false;
@@ -249,8 +264,11 @@ class AuthProvider with ChangeNotifier {
   // Ajout : méthode pour forcer le rechargement de l'utilisateur
   Future<void> reloadUser() async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
-    _loading = true;
-    notifyListeners();
+    final silent = _user != null;
+    if (!silent) {
+      _loading = true;
+      notifyListeners();
+    }
     if (firebaseUser != null) {
       final idToken = await firebaseUser.getIdToken();
       _token = idToken;

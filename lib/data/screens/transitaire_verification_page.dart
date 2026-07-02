@@ -10,6 +10,7 @@ import 'package:tranoo_pro/utils/api_error_message.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'package:tranoo_pro/utils/phone_country_config.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:dio/dio.dart';
 
 class TransitaireVerificationPage extends StatefulWidget {
@@ -733,16 +734,11 @@ class _CardImagePreviewPage extends StatelessWidget {
         child: InteractiveViewer(
           child: localFile != null
               ? Image.file(localFile!, fit: BoxFit.contain)
-              : Image.network(
-                  imageUrl!,
+              : CachedMediaImage(
+                  url: imageUrl!,
                   fit: BoxFit.contain,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return const CircularProgressIndicator(
-                      color: kTransitaireAmber,
-                    );
-                  },
-                  errorBuilder: (_, __, ___) => const Icon(
+                  cloudinaryWidthPx: 1200,
+                  errorWidget: const Icon(
                     Icons.broken_image_outlined,
                     color: Colors.white54,
                     size: 64,
@@ -931,23 +927,11 @@ class _DocUploadSlot extends StatelessWidget {
                         behavior: HitTestBehavior.opaque,
                         child: localFile != null
                             ? Image.file(localFile!, fit: BoxFit.cover)
-                            : Image.network(
-                                imageUrl!,
+                            : CachedMediaImage(
+                                url: imageUrl!,
                                 fit: BoxFit.cover,
-                                loadingBuilder: (context, child, progress) {
-                                  if (progress == null) return child;
-                                  return const Center(
-                                    child: SizedBox(
-                                      width: 28,
-                                      height: 28,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: kTransitaireAmber,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (_, __, ___) => Column(
+                                cloudinaryWidthPx: 400,
+                                errorWidget: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(

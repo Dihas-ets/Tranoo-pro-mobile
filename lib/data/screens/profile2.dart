@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -158,7 +159,12 @@ class _Profile2State extends State<Profile2> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    if (loading) return Center(child: CircularProgressIndicator());
+    if (loading) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SkeletonPresets.transitaireProfile(),
+      );
+    }
     if (errorMsg != null) return Center(child: Text(errorMsg!));
     if (userData == null)
       return Center(child: Text(l10n.noUserData));

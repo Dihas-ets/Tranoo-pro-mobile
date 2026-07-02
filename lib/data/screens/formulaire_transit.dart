@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/services/transit_mission_service.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class FormulaireTransitPage extends StatefulWidget {
   final Map<String, dynamic>? mission;
@@ -235,13 +236,13 @@ class _FormulaireTransitPageState extends State<FormulaireTransitPage> {
                           const SizedBox(height: 16),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              article['photos'][0].toString(),
+                            child: CachedMediaImage(
+                              url: article['photos'][0].toString(),
                               height: 140,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
+                              cloudinaryWidthPx: 800,
+                              errorWidget: const SizedBox.shrink(),
                             ),
                           ),
                         ],

@@ -10,6 +10,7 @@ import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'package:tranoo_pro/utils/api_error_message.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:video_player/video_player.dart';
 
 const int kTransitaireGalleryMaxItems = 20;
@@ -304,7 +305,11 @@ class TransitaireGalleryGrid extends StatelessWidget {
                     )
                   : GestureDetector(
                       onTap: () => _showImage(context, item.url),
-                      child: Image.network(item.url, fit: BoxFit.cover),
+                      child: CachedMediaImage(
+                        url: item.url,
+                        fit: BoxFit.cover,
+                        cloudinaryWidthPx: 400,
+                      ),
                     ),
             ),
             if (isOwner && onItemsChanged != null)
@@ -378,7 +383,13 @@ class TransitaireGalleryGrid extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            InteractiveViewer(child: Image.network(url, fit: BoxFit.contain)),
+            InteractiveViewer(
+              child: CachedMediaImage(
+                url: url,
+                fit: BoxFit.contain,
+                cloudinaryWidthPx: 1200,
+              ),
+            ),
             Positioned(
               top: 8,
               right: 8,
@@ -420,7 +431,11 @@ class _GalleryVideoThumb extends StatelessWidget {
           children: [
             if (thumb != null)
               Positioned.fill(
-                child: Image.network(thumb, fit: BoxFit.cover),
+                child: CachedMediaImage(
+                  url: thumb,
+                  fit: BoxFit.cover,
+                  cloudinaryWidthPx: 400,
+                ),
               ),
             Container(
               padding: const EdgeInsets.all(8),

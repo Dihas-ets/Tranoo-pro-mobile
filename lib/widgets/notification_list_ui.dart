@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/utils/notification_i18n.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 /// Type d'icône pour la liste style YouTube.
 enum NotificationVisualKind {
@@ -158,12 +159,13 @@ Widget buildNotificationThumbnail(String? url, NotificationVisualKind kind) {
   if (url == null || url.isEmpty) return placeholder;
   return ClipRRect(
     borderRadius: BorderRadius.circular(8),
-    child: Image.network(
-      url,
+    child: CachedMediaImage(
+      url: url,
       width: w,
       height: h,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => placeholder,
+      cloudinaryWidthPx: (w * 2).toInt(),
+      errorWidget: placeholder,
     ),
   );
 }

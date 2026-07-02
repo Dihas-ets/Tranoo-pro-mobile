@@ -9,6 +9,7 @@ import 'package:tranoo_pro/services/notification_ringtone_player.dart';
 import 'package:tranoo_pro/utils/local_notification_service.dart';
 import 'package:tranoo_pro/utils/locale_helper.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 /// Écran plein écran style appel entrant pour les alertes acheteur (vendeurs).
 class AlertIncomingCallOverlay extends StatefulWidget {
@@ -322,10 +323,11 @@ class _AvatarRing extends StatelessWidget {
         padding: const EdgeInsets.all(4),
         child: ClipOval(
           child: imageUrl != null && imageUrl!.isNotEmpty
-              ? Image.network(
-                  imageUrl!,
+              ? CachedMediaImage(
+                  url: imageUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _placeholder(),
+                  cloudinaryWidthPx: 160,
+                  errorWidget: _placeholder(),
                 )
               : _placeholder(),
         ),

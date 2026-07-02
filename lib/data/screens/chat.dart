@@ -3,6 +3,7 @@ import 'discussion.dart';
 import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
@@ -320,23 +321,18 @@ class _ChatListPageState extends State<ChatListPage> {
                                     children: [
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(6),
-                                        child: Image.network(
-                                          _getArticlePhoto(room),
+                                        child: CachedMediaImage(
+                                          url: _getArticlePhoto(room),
                                           width: 36,
                                           height: 36,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (
-                                            context,
-                                            error,
-                                            stackTrace,
-                                          ) {
-                                            return Image.asset(
-                                              'assets/images/car.png',
-                                              width: 36,
-                                              height: 36,
-                                              fit: BoxFit.cover,
-                                            );
-                                          },
+                                          cloudinaryWidthPx: 72,
+                                          errorWidget: Image.asset(
+                                            'assets/images/car.png',
+                                            width: 36,
+                                            height: 36,
+                                            fit: BoxFit.cover,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),

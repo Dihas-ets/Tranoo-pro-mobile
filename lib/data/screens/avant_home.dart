@@ -29,7 +29,7 @@ import 'package:tranoo_pro/data/screens/profil3.dart';
 import 'package:tranoo_pro/data/screens/settings_type_vendeur_page.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
-import 'package:tranoo_pro/main.dart';
+import 'package:tranoo_pro/main.dart' show NotificationService;
 import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
 import 'package:tranoo_pro/widgets/alert_display_permission_dialog.dart';
 import 'package:tranoo_pro/data/screens/transitaire_verification_page.dart';
@@ -49,7 +49,6 @@ class _AvantHomeState extends State<AvantHome>
   Future<void> onPagePullRefresh() async => _runLightRefresh(force: true);
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _didRedirectToLogin = false;
   bool _didCheckOnboarding = false;
   bool _didCheckTypeVendeurMigration = false;
   bool _didCheckTransitaireAccess = false;
@@ -59,6 +58,8 @@ class _AvantHomeState extends State<AvantHome>
       TransitaireAccessService();
   Timer? _lightRefreshTimer;
   DateTime? _lastLightRefreshAt;
+  List<Widget>? _tabPages;
+  String? _tabPagesRoleKey;
 
   @override
   void initState() {
@@ -166,20 +167,66 @@ class _AvantHomeState extends State<AvantHome>
       });
       return;
     }
+    if (_selectedIndex == index) return;
     setState(() {
       _selectedIndex = index;
     });
-    if (role == 'chauffeur' && index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const Profile()),
-      );
-    } else if (role == 'livreur' && index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const Profile()),
-      );
+  }
+
+  Widget _buildAnimatedTabBody(List<Widget> pages) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (var i = 0; i < pages.length; i++)
+          IgnorePointer(
+            ignoring: _selectedIndex != i,
+            child: AnimatedOpacity(
+              opacity: _selectedIndex == i ? 1 : 0,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              child: TickerMode(
+                enabled: _selectedIndex == i,
+                child: pages[i],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _roleKeyForUser(Map<String, dynamic>? user) {
+    final role = (user?['role'] ?? user?['typeUtilisateur'] ?? user?['type'])
+        ?.toString()
+        .toLowerCase();
+    if (role == 'vendeur') {
+      final userService = UserService();
+      return 'vendeur_${userService.vendeurType ?? 'mixte'}';
     }
+    return role ?? 'guest';
+  }
+
+  List<Widget> _pagesForUser(Map<String, dynamic>? user) {
+    final role = (user?['role'] ?? user?['typeUtilisateur'] ?? user?['type'])
+        ?.toString()
+        .toLowerCase();
+    if (role == 'livreur') return _pagesLivreur;
+    if (role == 'chauffeur') return _pagesChauffeur;
+    if (role == 'transitaire') return _pagesTransitaire;
+    if (role == 'vendeur') return _buildVendeurPages();
+    return [const Marque(), const Profil3()];
+  }
+
+  List<Widget> _resolveTabPages(Map<String, dynamic>? user) {
+    final roleKey = _roleKeyForUser(user);
+    if (_tabPages != null && _tabPagesRoleKey == roleKey) {
+      return _tabPages!;
+    }
+    _tabPagesRoleKey = roleKey;
+    _tabPages = _pagesForUser(user);
+    if (_selectedIndex >= _tabPages!.length) {
+      _selectedIndex = 0;
+    }
+    return _tabPages!;
   }
 
   final List<Widget> _pagesChauffeur = [
@@ -265,29 +312,6 @@ class _AvantHomeState extends State<AvantHome>
     );
   }
 
-  Widget getCurrentPage(String? role) {
-    if (role == 'livreur') {
-      return _selectedIndex < _pagesLivreur.length
-          ? _pagesLivreur[_selectedIndex]
-          : _pagesLivreur[0];
-    } else if (role == 'chauffeur') {
-      return _selectedIndex < _pagesChauffeur.length
-          ? _pagesChauffeur[_selectedIndex]
-          : _pagesChauffeur[0];
-    } else if (role == 'transitaire') {
-      return _selectedIndex < _pagesTransitaire.length
-          ? _pagesTransitaire[_selectedIndex]
-          : _pagesTransitaire[0];
-    } else if (role == 'vendeur') {
-      final vendeurPages = _buildVendeurPages();
-      return _selectedIndex < vendeurPages.length
-          ? vendeurPages[_selectedIndex]
-          : vendeurPages[0];
-    } else {
-      return const Center(child: CircularProgressIndicator());
-    }
-  }
-
   Widget _profilePageForRole(String? role) {
     final normalized = role?.toLowerCase();
     if (normalized == 'vendeur') return const ProfilUtilisateurPage();
@@ -314,33 +338,25 @@ class _AvantHomeState extends State<AvantHome>
     return Consumer<myauth.AuthProvider>(
       builder: (context, auth, _) {
         final user = auth.user;
-        final loading = auth.loading;
         final role = user != null ? user['role'] as String? : null;
-
-        if (!loading && !_didCheckOnboarding) {
-          _checkOnboardingAndInactivity();
-        }
-
-        if (!loading &&
-            user == null &&
-            !_didRedirectToLogin &&
-            _didCheckOnboarding) {
-          _didRedirectToLogin = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const ConnexionPage()),
-              (route) => false,
-            );
-          });
-        }
+        final pages = _resolveTabPages(user);
 
         if (user != null) {
           _updateLastLoginTime();
         }
 
-        if (!loading &&
-            user != null &&
+        if (!_didCheckOnboarding) {
+          _checkOnboardingAndInactivity();
+        }
+
+        if (user == null) {
+          return const Scaffold(
+            backgroundColor: Colors.white,
+            body: SizedBox.shrink(),
+          );
+        }
+
+        if (user != null &&
             role == 'vendeur' &&
             !_didCheckTypeVendeurMigration) {
           _didCheckTypeVendeurMigration = true;
@@ -374,8 +390,7 @@ class _AvantHomeState extends State<AvantHome>
           });
         }
 
-        if (!loading &&
-            user != null &&
+        if (user != null &&
             role == 'transitaire' &&
             !_didCheckTransitaireAccess) {
           _didCheckTransitaireAccess = true;
@@ -384,20 +399,7 @@ class _AvantHomeState extends State<AvantHome>
           });
         }
 
-        if (!loading &&
-            user != null &&
-            role == 'transitaire' &&
-            _transitaireAccessLoading &&
-            _transitaireAccess == null) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(color: Color(0xFFF8BF13)),
-            ),
-          );
-        }
-
-        if (!loading &&
-            user != null &&
+        if (user != null &&
             role == 'transitaire' &&
             _transitaireAccess != null &&
             _transitaireAccess!.needsVerificationBlock) {
@@ -407,8 +409,7 @@ class _AvantHomeState extends State<AvantHome>
           );
         }
 
-        if (!loading &&
-            user != null &&
+        if (user != null &&
             role == 'transitaire' &&
             _transitaireAccess != null &&
             _transitaireAccess!.needsSubscriptionBlock) {
@@ -492,15 +493,11 @@ class _AvantHomeState extends State<AvantHome>
               },
             ),
           ),
-          body: loading
-              ? const Center(child: CircularProgressIndicator())
-              : getCurrentPage(role),
+          body: _buildAnimatedTabBody(pages),
           drawer: Drawer(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : user == null
-                    ? Center(child: Text(l10n.userNotConnected))
-                    : Column(
+            child: user == null
+                ? Center(child: Text(l10n.userNotConnected))
+                : Column(
                         children: [
                           // Header fixe
                           Container(
@@ -663,9 +660,7 @@ class _AvantHomeState extends State<AvantHome>
                         ],
                       ),
           ),
-          bottomNavigationBar: loading
-              ? null
-              : BottomNavigationBar(
+          bottomNavigationBar: BottomNavigationBar(
                   type: BottomNavigationBarType.fixed,
                   backgroundColor: const Color(0xFFF9FAFB),
                   selectedItemColor: const Color(0xFFF8BF13),

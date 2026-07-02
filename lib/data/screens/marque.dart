@@ -27,6 +27,10 @@ import 'package:tranoo_pro/utils/catalog_filter_options.dart';
 import 'package:tranoo_pro/widgets/catalog_filter_sections.dart';
 import 'package:tranoo_pro/widgets/seller_stats_dashboard.dart';
 import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
+import 'package:tranoo_pro/utils/local_data_cache.dart';
+import 'package:tranoo_pro/utils/pro_image_utils.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
+import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -336,13 +340,14 @@ class _MarqueState extends State<Marque>
   Future<void> onPagePullRefresh() async {
     setState(() => _pullRefreshing = true);
     try {
-      await fetchArticlesPieces();
-      await fetchVoituresRecommandees();
-      await fetchPubs();
-      await fetchPubsSponsorisees();
-      if (_userService.currentRole == UserRole.vendeur) {
-        await _loadSellerMarqueStats();
-      }
+      await Future.wait<void>([
+        fetchArticlesPieces(),
+        fetchVoituresRecommandees(),
+        fetchMotosRecommandees(),
+        fetchPubs(),
+        fetchPubsSponsorisees(),
+        if (_userService.currentRole == UserRole.vendeur) _loadSellerMarqueStats(),
+      ]);
     } finally {
       if (mounted) setState(() => _pullRefreshing = false);
     }
@@ -404,6 +409,69 @@ class _MarqueState extends State<Marque>
   bool _revenueAmountVisible = false;
 
   final _logger = Logger('MarquePage');
+
+  String get _marqueCacheRole =>
+      _userService.currentRole == UserRole.vendeur ? 'vendeur' : 'acheteur';
+
+  String _marqueCacheKey(String name) => 'marque_${name}_$_marqueCacheRole';
+
+  void _precachePubImages(Iterable<Pub> pubs) {
+    if (!mounted) return;
+    final urls = pubs
+        .expand((p) => p.media)
+        .where((u) => u.trim().isNotEmpty)
+        .take(12);
+    precacheProImages(
+      context,
+      urls,
+      cloudinaryWidthPx: cloudinaryWidthPx(context, logicalWidth: 280),
+      maxCount: 12,
+    );
+  }
+
+  void _precacheArticleVoitureThumbs(Iterable<ArticleVoiture> items) {
+    if (!mounted) return;
+    precacheProImages(
+      context,
+      items.where((v) => v.images.isNotEmpty).map((v) => v.images.first),
+      cloudinaryWidthPx: cloudinaryWidthPx(context, logicalWidth: 180),
+      maxCount: 16,
+    );
+  }
+
+  void _precachePieceThumbs(Iterable<Article> items) {
+    if (!mounted) return;
+    precacheProImages(
+      context,
+      items.where((p) => p.images.isNotEmpty).map((p) => p.images.first),
+      cloudinaryWidthPx: cloudinaryWidthPx(context, logicalWidth: 120),
+      maxCount: 16,
+    );
+  }
+
+  Future<void> _loadMarqueInitialData() async {
+    await Future.wait<void>([
+      fetchPubs(),
+      fetchPubsSponsorisees(),
+    ]);
+    if (!mounted) return;
+    unawaited(Future.wait<void>([
+      fetchArticlesPieces(),
+      fetchVoituresRecommandees(),
+      fetchMotosRecommandees(),
+      if (_userService.currentRole == UserRole.vendeur) _loadSellerMarqueStats(),
+    ]));
+  }
+
+  Future<void> _refreshMarqueDataSilent() async {
+    await Future.wait<void>([
+      fetchArticlesPieces(silent: true),
+      fetchVoituresRecommandees(silent: true),
+      fetchMotosRecommandees(silent: true),
+      fetchPubs(silent: true),
+      fetchPubsSponsorisees(silent: true),
+    ]);
+  }
 
   // Méthodes pour les statistiques
   Future<void> _loadVehicleClickStats() async {
@@ -620,15 +688,8 @@ class _MarqueState extends State<Marque>
 
     // Configuration du carrousel automatique
     _startCarouselTimer();
-    fetchArticlesPieces();
-    fetchVoituresRecommandees();
-    fetchMotosRecommandees();
-    fetchPubs();
-    fetchPubsSponsorisees();
+    _loadMarqueInitialData();
     _loadVehicleClickStats();
-    if (_userService.currentRole == UserRole.vendeur) {
-      _loadSellerMarqueStats();
-    }
   }
 
   Future<void> _loadSellerMarqueStats() async {
@@ -684,39 +745,51 @@ class _MarqueState extends State<Marque>
     }
   }
 
-  void _reloadAll() {
-    // Réinitialiser les filtres
+  Future<void> _reloadAll() async {
     _selectedBrand = null;
     _selectedModel = null;
     _selectedMotoBrand = null;
     _selectedLocation = null;
     _budgetMin = null;
     _budgetMax = null;
-
-    // Recharger les données
-    fetchArticlesPieces();
-    fetchVoituresRecommandees();
-    fetchMotosRecommandees();
-    fetchPubs();
-    fetchPubsSponsorisees();
-    if (_userService.currentRole == UserRole.vendeur) {
-      _loadSellerMarqueStats();
-    }
     setState(() {});
+    await Future.wait<void>([
+      fetchArticlesPieces(),
+      fetchVoituresRecommandees(),
+      fetchMotosRecommandees(),
+      fetchPubs(),
+      fetchPubsSponsorisees(),
+      if (_userService.currentRole == UserRole.vendeur) _loadSellerMarqueStats(),
+    ]);
   }
 
-  Future<void> fetchArticlesPieces() async {
-    setState(() {
-      isLoadingPieces = true;
-      errorPieces = null;
-    });
+  Future<void> fetchArticlesPieces({bool silent = false}) async {
+    if (!silent) {
+      final stale =
+          await LocalDataCache.readJsonListStale(_marqueCacheKey('pieces'));
+      if (stale != null && mounted) {
+        final cached = stale.map((e) => Article.fromJson(e)).toList();
+        setState(() {
+          articlesPieces =
+              cached.where((p) => (p.statut ?? 'en_ligne') != 'vendu').toList();
+          isLoadingPieces = false;
+        });
+        _precachePieceThumbs(articlesPieces);
+      } else {
+        setState(() {
+          isLoadingPieces = true;
+          errorPieces = null;
+        });
+      }
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
       final isVendeur = _userService.currentRole == UserRole.vendeur;
       String url = isVendeur
           ? getBaseUrl() + '/articles?type=piece&vendu=false'
-          : getBaseUrl() + '/articles?type=piece&statut=en_ligne&vendu=false';
+          : getBaseUrl() +
+              '/public/articles?type=piece&statut=en_ligne&vendu=false';
       _logger.info('[DEBUG] URL pièces: $url');
       final headers = <String, String>{
         'Content-Type': 'application/json',
@@ -735,24 +808,11 @@ class _MarqueState extends State<Marque>
             json.decode(body) as List<dynamic>,
           );
           if (!mounted) return;
+          await LocalDataCache.writeJsonList(_marqueCacheKey('pieces'), data);
           final allPieces = data.map((e) => Article.fromJson(e)).toList();
           final piecesFiltered = allPieces
               .where((p) => (p.statut ?? 'en_ligne') != 'vendu')
               .toList();
-
-          _logger.info('[DEBUG] Total pièces reçues: ${allPieces.length}');
-          _logger.info(
-            '[DEBUG] Pièces après filtrage vendu: ${piecesFiltered.length}',
-          );
-
-          // Log des statuts pour déboguer
-          for (var p in allPieces) {
-            if ((p.statut ?? 'en_ligne') == 'vendu') {
-              _logger.info(
-                '[DEBUG] Pièce vendue trouvée: ${p.title} - Statut: ${p.statut}',
-              );
-            }
-          }
 
           setState(() {
             articlesPieces = piecesFiltered;
@@ -761,6 +821,7 @@ class _MarqueState extends State<Marque>
             }
             isLoadingPieces = false;
           });
+          _precachePieceThumbs(piecesFiltered);
           _loadBackendViews();
         } catch (e) {
           _logger.info('[DEBUG] Erreur de décodage JSON: $e');
@@ -771,9 +832,6 @@ class _MarqueState extends State<Marque>
           });
         }
       } else {
-        _logger.info(
-          '[DEBUG] HTTP pièces ${response.statusCode}: ${response.body}',
-        );
         if (!mounted) return;
         setState(() {
           errorPieces = 'Erreur lors du chargement des pièces';
@@ -1021,51 +1079,54 @@ class _MarqueState extends State<Marque>
     return 'Vous n\'avez aucun $entityLabel en ligne';
   }
 
-  Future<void> fetchVoituresRecommandees() async {
-    setState(() {
-      isLoadingVoitures = true;
-      errorVoitures = null;
-    });
+  Future<void> fetchVoituresRecommandees({bool silent = false}) async {
+    if (!silent) {
+      final stale =
+          await LocalDataCache.readJsonListStale(_marqueCacheKey('voitures'));
+      if (stale != null && mounted) {
+        final cached = stale.map((e) => ArticleVoiture.fromJson(e)).toList();
+        setState(() {
+          voituresRecommandees =
+              cached.where((v) => (v.statut ?? 'en_ligne') != 'vendu').toList();
+          isLoadingVoitures = false;
+        });
+        _precacheArticleVoitureThumbs(voituresRecommandees);
+      } else {
+        setState(() {
+          isLoadingVoitures = true;
+          errorVoitures = null;
+        });
+      }
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
       final isVendeur = _userService.currentRole == UserRole.vendeur;
       String url = isVendeur
           ? getBaseUrl() + '/articles?type=voiture&vendu=false'
-          : getBaseUrl() + '/articles?type=voiture&statut=en_ligne&vendu=false';
-      _logger.info('[DEBUG] URL voitures: $url');
+          : getBaseUrl() +
+              '/public/articles?type=voiture&statut=en_ligne&vendu=false';
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (idToken != null) {
+        headers['Authorization'] = 'Bearer $idToken';
+      }
       final response = await http.get(
         Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       ).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final List<dynamic> data = sortArticleMapsNewestFirst(
           json.decode(response.body) as List<dynamic>,
         );
         if (!mounted) return;
+        await LocalDataCache.writeJsonList(_marqueCacheKey('voitures'), data);
         final allVoitures =
             data.map((e) => ArticleVoiture.fromJson(e)).toList();
         final voituresFiltered = allVoitures
             .where((v) => (v.statut ?? 'en_ligne') != 'vendu')
             .toList();
-
-        _logger.info('[DEBUG] Total voitures reçues: ${allVoitures.length}');
-        _logger.info(
-          '[DEBUG] Voitures après filtrage vendu: ${voituresFiltered.length}',
-        );
-
-        // Log des statuts pour déboguer
-        for (var v in allVoitures) {
-          if ((v.statut ?? 'en_ligne') == 'vendu') {
-            _logger.info(
-              '[DEBUG] Voiture vendue trouvée: ${v.titre} - Statut: ${v.statut}',
-            );
-          }
-        }
-
         setState(() {
           voituresRecommandees = voituresFiltered;
           for (final v in voituresFiltered) {
@@ -1073,6 +1134,7 @@ class _MarqueState extends State<Marque>
           }
           isLoadingVoitures = false;
         });
+        _precacheArticleVoitureThumbs(voituresFiltered);
         _loadBackendViews();
       } else {
         if (!mounted) return;
@@ -1082,7 +1144,6 @@ class _MarqueState extends State<Marque>
         });
       }
     } catch (e) {
-      _logger.info('[DEBUG] Exception fetchVoituresRecommandees: $e');
       if (!mounted) return;
       setState(() {
         errorVoitures = 'Erreur réseau';
@@ -1091,30 +1152,49 @@ class _MarqueState extends State<Marque>
     }
   }
 
-  Future<void> fetchMotosRecommandees() async {
-    setState(() {
-      isLoadingMotos = true;
-      errorMotos = null;
-    });
+  Future<void> fetchMotosRecommandees({bool silent = false}) async {
+    if (!silent) {
+      final stale =
+          await LocalDataCache.readJsonListStale(_marqueCacheKey('motos'));
+      if (stale != null && mounted) {
+        final cached = stale.map((e) => ArticleVoiture.fromJson(e)).toList();
+        setState(() {
+          motosRecommandees =
+              cached.where((m) => (m.statut ?? 'en_ligne') != 'vendu').toList();
+          isLoadingMotos = false;
+        });
+        _precacheArticleVoitureThumbs(motosRecommandees);
+      } else {
+        setState(() {
+          isLoadingMotos = true;
+          errorMotos = null;
+        });
+      }
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
       final isVendeur = _userService.currentRole == UserRole.vendeur;
       final url = isVendeur
           ? getBaseUrl() + '/articles?type=moto&vendu=false'
-          : getBaseUrl() + '/articles?type=moto&statut=en_ligne&vendu=false';
+          : getBaseUrl() +
+              '/public/articles?type=moto&statut=en_ligne&vendu=false';
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (idToken != null) {
+        headers['Authorization'] = 'Bearer $idToken';
+      }
       final response = await http.get(
         Uri.parse(url),
-        headers: {
-          if (idToken != null) 'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       ).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final List<dynamic> data = sortArticleMapsNewestFirst(
           json.decode(response.body) as List<dynamic>,
         );
         if (!mounted) return;
+        await LocalDataCache.writeJsonList(_marqueCacheKey('motos'), data);
         final allMotos = data.map((e) => ArticleVoiture.fromJson(e)).toList();
         final motosFiltered = allMotos
             .where((m) => (m.statut ?? 'en_ligne') != 'vendu')
@@ -1126,6 +1206,7 @@ class _MarqueState extends State<Marque>
           }
           isLoadingMotos = false;
         });
+        _precacheArticleVoitureThumbs(motosFiltered);
         _loadBackendViews();
       } else {
         if (!mounted) return;
@@ -1187,51 +1268,58 @@ class _MarqueState extends State<Marque>
     }
   }
 
-  Future<void> fetchPubs() async {
-    setState(() {
-      isLoadingPubs = true;
-      errorPubs = null;
-    });
+  Future<void> fetchPubs({bool silent = false}) async {
+    if (!silent) {
+      final stale =
+          await LocalDataCache.readJsonListStale(_marqueCacheKey('pubs'));
+      if (stale != null && mounted) {
+        final pubs = stale.map((e) => Pub.fromJson(e)).toList();
+        setState(() {
+          pubsALaUne = pubs
+              .where((p) => p.typePub == 'À la une' && _isPubValid(p))
+              .toList();
+          isLoadingPubs = false;
+          if (pubsALaUne.isNotEmpty) {
+            _startCarouselTimer();
+          }
+        });
+        _precachePubImages(pubsALaUne);
+      } else {
+        setState(() {
+          isLoadingPubs = true;
+          errorPubs = null;
+        });
+      }
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
-      String url = getBaseUrl() + '/publicites?statut=valide';
+      String url = getBaseUrl() + '/public/publicites?statut=valide';
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (idToken != null) {
+        headers['Authorization'] = 'Bearer $idToken';
+      }
       final response = await http.get(
         Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       );
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+        await LocalDataCache.writeJsonList(_marqueCacheKey('pubs'), data);
         final pubs = data.map((e) => Pub.fromJson(e)).toList();
         if (!mounted) return;
         setState(() {
           pubsALaUne = pubs
               .where((p) => p.typePub == 'À la une' && _isPubValid(p))
               .toList();
-          _logger.info('[DEBUG] 📺 Total pubs reçues: ${pubs.length}');
-          _logger.info(
-            '[DEBUG] 📺 Publicités À la une: ${pubsALaUne.length} valides sur ${pubs.where((p) => p.typePub == 'À la une').length} totales',
-          );
-          for (var pub in pubs.where((p) => p.typePub == 'À la une')) {
-            final isValid = _isPubValid(pub);
-            _logger.info(
-              '[DEBUG] 📺 Pub ${pub.id}: statut=${pub.statut}, dateDebut=${pub.dateDebut}, dateFin=${pub.dateFin}, valide=$isValid',
-            );
-            if (!isValid && pub.statut == 'valide') {
-              _logger.info(
-                '[DEBUG] 📺 Pub ${pub.id} rejetée pour expiration - maintenant: ${DateTime.now()}, dateFin: ${pub.dateFin}',
-              );
-            }
-          }
           isLoadingPubs = false;
-          // Redémarrer le timer si nécessaire
           if (pubsALaUne.isNotEmpty) {
             _startCarouselTimer();
           }
         });
+        _precachePubImages(pubsALaUne);
       } else {
         if (!mounted) return;
         setState(() {
@@ -1248,48 +1336,53 @@ class _MarqueState extends State<Marque>
     }
   }
 
-  Future<void> fetchPubsSponsorisees() async {
-    setState(() {
-      isLoadingPubs = true;
-      errorPubs = null;
-    });
+  Future<void> fetchPubsSponsorisees({bool silent = false}) async {
+    if (!silent) {
+      final stale = await LocalDataCache.readJsonListStale(
+        _marqueCacheKey('pubs_sponsor'),
+      );
+      if (stale != null && mounted) {
+        final pubs = stale.map((e) => Pub.fromJson(e)).toList();
+        setState(() {
+          pubsSponsorisees = pubs.where((p) => _isPubValid(p)).toList();
+          isLoadingPubs = false;
+        });
+        _precachePubImages(pubsSponsorisees);
+      } else {
+        setState(() {
+          isLoadingPubs = true;
+          errorPubs = null;
+        });
+      }
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
-      String url =
-          getBaseUrl() + '/publicites?typePub=Sponsorisée&statut=valide';
+      String url = getBaseUrl() +
+          '/public/publicites?typePub=Sponsorisée&statut=valide';
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (idToken != null) {
+        headers['Authorization'] = 'Bearer $idToken';
+      }
       final response = await http.get(
         Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       );
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+        await LocalDataCache.writeJsonList(
+          _marqueCacheKey('pubs_sponsor'),
+          data,
+        );
         final pubs = data.map((e) => Pub.fromJson(e)).toList();
         if (!mounted) return;
         setState(() {
           pubsSponsorisees = pubs.where((p) => _isPubValid(p)).toList();
-          _logger.info(
-            '[DEBUG] ⭐ Total pubs sponsorisées reçues: ${pubs.length}',
-          );
-          _logger.info(
-            '[DEBUG] ⭐ Publicités Sponsorisées: ${pubsSponsorisees.length} valides sur ${pubs.length} totales',
-          );
-          for (var pub in pubs) {
-            final isValid = _isPubValid(pub);
-            _logger.info(
-              '[DEBUG] ⭐ Pub ${pub.id}: statut=${pub.statut}, dateDebut=${pub.dateDebut}, dateFin=${pub.dateFin}, valide=$isValid',
-            );
-            if (!isValid && pub.statut == 'valide') {
-              _logger.info(
-                '[DEBUG] ⭐ Pub ${pub.id} rejetée pour expiration - maintenant: ${DateTime.now()}, dateFin: ${pub.dateFin}',
-              );
-            }
-          }
           isLoadingPubs = false;
         });
+        _precachePubImages(pubsSponsorisees);
       } else {
         if (!mounted) return;
         setState(() {
@@ -1360,9 +1453,11 @@ class _MarqueState extends State<Marque>
               padding: const EdgeInsets.all(12),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imageUrl,
+                child: CachedMediaImage(
+                  url: imageUrl,
                   fit: BoxFit.contain,
+                  cloudinaryWidthPx: cloudinaryWidthPx(context),
+                  placeholderColor: Colors.black,
                 ),
               ),
             ),
@@ -1582,11 +1677,13 @@ class _MarqueState extends State<Marque>
                             topRight: Radius.circular(12),
                           ),
                           child: voiture.images.isNotEmpty
-                              ? Image.network(
-                                  voiture.images.first,
+                              ? CachedMediaImage(
+                                  url: voiture.images.first,
                                   height: double.infinity,
                                   width: double.infinity,
                                   fit: BoxFit.cover,
+                                  cloudinaryWidthPx:
+                                      cloudinaryWidthPx(context, logicalWidth: 180),
                                 )
                               : (voiture.video?.isNotEmpty ?? false)
                                   ? VideoPreviewPlaceholder(
@@ -1876,11 +1973,12 @@ class _MarqueState extends State<Marque>
                       child: Stack(
                         children: [
                           piece.images.isNotEmpty
-                              ? Image.network(
-                                  piece.images.first,
+                              ? CachedMediaImage(
+                                  url: piece.images.first,
                                   height: 40,
                                   width: 40,
                                   fit: BoxFit.cover,
+                                  cloudinaryWidthPx: 120,
                                 )
                               : (piece.video?.isNotEmpty ?? false)
                                   ? VideoPreviewPlaceholder(
@@ -2294,9 +2392,12 @@ Padding(
                                       child: SizedBox(
                                         width: double.infinity,
                                         child: piece.images.isNotEmpty
-                                            ? Image.network(
-                                                piece.images.first,
+                                            ? CachedMediaImage(
+                                                url: piece.images.first,
                                                 fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                height: double.infinity,
+                                                cloudinaryWidthPx: 120,
                                               )
                                             : (piece.video?.isNotEmpty ?? false)
                                                 ? VideoPreviewPlaceholder(
@@ -2527,22 +2628,12 @@ Padding(
                                   width: 255, // Réduit de 340 à 255 (-1/4)
                                   color: Colors.grey[300],
                                   child: pub.media.isNotEmpty
-                                      ? Image.network(
-                                          pub.media[0],
-                                          width: 255, // Réduit de 340 à 255 (-1/4)
+                                      ? CachedMediaImage(
+                                          url: pub.media[0],
+                                          width: 255,
                                           height: 170,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (
-                                            context,
-                                            error,
-                                            stackTrace,
-                                          ) {
-                                            return Icon(
-                                              Icons.image_not_supported,
-                                              size: 80,
-                                              color: Colors.grey[600],
-                                            );
-                                          },
+                                          cloudinaryWidthPx: 280,
                                         )
                                       : Icon(
                                           Icons.image_not_supported,
@@ -2659,21 +2750,12 @@ Widget buildPubsALaUneCarousel() {
                           children: [
                             // Image avec ajustement auto
                             Positioned.fill(
-                              child: Image.network(
-                                pub.media[0],
+                              child: CachedMediaImage(
+                                url: pub.media[0],
                                 fit: BoxFit.cover,
-                                alignment: Alignment.center,
-                                filterQuality: FilterQuality.high,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                    child: const Icon(
-                                      Icons.image_not_supported,
-                                      size: 60, // Réduit de 80 à 60
-                                      color: Colors.black54,
-                                    ),
-                                  );
-                                },
+                                width: double.infinity,
+                                height: double.infinity,
+                                cloudinaryWidthPx: 280,
                               ),
                             ),
                             // Overlay pour s'assurer que le contenu reste lisible
@@ -3049,12 +3131,12 @@ Widget buildPubsALaUneCarousel() {
                   leading: thumb.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            thumb,
+                          child: CachedMediaImage(
+                            url: thumb,
                             width: 56,
                             height: 56,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.directions_car),
+                            cloudinaryWidthPx: 120,
                           ),
                         )
                       : const Icon(Icons.directions_car),
@@ -3335,11 +3417,12 @@ Widget buildPubsALaUneCarousel() {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: vehicle.images.isNotEmpty
-                              ? Image.network(
-                                  vehicle.images.first,
+                              ? CachedMediaImage(
+                                  url: vehicle.images.first,
                                   width: 40,
                                   height: 40,
                                   fit: BoxFit.cover,
+                                  cloudinaryWidthPx: 80,
                                 )
                               : Container(
                                   width: 40,

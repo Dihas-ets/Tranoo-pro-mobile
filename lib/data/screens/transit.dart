@@ -7,6 +7,7 @@ import 'package:tranoo_pro/services/transit_mission_service.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class Transit extends StatefulWidget {
   const Transit({super.key});
@@ -396,12 +397,13 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
     if (image != null && image.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          image,
+        child: CachedMediaImage(
+          url: image,
           width: 72,
           height: 72,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _thumbPlaceholder(),
+          cloudinaryWidthPx: 144,
+          errorWidget: _thumbPlaceholder(),
         ),
       );
     }

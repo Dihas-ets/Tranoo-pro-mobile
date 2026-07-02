@@ -16,6 +16,7 @@ import 'package:http/http.dart' as http;
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
 import 'dart:developer';
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'map_picker_screen.dart';
 import '../../widgets/location_permission_dialog.dart';
@@ -1410,12 +1411,13 @@ class _UneState extends State<Une> {
                     if (hasImage)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          _cloudinaryImageUrls[index]!,
+                        child: CachedMediaImage(
+                          url: _cloudinaryImageUrls[index]!,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
+                          cloudinaryWidthPx: 400,
+                          errorWidget: const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
                           ),
@@ -2231,13 +2233,12 @@ class _UneState extends State<Une> {
                                   borderRadius: BorderRadius.circular(10),
                                   child: Container(
                                     color: Colors.black,
-                                    child: Image.network(
-                                      _cloudinaryImageUrls[0]!,
+                                    child: CachedMediaImage(
+                                      url: _cloudinaryImageUrls[0]!,
                                       fit: BoxFit.contain,
-                                      alignment: Alignment.center,
-                                      filterQuality: FilterQuality.high,
                                       width: double.infinity,
                                       height: double.infinity,
+                                      cloudinaryWidthPx: 1200,
                                     ),
                                   ),
                                 )

@@ -20,6 +20,8 @@ import 'package:dio/dio.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/widgets/spec_info_card.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
+import 'package:tranoo_pro/utils/whatsapp_helper.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class MotoInfo extends StatefulWidget {
   final String? id;
@@ -284,7 +286,17 @@ class _MotoInfoState extends State<MotoInfo> {
         totalMediaCount > 0 ? totalMediaCount - 1 : 0,
       ),
     );
+    if ((widget.id ?? '').trim().isNotEmpty) {
+      _isOnline = true;
+    }
     _loadArticleStatut();
+  }
+
+  bool _articlePublishedStatut(String statut) {
+    return statut == 'en_ligne' ||
+        statut == 'en_attente' ||
+        statut == 'vendu' ||
+        statut == 'non_vendu';
   }
 
   Future<void> _loadArticleStatut() async {
@@ -305,10 +317,42 @@ class _MotoInfoState extends State<MotoInfo> {
         final statut = (data['statut'] ?? '').toString().toLowerCase();
         if (!mounted) return;
         setState(() {
-          _isOnline = (statut == 'en_ligne');
+          _isOnline = _articlePublishedStatut(statut);
         });
       }
     } catch (_) {}
+  }
+
+  String get _whatsAppPhone =>
+      WhatsappHelper.phoneFromArticleSupplier(fournisseur: widget.fournisseur) ??
+      WhatsappHelper.supportDigits;
+
+  Future<void> _openWhatsApp() async {
+    await WhatsappHelper.openChat(
+      context,
+      phone: _whatsAppPhone,
+      unavailableMessage: l10n.sellerPhoneUnavailable,
+      cannotOpenMessage: l10n.cannotOpenWhatsApp,
+    );
+  }
+
+  void _precacheAdjacentImages(int index) {
+    if (!mounted || widget.images.isEmpty) return;
+    final w = MediaQuery.sizeOf(context).width *
+        MediaQuery.devicePixelRatioOf(context);
+    final urls = <String>[];
+    for (final delta in [-1, 0, 1]) {
+      final i = index + delta;
+      if (i < 0 || i >= widget.images.length) continue;
+      final url = widget.images[i].trim();
+      if (url.startsWith('http')) urls.add(url);
+    }
+    precacheMediaImages(
+      context,
+      urls,
+      cloudinaryWidthPx: w.round().clamp(120, 1600),
+      maxCount: 3,
+    );
   }
 
   void _openImageViewer(int startIndex) {
@@ -329,14 +373,10 @@ class _MotoInfoState extends State<MotoInfo> {
                     child: InteractiveViewer(
                       minScale: 1,
                       maxScale: 5,
-                      child: Image.network(
-                        widget.images[index],
+                      child: CachedMediaImage(
+                        url: widget.images[index],
                         fit: BoxFit.contain,
-                        errorBuilder: (c, e, s) => const Icon(
-                          Icons.image_not_supported,
-                          color: Colors.white,
-                          size: 80,
-                        ),
+                        placeholderColor: Colors.black,
                       ),
                     ),
                   );
@@ -440,7 +480,10 @@ class _MotoInfoState extends State<MotoInfo> {
               ? PageView.builder(
                   controller: _pageController,
                   itemCount: _totalMediaCount,
-                  onPageChanged: (i) => setState(() => _currentImageIndex = i),
+                  onPageChanged: (i) {
+                    setState(() => _currentImageIndex = i);
+                    _precacheAdjacentImages(i);
+                  },
                   itemBuilder: (context, index) {
                     if (index < _imagesCount) {
                       final hasImage =
@@ -459,16 +502,13 @@ class _MotoInfoState extends State<MotoInfo> {
                           child: InteractiveViewer(
                             minScale: 1,
                             maxScale: 4,
-                            child: Image.network(
-                              widget.images[index],
+                            child: CachedMediaImage(
+                              url: widget.images[index],
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(
-                                color: Colors.grey[300],
-                                child: Center(
-                                  child: Text(l10n.imageNotAvailable),
-                                ),
-                              ),
+                              width: double.infinity,
+                              height: double.infinity,
+                              cloudinaryWidthPx:
+                                  MediaQuery.sizeOf(context).width.toInt(),
                             ),
                           ),
                         ),
@@ -621,17 +661,7 @@ class _MotoInfoState extends State<MotoInfo> {
               const SizedBox(height: 8),
               // WhatsApp
               GestureDetector(
-                onTap: () async {
-                  final url = 'https://wa.me/22941839801';
-                  final uri = Uri.parse(url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.cannotOpenWhatsApp)),
-                    );
-                  }
-                },
+                onTap: _openWhatsApp,
                 child: CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.white,
@@ -1290,17 +1320,7 @@ class _MotoInfoState extends State<MotoInfo> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: () async {
-                final uri = Uri.parse('https://wa.me/22941839801');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.cannotOpenWhatsApp),
-                    ),
-                  );
-                }
-              },
+              onPressed: _openWhatsApp,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1696,6 +1716,7 @@ class _MotoInfoState extends State<MotoInfo> {
                         log('[DEBUG] Body réponse API : ${response.body}');
                         if (response.statusCode == 201 ||
                             response.statusCode == 200) {
+                          if (mounted) setState(() => _isOnline = true);
                           _confettiController.play();
                           await Future.delayed(const Duration(seconds: 2));
                           Navigator.push(

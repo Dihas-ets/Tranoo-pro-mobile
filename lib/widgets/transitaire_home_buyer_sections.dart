@@ -13,6 +13,7 @@ import 'package:tranoo_pro/data/screens/voitures.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/article_list_sort.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:tranoo_pro/widgets/catalog_article_grid_card.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -268,7 +269,11 @@ class TransitaireHomeBuyerSectionsState
         child: Stack(
           children: [
             InteractiveViewer(
-              child: Image.network(imageUrl, fit: BoxFit.contain),
+              child: CachedMediaImage(
+                url: imageUrl,
+                fit: BoxFit.contain,
+                cloudinaryWidthPx: 1200,
+              ),
             ),
             Positioned(
               top: 8,
@@ -319,12 +324,11 @@ class TransitaireHomeBuyerSectionsState
                     height: 180,
                     color: Colors.black,
                     child: pub.media.isNotEmpty
-                        ? Image.network(
-                            pub.media[0],
+                        ? CachedMediaImage(
+                            url: pub.media[0],
                             fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            filterQuality: FilterQuality.high,
-                            errorBuilder: (_, __, ___) => Container(
+                            cloudinaryWidthPx: 800,
+                            errorWidget: Container(
                               color: Colors.grey[300],
                               child: const Icon(
                                 Icons.image_not_supported,

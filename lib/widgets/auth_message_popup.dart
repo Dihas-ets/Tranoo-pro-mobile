@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/utils/whatsapp_helper.dart';
 
 /// Popup coloré et non agressif pour les messages d'authentification.
 /// Types: success, error, warning, info, support.
@@ -233,10 +234,11 @@ class AuthMessagePopup {
   }
 
   static Future<void> _openSupportWhatsApp(BuildContext context) async {
-    final phone = _supportPhone.replaceAll(RegExp(r'[\s+]'), '');
+    final phone = WhatsappHelper.digitsOnly(_supportPhone);
     final candidates = <Uri>[
       Uri.parse('whatsapp://send?phone=$phone'),
-      Uri.parse('https://wa.me/$phone'),
+      if (WhatsappHelper.buildWaMeUri(phone) != null)
+        WhatsappHelper.buildWaMeUri(phone)!,
       Uri.parse('https://api.whatsapp.com/send?phone=$phone'),
     ];
 

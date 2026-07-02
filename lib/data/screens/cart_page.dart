@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:provider/provider.dart';
 import '../../services/cart_service.dart';
 import 'order_summary.dart';
@@ -96,19 +97,12 @@ class _CartPageState extends State<CartPage> {
                                 color: Colors.grey[200],
                                 child:
                                     item.imageUrl != null
-                                        ? Image.network(
-                                          item.imageUrl!,
+                                        ? CachedMediaImage(
+                                          url: item.imageUrl!,
+                                          width: 80,
+                                          height: 80,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (
-                                            context,
-                                            error,
-                                            stackTrace,
-                                          ) {
-                                            return const Icon(
-                                              Icons.image_not_supported,
-                                              color: Colors.grey,
-                                            );
-                                          },
+                                          cloudinaryWidthPx: 160,
                                         )
                                         : const Icon(
                                           Icons.image_not_supported,

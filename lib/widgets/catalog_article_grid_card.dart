@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/utils/catalog_display.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 /// Carte catalogue alignée sur [VoituresPage] (grille 2 colonnes).
 class CatalogArticleGridCard extends StatelessWidget {
@@ -99,11 +100,13 @@ class CatalogArticleGridCard extends StatelessWidget {
                         topRight: Radius.circular(12),
                       ),
                       child: hasPhoto
-                          ? Image.network(
-                              photos!.first.toString(),
+                          ? CachedMediaImage(
+                              url: photos!.first.toString(),
                               height: double.infinity,
                               width: double.infinity,
                               fit: BoxFit.cover,
+                              cloudinaryWidthPx:
+                                  MediaQuery.sizeOf(context).width.toInt(),
                             )
                           : hasVideo
                               ? VideoPreviewPlaceholder(

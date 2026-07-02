@@ -4,6 +4,7 @@ import 'package:tranoo_pro/services/transitaire_review_service.dart';
 import 'package:tranoo_pro/widgets/transitaire_gallery_section.dart';
 import 'package:tranoo_pro/widgets/transitaire_reviews_section.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 const Color kTransitaireNavy = Color(0xFF1B2B4B);
 const Color kTransitaireAmber = Color(0xFFF8BF13);
@@ -281,7 +282,11 @@ void _showProfilePhotoZoom(
             onTap: () => Navigator.of(ctx).pop(),
             child: InteractiveViewer(
               child: photoUrl != null
-                  ? Image.network(photoUrl, fit: BoxFit.contain)
+                  ? CachedMediaImage(
+                      url: photoUrl,
+                      fit: BoxFit.contain,
+                      cloudinaryWidthPx: 800,
+                    )
                   : CircleAvatar(
                       radius: 80,
                       backgroundColor: kTransitaireAmber.withOpacity(0.2),
@@ -615,23 +620,11 @@ class _ProfileCoverHeader extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.network(
-          photoUrl!,
+        CachedMediaImage(
+          url: photoUrl!,
           fit: BoxFit.cover,
-          gaplessPlayback: true,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return Container(
-              color: const Color(0xFFE8EDF5),
-              alignment: Alignment.center,
-              child: const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            );
-          },
-          errorBuilder: (_, __, ___) => _defaultCover(),
+          cloudinaryWidthPx: 800,
+          errorWidget: _defaultCover(),
         ),
         Container(
           decoration: BoxDecoration(

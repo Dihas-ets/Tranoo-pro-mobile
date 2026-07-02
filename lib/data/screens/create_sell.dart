@@ -23,6 +23,7 @@ import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/services/seller_profile_locations.dart';
 import 'package:tranoo_pro/widgets/country_location_field.dart';
 import 'package:tranoo_pro/utils/location_geocode_helper.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class CreateSellPage extends StatefulWidget {
   final String? alertNotificationId;
@@ -1014,12 +1015,13 @@ class _CreateSellPageState extends State<CreateSellPage> {
                     if (hasImage)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          _cloudinaryImageUrls[index]!,
+                        child: CachedMediaImage(
+                          url: _cloudinaryImageUrls[index]!,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
+                          cloudinaryWidthPx: 400,
+                          errorWidget: const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
                           ),

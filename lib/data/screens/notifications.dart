@@ -17,6 +17,9 @@ import 'package:tranoo_pro/widgets/notification_list_ui.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/utils/notification_i18n.dart';
 import 'package:tranoo_pro/utils/locale_helper.dart';
+import 'package:tranoo_pro/utils/local_data_cache.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 
 // --------- HELPERS SÉCURISÉS ----------
 List<String> getNotifImages(Map notif) {
@@ -266,30 +269,33 @@ class VerificationDetailPage extends StatelessWidget {
               if (stampUrl != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 10),
-                  child: Image.network(stampUrl,
+                  child: CachedMediaImage(
+                      url: stampUrl,
                       height: 53,
                       width: 53,
                       fit: BoxFit.contain,
-                      opacity: const AlwaysStoppedAnimation(0.9),
-                      errorBuilder: (context, error, stackTrace) {
-                    return Container(
+                      cloudinaryWidthPx: 106,
+                      errorWidget: Container(
                       height: 53,
                       width: 53,
                       color: Colors.grey[300],
                       child: const Icon(Icons.verified, color: Colors.amber),
-                    );
-                  }),
+                    ),
+                  ),
                 ),
               if (signatureUrl != null)
-                Image.network(signatureUrl, height: 39, fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                  return Container(
+                CachedMediaImage(
+                    url: signatureUrl,
                     height: 39,
-                    width: 100,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.edit, color: Colors.blueGrey),
-                  );
-                }),
+                    fit: BoxFit.contain,
+                    cloudinaryWidthPx: 200,
+                    errorWidget: Container(
+                  height: 39,
+                  width: 100,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.edit, color: Colors.blueGrey),
+                ),
+                ),
             ]),
             const SizedBox(height: 16),
             if ((_safeGetStringLocal(notification, 'status') ?? 'pending') ==
@@ -358,17 +364,16 @@ class VerificationDetailPage extends StatelessWidget {
       return images
           .map((img) => ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  img,
+                child: CachedMediaImage(
+                  url: img,
                   height: 90,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 90,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.broken_image),
-                    );
-                  },
+                  cloudinaryWidthPx: 180,
+                  errorWidget: Container(
+                    height: 90,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.broken_image),
+                  ),
                 ),
               ))
           .toList();
@@ -380,6 +385,8 @@ class VerificationDetailPage extends StatelessWidget {
 }
 
 class NotificationProvider with ChangeNotifier {
+  static const String _cacheKey = 'notifications_list';
+
   final List<Map<String, dynamic>> _notifications = [];
   List<Map<String, dynamic>> get notifications =>
       List.unmodifiable(_notifications);
@@ -387,6 +394,28 @@ class NotificationProvider with ChangeNotifier {
 
   NotificationProvider() {
     _initFCMListener();
+    _primeFromCache();
+  }
+
+  Future<void> _primeFromCache() async {
+    final cached = await LocalDataCache.readJsonListStale(_cacheKey);
+    if (cached == null || cached.isEmpty) return;
+    _notifications
+      ..clear()
+      ..addAll(cached.map(_mapCachedNotification));
+    loading = false;
+    notifyListeners();
+  }
+
+  Map<String, dynamic> _mapCachedNotification(dynamic notif) {
+    if (notif is! Map) return {};
+    final map = Map<String, dynamic>.from(notif);
+    map['date'] = map['date'] is DateTime
+        ? map['date']
+        : (map['createdAt'] != null
+            ? DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now()
+            : DateTime.now());
+    return map;
   }
 
   void addNotification(Map<String, dynamic> notif) {
@@ -394,9 +423,12 @@ class NotificationProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadNotificationsFromAPI(String token) async {
-    loading = true;
-    notifyListeners();
+  Future<void> loadNotificationsFromAPI(String token, {bool silent = false}) async {
+    final hasData = _notifications.isNotEmpty;
+    if (!silent && !hasData) {
+      loading = true;
+      notifyListeners();
+    }
     try {
       final response = await http.get(
         Uri.parse('${getBaseUrl()}/notifications/'),
@@ -423,6 +455,10 @@ class NotificationProvider with ChangeNotifier {
             }
           }
         }
+        await LocalDataCache.writeJsonList(
+          _cacheKey,
+          _notifications.map((n) => Map<String, dynamic>.from(n)).toList(),
+        );
         notifyListeners();
       } else {
         print(
@@ -618,7 +654,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     if (user != null) {
       user.getIdToken().then((token) {
         if (token != null) {
-          provider.loadNotificationsFromAPI(token).then((_) {
+          provider.loadNotificationsFromAPI(token, silent: provider.notifications.isNotEmpty).then((_) {
             if (!mounted) return;
             _syncUnreadCountWithHeader(provider);
             _openPendingNotificationIfNeeded(provider, token);
@@ -696,7 +732,11 @@ class _NotificationsBodyState extends State<NotificationsBody> {
             InteractiveViewer(
               minScale: 0.5,
               maxScale: 4,
-              child: Image.network(url, fit: BoxFit.contain),
+              child: CachedMediaImage(
+                url: url,
+                fit: BoxFit.contain,
+                cloudinaryWidthPx: 1200,
+              ),
             ),
             Positioned(
               top: 8,
@@ -771,8 +811,8 @@ class _NotificationsBodyState extends State<NotificationsBody> {
             ),
         ],
       ),
-      body: provider.loading
-          ? const Center(child: CircularProgressIndicator())
+      body: provider.loading && provider.notifications.isEmpty
+          ? SkeletonPresets.notificationList()
           : provider.notifications.isEmpty
               ? Center(
                   child: Text(l10n.noNotifications,
@@ -944,12 +984,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: url != null && url.isNotEmpty
-          ? Image.network(
-              url,
+          ? CachedMediaImage(
+              url: url,
               width: w,
               height: h,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _alertThumbnailPlaceholder(isPiece),
+              cloudinaryWidthPx: (w * 2).toInt(),
+              errorWidget: _alertThumbnailPlaceholder(isPiece),
             )
           : _alertThumbnailPlaceholder(isPiece),
     );
@@ -1161,6 +1202,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               fournisseur: (article['fournisseur'] is Map)
                   ? Map<String, dynamic>.from(article['fournisseur'])
                   : null,
+              vendeur: article['vendeur'] is Map
+                  ? Map<String, dynamic>.from(article['vendeur'] as Map)
+                  : null,
             ),
           ),
         );
@@ -1339,35 +1383,32 @@ class _NotificationsBodyState extends State<NotificationsBody> {
             if (stampUrl != null)
               Padding(
                 padding: const EdgeInsets.only(right: 12),
-                child: Image.network(
-                  stampUrl,
+                child: CachedMediaImage(
+                  url: stampUrl,
                   height: 47,
                   width: 47,
                   fit: BoxFit.contain,
-                  opacity: const AlwaysStoppedAnimation(0.9),
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 47,
-                      width: 47,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.verified, color: Colors.amber),
-                    );
-                  },
+                  cloudinaryWidthPx: 94,
+                  errorWidget: Container(
+                    height: 47,
+                    width: 47,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.verified, color: Colors.amber),
+                  ),
                 ),
               ),
             if (signatureUrl != null)
-              Image.network(
-                signatureUrl,
+              CachedMediaImage(
+                url: signatureUrl,
                 height: 34,
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 34,
-                    width: 100,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.edit, color: Colors.blueGrey),
-                  );
-                },
+                cloudinaryWidthPx: 200,
+                errorWidget: Container(
+                  height: 34,
+                  width: 100,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.edit, color: Colors.blueGrey),
+                ),
               ),
           ],
         ),
@@ -1505,12 +1546,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               child: Stack(
                 alignment: Alignment.bottomRight,
                 children: [
-                  Image.network(
-                    imageUrl,
+                  CachedMediaImage(
+                    url: imageUrl,
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    cloudinaryWidthPx: 800,
+                    errorWidget: Container(
                       height: 160,
                       color: Colors.grey[200],
                       alignment: Alignment.center,

@@ -8,6 +8,7 @@ import 'package:tranoo_pro/widgets/transitaire_gallery_section.dart';
 import 'package:tranoo_pro/widgets/transitaire_home_buyer_sections.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 /// Accueil transitaire — pubs à la une, galerie, profil, voitures, motos.
 class TransitaireHome extends StatefulWidget {
@@ -162,10 +163,11 @@ class _TransitaireHomeState extends State<TransitaireHome> {
                         iconSize: 32,
                         onTap: _openFullGallery,
                       )
-                    : Image.network(
-                        item.url,
+                    : CachedMediaImage(
+                        url: item.url,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        cloudinaryWidthPx: 400,
+                        errorWidget: Container(
                           color: Colors.grey.shade200,
                           child: const Icon(Icons.broken_image_outlined),
                         ),

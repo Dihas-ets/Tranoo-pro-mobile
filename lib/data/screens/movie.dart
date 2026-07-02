@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:developer';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/utils/cloudinary_url.dart';
 
 class Movie extends StatefulWidget {
   final String? videoUrl;
@@ -111,15 +113,31 @@ class _MovieState extends State<Movie> {
   }
 
   Widget _buildVideoSection() {
-    if (widget.videoUrl != null && _initialized) {
-      return WebViewWidget(controller: _webController);
-    } else {
-      return GestureDetector(
-        onTap: () => Navigator.pop(context),
-        child: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    }
+    final thumbUrl = cloudinaryVideoThumbUrl(widget.videoUrl);
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (thumbUrl != null)
+          CachedNetworkImage(
+            imageUrl: thumbUrl,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => const ColoredBox(color: Colors.black),
+            errorWidget: (_, __, ___) => const ColoredBox(color: Colors.black),
+          )
+        else
+          const ColoredBox(color: Colors.black),
+        if (widget.videoUrl != null && _initialized)
+          WebViewWidget(controller: _webController)
+        else
+          Center(
+            child: Icon(
+              Icons.play_circle_outline,
+              color: Colors.white.withValues(alpha: 0.85),
+              size: 72,
+            ),
+          ),
+      ],
+    );
   }
 }

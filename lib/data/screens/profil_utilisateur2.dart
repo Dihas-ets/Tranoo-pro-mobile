@@ -13,6 +13,7 @@ import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
+import 'package:tranoo_pro/utils/local_data_cache.dart';
 
 class ProfilUtilisateur2 extends StatefulWidget {
   const ProfilUtilisateur2({super.key});
@@ -35,8 +36,18 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
   @override
   void initState() {
     super.initState();
-    fetchUser();
-    _loadWallet();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final cached = await LocalDataCache.readJsonMapStale('profile_me');
+    if (cached != null && mounted) {
+      setState(() {
+        userData = cached;
+        loading = false;
+      });
+    }
+    await Future.wait<void>([fetchUser(), _loadWallet()]);
   }
 
   Future<void> _loadWallet() async {
@@ -226,8 +237,12 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
         ),
       );
       final response = await dio.get('/protected/me');
+      final profile = response.data['user'] as Map<String, dynamic>?;
+      if (profile != null) {
+        await LocalDataCache.writeJsonMap('profile_me', profile);
+      }
       setState(() {
-        userData = response.data['user'];
+        userData = profile;
         loading = false;
         errorMsg = null;
       });

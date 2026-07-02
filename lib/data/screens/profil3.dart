@@ -18,6 +18,7 @@ import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/services/subscription_access_service.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 
 void main() {
   runApp(const MyApp());
@@ -268,14 +269,30 @@ class Profil3State extends State<Profil3> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<myauth.AuthProvider>(context);
     final userData = authProvider.user;
-    final loading = authProvider.loading;
-    final errorMsg =
-        userData == null && !loading ? "Utilisateur non connecté." : null;
 
-    if (loading) return Center(child: CircularProgressIndicator());
-    if (errorMsg != null) return Center(child: Text(errorMsg));
     if (userData == null) {
-      return Center(child: Text(l10n.noUserData));
+      return Scaffold(
+        backgroundColor: const Color(0xFFF9FAFB),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFFF8BF13),
+          elevation: 0,
+          foregroundColor: Colors.black,
+          title: Text(
+            l10n.account,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: Colors.black,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Text(
+            l10n.userNotConnected,
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+          ),
+        ),
+      );
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -621,7 +638,14 @@ class Profil3State extends State<Profil3> {
 
   Widget _buildSubscriptionSection() {
     if (_subscriptionLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: SkeletonBox(
+          width: double.infinity,
+          height: 120,
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      );
     }
     final status = _subscriptionStatus;
     final warning = status?.showExpiryWarning == true;

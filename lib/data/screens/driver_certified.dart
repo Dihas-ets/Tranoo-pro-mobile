@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:tranoo_pro/services/user_service.dart'; // Ajout pour getBaseUrl
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -241,10 +242,11 @@ class DriverCertifiedPageState extends State<DriverCertifiedPage> {
             if (_cloudinaryUrl != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Image.network(
-                  _cloudinaryUrl!,
+                child: CachedMediaImage(
+                  url: _cloudinaryUrl!,
                   height: 120,
                   fit: BoxFit.cover,
+                  cloudinaryWidthPx: 240,
                 ),
               ),
 

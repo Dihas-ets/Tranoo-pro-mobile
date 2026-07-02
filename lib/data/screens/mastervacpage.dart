@@ -21,6 +21,8 @@ import 'dart:developer';
 import 'une.dart' as pub_page; // Import pour la page de demande de pub avec préfixe
 // import 'verification_payment.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/utils/whatsapp_helper.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/utils/auth_config.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -46,6 +48,7 @@ class MastervacPage extends StatefulWidget {
   final String? video;
   final bool fromPub;
   final Map<String, dynamic>? fournisseur; // Ajout des infos fournisseur
+  final Map<String, dynamic>? vendeur;
   final bool editMode;
   final String? alertNotificationId;
   final String? alertBuyerId;
@@ -70,6 +73,7 @@ class MastervacPage extends StatefulWidget {
     this.video,
     this.fromPub = false,
     this.fournisseur, // Ajout des infos fournisseur
+    this.vendeur,
     this.alertNotificationId,
     this.alertBuyerId,
     this.alertRequestType,
@@ -128,7 +132,12 @@ class _MastervacPageState extends State<MastervacPage> {
       duration: const Duration(seconds: 2),
     );
     _pageController = PageController(initialPage: _currentImageIndex);
-    _sellerPhone = _phoneFromFournisseurWidget();
+    if ((widget.id ?? '').trim().isNotEmpty) {
+      _isOnline = true;
+    }
+    _sellerPhone = WhatsappHelper.phoneFromArticleSupplier(
+          fournisseur: widget.fournisseur, vendeur: widget.vendeur) ??
+        _phoneFromFournisseurWidget();
     _loadArticleDetails();
 
     _editTitleController = TextEditingController(text: widget.title);
@@ -330,18 +339,26 @@ class _MastervacPageState extends State<MastervacPage> {
     return phone.isEmpty ? null : phone;
   }
 
-  String? _extractSellerPhone(Map<String, dynamic> data) {
-    final fournisseur = data['fournisseur'];
-    if (fournisseur is Map) {
-      final phone = fournisseur['telephone']?.toString().trim() ?? '';
-      if (phone.isNotEmpty) return phone;
+  String? _extractSellerPhone(Map<String, dynamic> data) =>
+      WhatsappHelper.phoneFromArticle(data) ?? _sellerPhone;
+
+  void _precacheAdjacentImages(int index) {
+    if (!mounted || widget.images.isEmpty) return;
+    final w = MediaQuery.sizeOf(context).width *
+        MediaQuery.devicePixelRatioOf(context);
+    final urls = <String>[];
+    for (final delta in [-1, 0, 1]) {
+      final i = index + delta;
+      if (i < 0 || i >= widget.images.length) continue;
+      final url = widget.images[i]?.trim() ?? '';
+      if (url.startsWith('http')) urls.add(url);
     }
-    final vendeur = data['vendeur'];
-    if (vendeur is Map) {
-      final phone = vendeur['telephone']?.toString().trim() ?? '';
-      if (phone.isNotEmpty) return phone;
-    }
-    return null;
+    precacheMediaImages(
+      context,
+      urls,
+      cloudinaryWidthPx: w.round().clamp(120, 1600),
+      maxCount: 3,
+    );
   }
 
   String _digitsOnly(String raw) => raw.replaceAll(RegExp(r'\D'), '');
@@ -354,24 +371,11 @@ class _MastervacPageState extends State<MastervacPage> {
   }
 
   Future<void> _openSellerWhatsApp() async {
-    final phone = _sellerPhone?.trim() ?? '';
-    if (phone.isEmpty) {
-      _showSellerContactUnavailable();
-      return;
-    }
-    final digits = _digitsOnly(phone);
-    if (digits.isEmpty) {
-      _showSellerContactUnavailable();
-      return;
-    }
-    final uri = Uri.parse('https://wa.me/$digits');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      return;
-    }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.cannotOpenWhatsApp)),
+    await WhatsappHelper.openChat(
+      context,
+      phone: _sellerPhone,
+      unavailableMessage: l10n.sellerPhoneUnavailable,
+      cannotOpenMessage: l10n.cannotOpenWhatsApp,
     );
   }
 
@@ -397,6 +401,13 @@ class _MastervacPageState extends State<MastervacPage> {
     );
   }
 
+  bool _articlePublishedStatut(String statut) {
+    return statut == 'en_ligne' ||
+        statut == 'en_attente' ||
+        statut == 'vendu' ||
+        statut == 'non_vendu';
+  }
+
   Future<void> _loadArticleDetails() async {
     try {
       final id = widget.id;
@@ -404,7 +415,7 @@ class _MastervacPageState extends State<MastervacPage> {
       final user = FirebaseAuth.instance.currentUser;
       final token = await user?.getIdToken();
       final res = await http.get(
-        Uri.parse(getBaseUrl() + '/articles/' + id),
+        Uri.parse(getBaseUrl() + '/public/articles/' + id),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer ' + token,
@@ -418,7 +429,7 @@ class _MastervacPageState extends State<MastervacPage> {
         final loc = (data['localisation'] ?? data['lieu'])?.toString().trim();
         final company = data['entreprise']?.toString().trim();
         setState(() {
-          _isOnline = (statut == 'en_ligne');
+          _isOnline = _articlePublishedStatut(statut);
           _sellerPhone = phone;
           _loadedCategorie = data['categorie']?.toString();
           _loadedMarque = data['marque']?.toString();
@@ -664,10 +675,6 @@ class _MastervacPageState extends State<MastervacPage> {
         onPressed: () => Navigator.pop(context),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.share, color: Colors.black),
-          onPressed: () {},
-        ),
         // Icône Panier avec compteur
         AnimatedBuilder(
           animation: CartService(),
@@ -732,19 +739,20 @@ class _MastervacPageState extends State<MastervacPage> {
               ? PageView.builder(
             controller: _pageController,
             itemCount: widget.images.length,
-            onPageChanged: (i) => setState(() => _currentImageIndex = i),
+            onPageChanged: (i) {
+              setState(() => _currentImageIndex = i);
+              _precacheAdjacentImages(i);
+            },
             itemBuilder: (context, index) {
               final String img = widget.images[index] ?? '';
               final Widget child = img.startsWith('http')
-                  ? Image.network(
-                      img,
+                  ? CachedMediaImage(
+                      url: img,
                       fit: BoxFit.cover,
-                      errorBuilder: (c, e, s) => Container(
-                        color: Colors.grey[300],
-                        child: Center(
-                          child: Text(l10n.imageNotAvailable),
-                        ),
-                      ),
+                      width: double.infinity,
+                      height: double.infinity,
+                      cloudinaryWidthPx:
+                          MediaQuery.sizeOf(context).width.toInt(),
                     )
                   : (img.isNotEmpty
                       ? Image.asset(
@@ -864,7 +872,11 @@ class _MastervacPageState extends State<MastervacPage> {
                 itemBuilder: (context, index) {
                   final String img = widget.images[index] ?? '';
                   final Widget child = img.startsWith('http')
-                      ? Image.network(img, fit: BoxFit.contain)
+                      ? CachedMediaImage(
+                          url: img,
+                          fit: BoxFit.contain,
+                          placeholderColor: Colors.black,
+                        )
                       : (img.isNotEmpty
                           ? Image.asset(img, fit: BoxFit.contain)
                           : const Icon(
@@ -1251,6 +1263,7 @@ class _MastervacPageState extends State<MastervacPage> {
                         if (response.statusCode == 201 ||
                             response.statusCode == 200) {
                           if (!mounted) return;
+                          setState(() => _isOnline = true);
                           _confettiController.play();
                           await Future.delayed(const Duration(seconds: 2));
                           Navigator.push(

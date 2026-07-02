@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'succes.dart'; // Assurez-vous que ce chemin est correct
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class FinalisationAchatScreen extends StatelessWidget {
   final String? articleImage; // URL image (peut être vide)
@@ -73,11 +74,12 @@ class FinalisationAchatScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 child:
                     (displayedImage.startsWith('http'))
-                        ? Image.network(
-                          displayedImage,
+                        ? CachedMediaImage(
+                          url: displayedImage,
                           height: 200,
                           width: double.infinity,
                           fit: BoxFit.cover,
+                          cloudinaryWidthPx: 800,
                         )
                         : Image.asset(
                           displayedImage,

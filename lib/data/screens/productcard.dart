@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class ProductCard extends StatelessWidget {
   final String imagePath;
@@ -31,19 +32,18 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image principale dynamique
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                imagePath,
+              child: CachedMediaImage(
+                url: imagePath,
                 height: imageHeight,
                 width: imageWidth,
                 fit: BoxFit.cover,
+                cloudinaryWidthPx:
+                    MediaQuery.sizeOf(context).width.toInt(),
               ),
             ),
             const SizedBox(height: 8),
-
-            // Miniatures statiques (tu peux les rendre dynamiques aussi si besoin)
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: List.generate(
@@ -54,19 +54,17 @@ class ProductCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.blueAccent),
                   ),
-                  child: Image.network(
-                    imagePath,
+                  child: CachedMediaImage(
+                    url: imagePath,
                     width: 40,
                     height: 40,
                     fit: BoxFit.cover,
+                    cloudinaryWidthPx: 80,
                   ),
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // Titre + note
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -86,20 +84,16 @@ class ProductCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-
             const Text(
               "10,000 ₣",
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-
             const Text(
               "Composant essentiel du système de freinage, le mastervac amplifie la force exercée sur la pédale de frein pour faciliter le freinage.",
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 12),
-
-            // Infos Modèle et Type
             Row(
               children: [
                 Expanded(
@@ -115,7 +109,7 @@ class ProductCard extends StatelessWidget {
                         const Icon(Icons.precision_manufacturing),
                         const SizedBox(height: 4),
                         Text(l10n.model),
-                        Text(
+                        const Text(
                           "124-CFDS",
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
@@ -137,7 +131,7 @@ class ProductCard extends StatelessWidget {
                         const Icon(Icons.label_important),
                         const SizedBox(height: 4),
                         Text(l10n.typeLabel),
-                        Text(
+                        const Text(
                           "Rare",
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
@@ -147,12 +141,9 @@ class ProductCard extends StatelessWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
-
-            // Badges
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Badge(text: "New"),
                 SizedBox(width: 6),
                 Badge(text: "2023"),
@@ -161,8 +152,6 @@ class ProductCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Bouton
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -191,7 +180,6 @@ class Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

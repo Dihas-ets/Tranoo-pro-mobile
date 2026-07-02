@@ -5,6 +5,7 @@ import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 class Discussion extends StatefulWidget {
   final String roomId;
@@ -543,19 +544,18 @@ class _DiscussionState extends State<Discussion> {
           borderRadius: BorderRadius.circular(8),
           child:
               fileUrl.startsWith('http')
-                  ? Image.network(
-                    fileUrl,
+                  ? CachedMediaImage(
+                    url: fileUrl,
                     width: 120,
                     height: 120,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 120,
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.image, color: Colors.grey),
-                      );
-                    },
+                    cloudinaryWidthPx: 240,
+                    errorWidget: Container(
+                      width: 120,
+                      height: 120,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.image, color: Colors.grey),
+                    ),
                   )
                   : Container(
                     width: 120,
@@ -617,17 +617,16 @@ class _DiscussionState extends State<Discussion> {
             mainAxisSize: MainAxisSize.min,
             children: [
               imageUrl.startsWith('http')
-                  ? Image.network(
-                    imageUrl,
+                  ? CachedMediaImage(
+                    url: imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 200,
-                        height: 200,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.image, color: Colors.grey),
-                      );
-                    },
+                    cloudinaryWidthPx: 800,
+                    errorWidget: Container(
+                      width: 200,
+                      height: 200,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.image, color: Colors.grey),
+                    ),
                   )
                   : Image.asset(imageUrl, fit: BoxFit.cover),
               TextButton(

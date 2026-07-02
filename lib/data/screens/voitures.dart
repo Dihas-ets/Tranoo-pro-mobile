@@ -12,6 +12,7 @@ import 'create_sell.dart';
 import 'package:tranoo_pro/utils/article_list_sort.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
@@ -19,6 +20,10 @@ import 'package:tranoo_pro/utils/catalog_display.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/utils/catalog_filter_options.dart';
 import 'package:tranoo_pro/widgets/catalog_filter_sections.dart';
+import 'package:tranoo_pro/utils/local_data_cache.dart';
+import 'package:tranoo_pro/utils/pro_image_utils.dart';
+import 'package:provider/provider.dart';
+import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -74,6 +79,19 @@ class _VoituresPageState extends State<VoituresPage>
   late int _statusRejectedTabIndex;
 
   final UserService _userService = UserService();
+
+  String? _sellerMongoId() {
+    return Provider.of<myauth.AuthProvider>(context, listen: false)
+        .user?['_id']
+        ?.toString();
+  }
+
+  String _catalogCacheKey() {
+    if (_userService.currentRole != UserRole.vendeur) {
+      return 'catalog_voitures_public';
+    }
+    return 'catalog_voitures_${_sellerMongoId() ?? 'vendeur'}';
+  }
 
   @override
   void initState() {
@@ -141,34 +159,69 @@ class _VoituresPageState extends State<VoituresPage>
     setState(() {});
   }
 
-  Future<void> fetchVoitures() async {
-    setState(() {
-      isLoading = true;
-      error = null;
-    });
+  Future<void> fetchVoitures({bool silent = false}) async {
+    final cacheKey = _catalogCacheKey();
+    if (!silent) {
+      final stale = await LocalDataCache.readJsonListStale(cacheKey);
+      if (stale != null && mounted) {
+        setState(() {
+          voitures = stale;
+          _isVisible = List.generate(stale.length, (index) => true);
+          isLoading = false;
+        });
+        precacheProImages(
+          context,
+          photoUrlsFromArticles(stale.cast<Map<String, dynamic>>()),
+          cloudinaryWidthPx: cloudinaryWidthPx(context, logicalWidth: 180),
+        );
+      } else {
+        setState(() {
+          isLoading = true;
+          error = null;
+        });
+      }
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
-      final userService = UserService();
-      final role = userService.currentRole;
-      final userId = user?.uid;
-      String url = getBaseUrl() + '/articles?type=voiture';
+      final isVendeur = _userService.currentRole == UserRole.vendeur;
+      if (isVendeur && (idToken == null || idToken.isEmpty)) {
+        if (!mounted) return;
+        setState(() {
+          error = 'Session expirée. Reconnectez-vous.';
+          isLoading = false;
+        });
+        return;
+      }
+      final String url = isVendeur
+          ? '${getBaseUrl()}/articles?type=voiture'
+          : '${getBaseUrl()}/public/articles?type=voiture';
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (idToken != null) {
+        headers['Authorization'] = 'Bearer $idToken';
+      }
       final response = await http.get(
         Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       ).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final List<dynamic> data = sortArticleMapsNewestFirst(
           jsonDecode(response.body) as List<dynamic>,
         );
+        await LocalDataCache.writeJsonList(cacheKey, data);
+        if (!mounted) return;
         setState(() {
           voitures = data;
           _isVisible = List.generate(data.length, (index) => true);
           isLoading = false;
         });
+        precacheProImages(
+          context,
+          photoUrlsFromArticles(data.cast<Map<String, dynamic>>()),
+          cloudinaryWidthPx: cloudinaryWidthPx(context, logicalWidth: 180),
+        );
       } else {
         setState(() {
           error = 'Erreur lors du chargement des voitures';
@@ -237,7 +290,15 @@ class _VoituresPageState extends State<VoituresPage>
   // Appliquer les filtres
   List<dynamic> _applyFilters(List<dynamic> source) {
     final isVendeur = _userService.currentRole == UserRole.vendeur;
+    final sellerId = isVendeur ? _sellerMongoId() : null;
     return source.where((v) {
+      if (isVendeur &&
+          !articleOwnedBySeller(
+            Map<String, dynamic>.from(v as Map),
+            sellerId,
+          )) {
+        return false;
+      }
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
         final marque = (v['marque'] ?? '').toString();
         if (!catalogValueMatches(_selectedBrand, marque)) return false;
@@ -655,15 +716,17 @@ class _VoituresPageState extends State<VoituresPage>
                                                                         as List?)
                                                                     ?.isNotEmpty ==
                                                                 true
-                                                            ? Image.network(
-                                                                voiture['photos']
-                                                                    [0],
+                                                            ? CachedMediaImage(
+                                                                url: voiture[
+                                                                    'photos'][0],
                                                                 height: double
                                                                     .infinity,
                                                                 width: double
                                                                     .infinity,
                                                                 fit: BoxFit
                                                                     .cover,
+                                                                cloudinaryWidthPx:
+                                                                    MediaQuery.sizeOf(context).width.toInt(),
                                                               )
                                                             : (voiture['video'] !=
                                                                         null &&

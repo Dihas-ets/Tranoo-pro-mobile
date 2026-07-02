@@ -12,6 +12,7 @@ import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'package:tranoo_pro/utils/article_list_sort.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
@@ -19,6 +20,10 @@ import 'package:tranoo_pro/utils/catalog_display.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/utils/catalog_filter_options.dart';
 import 'package:tranoo_pro/widgets/catalog_filter_sections.dart';
+import 'package:tranoo_pro/utils/local_data_cache.dart';
+import 'package:tranoo_pro/utils/pro_image_utils.dart';
+import 'package:provider/provider.dart';
+import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 
 // Fonction utilitaire pour formater les prix avec des séparateurs de milliers
 String formatPrice(dynamic price) {
@@ -79,6 +84,19 @@ class _PieceState extends State<Piece>
   SellerAccessStatus? _accessStatus;
   bool _loadingAccessStatus = true;
 
+  String? _sellerMongoId() {
+    return Provider.of<myauth.AuthProvider>(context, listen: false)
+        .user?['_id']
+        ?.toString();
+  }
+
+  String _catalogCacheKey() {
+    if (_userService.currentRole != UserRole.vendeur) {
+      return 'catalog_pieces_public';
+    }
+    return 'catalog_pieces_${_sellerMongoId() ?? 'vendeur'}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +136,11 @@ class _PieceState extends State<Piece>
     final b = piece['lieu']?.toString().trim();
     if (b != null && b.isNotEmpty) return b;
     return '';
+  }
+
+  Map<String, dynamic>? _contactMap(dynamic value) {
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
   }
 
   Future<void> _refreshAccessStatus() async {
@@ -168,15 +191,43 @@ class _PieceState extends State<Piece>
     setState(() {});
   }
 
-  Future<void> fetchPieces() async {
-    setState(() {
-      isLoading = true;
-      error = null;
-    });
+  Future<void> fetchPieces({bool silent = false}) async {
+    final cacheKey = _catalogCacheKey();
+    if (!silent) {
+      final stale = await LocalDataCache.readJsonListStale(cacheKey);
+      if (stale != null && mounted) {
+        setState(() {
+          pieces = stale;
+          _isVisible = List.generate(stale.length, (index) => true);
+          isLoading = false;
+        });
+        precacheProImages(
+          context,
+          photoUrlsFromArticles(stale.cast<Map<String, dynamic>>()),
+          cloudinaryWidthPx: cloudinaryWidthPx(context, logicalWidth: 180),
+        );
+      } else {
+        setState(() {
+          isLoading = true;
+          error = null;
+        });
+      }
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
-      String url = getBaseUrl() + '/articles?type=piece';
+      final isVendeur = _userService.currentRole == UserRole.vendeur;
+      if (isVendeur && (idToken == null || idToken.isEmpty)) {
+        if (!mounted) return;
+        setState(() {
+          error = 'Session expirée. Reconnectez-vous.';
+          isLoading = false;
+        });
+        return;
+      }
+      final String url = isVendeur
+          ? '${getBaseUrl()}/articles?type=piece'
+          : '${getBaseUrl()}/public/articles?type=piece';
       final headers = <String, String>{
         'Content-Type': 'application/json',
       };
@@ -193,13 +244,19 @@ class _PieceState extends State<Piece>
         final List<dynamic> data = sortArticleMapsNewestFirst(
           jsonDecode(response.body) as List<dynamic>,
         );
+        await LocalDataCache.writeJsonList(cacheKey, data);
+        if (!mounted) return;
         setState(() {
           pieces = data;
           _isVisible = List.generate(data.length, (index) => true);
           isLoading = false;
         });
+        precacheProImages(
+          context,
+          photoUrlsFromArticles(data.cast<Map<String, dynamic>>()),
+          cloudinaryWidthPx: cloudinaryWidthPx(context, logicalWidth: 180),
+        );
       } else {
-        debugPrint('[PIECES] HTTP ${response.statusCode}: ${response.body}');
         setState(() {
           error = response.statusCode == 401
               ? 'Session expirée. Reconnectez-vous.'
@@ -208,7 +265,6 @@ class _PieceState extends State<Piece>
         });
       }
     } catch (e) {
-      debugPrint('[PIECES] fetchPieces exception: $e');
       setState(() {
         error = 'Erreur réseau';
         isLoading = false;
@@ -407,7 +463,15 @@ class _PieceState extends State<Piece>
   // Appliquer les filtres
   List<dynamic> _applyFilters(List<dynamic> source) {
     final isVendeur = _userService.currentRole == UserRole.vendeur;
+    final sellerId = isVendeur ? _sellerMongoId() : null;
     return source.where((p) {
+      if (isVendeur &&
+          !articleOwnedBySeller(
+            Map<String, dynamic>.from(p as Map),
+            sellerId,
+          )) {
+        return false;
+      }
       if (_selectedBrand != null && _selectedBrand!.isNotEmpty) {
         final marque =
             (p['marque'] ?? p['pieceType'] ?? p['condition'] ?? '').toString();
@@ -846,6 +910,10 @@ class _PieceState extends State<Piece>
                                                       marque: piece['marque']
                                                           ?.toString(),
                                                       video: piece['video'],
+                                                      fournisseur: _contactMap(
+                                                          piece['fournisseur']),
+                                                      vendeur: _contactMap(
+                                                          piece['vendeur']),
                                                     ),
                                                   ),
                                                 ).then((_) => fetchPieces());
@@ -885,12 +953,20 @@ class _PieceState extends State<Piece>
                                                                               as List?)
                                                                           ?.isNotEmpty ==
                                                                       true
-                                                                  ? Image
-                                                                      .network(
-                                                                      piece['photos']
+                                                                  ? CachedMediaImage(
+                                                                      url: piece[
+                                                                              'photos']
                                                                           [0],
                                                                       fit: BoxFit
                                                                           .cover,
+                                                                      width: double
+                                                                          .infinity,
+                                                                      height: 100,
+                                                                      cloudinaryWidthPx: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width
+                                                                          .toInt(),
                                                                     )
                                                                   : (piece['video'] !=
                                                                               null &&
@@ -901,6 +977,8 @@ class _PieceState extends State<Piece>
                                                                               piece['video']?.toString(),
                                                                           iconSize:
                                                                               36,
+                                                                          enablePreviewFrame:
+                                                                              false,
                                                                         )
                                                                       : Container(
                                                                           color:

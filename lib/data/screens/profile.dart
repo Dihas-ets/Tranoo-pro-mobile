@@ -11,6 +11,7 @@ import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart'; // Importer le composant d'upload Cloudinary
 import 'package:provider/provider.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
+import 'package:tranoo_pro/utils/local_data_cache.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -102,6 +103,14 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   }
 
   Future<void> fetchUser() async {
+    final cached = await LocalDataCache.readJsonMapStale('profile_me');
+    if (cached != null && mounted) {
+      setState(() {
+        userData = cached;
+        loading = false;
+        _syncControllersFromUserData();
+      });
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -121,8 +130,12 @@ class _ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
         ),
       );
       final response = await dio.get('/protected/me');
+      final profile = response.data['user'] as Map<String, dynamic>?;
+      if (profile != null) {
+        await LocalDataCache.writeJsonMap('profile_me', profile);
+      }
       setState(() {
-        userData = response.data['user'];
+        userData = profile;
         loading = false;
         errorMsg = null;
         _syncControllersFromUserData();

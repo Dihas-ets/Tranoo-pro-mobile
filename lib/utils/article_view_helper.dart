@@ -17,6 +17,29 @@ String articleIdFromMap(Map<String, dynamic> json) {
   return raw?.toString() ?? '';
 }
 
+/// Identifiant Mongo du vendeur (string ou objet peuplé).
+String? sellerIdFromArticleMap(Map<String, dynamic> json) {
+  final vendeur = json['vendeur'];
+  if (vendeur is Map) {
+    final id = vendeur['_id'] ?? vendeur['id'];
+    if (id != null && id.toString().trim().isNotEmpty) {
+      return id.toString();
+    }
+  }
+  if (vendeur != null && vendeur.toString().trim().isNotEmpty) {
+    return vendeur.toString();
+  }
+  return null;
+}
+
+bool articleOwnedBySeller(Map<String, dynamic> json, String? sellerMongoId) {
+  final mine = sellerMongoId?.trim() ?? '';
+  if (mine.isEmpty) return true;
+  final owner = sellerIdFromArticleMap(json);
+  if (owner == null || owner.isEmpty) return false;
+  return owner == mine;
+}
+
 int articleViewsFromMap(Map<String, dynamic> json) {
   final views = json['views'];
   if (views is num) return views.toInt();

@@ -20,6 +20,7 @@ import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/services/seller_profile_locations.dart';
 import 'package:tranoo_pro/widgets/country_location_field.dart';
 import 'package:tranoo_pro/utils/location_geocode_helper.dart';
+import 'package:tranoo_pro/widgets/cached_media_image.dart';
 
 enum PieceSellCategory { pieceDetachee, pneu, huileMoteur }
 
@@ -1521,12 +1522,13 @@ class CreateSellPage2State extends State<CreateSellPage2> {
                                   if (uploadedUrl != null && uploadedUrl.isNotEmpty)
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        uploadedUrl,
+                                      child: CachedMediaImage(
+                                        url: uploadedUrl,
                                         fit: BoxFit.cover,
                                         width: double.infinity,
                                         height: double.infinity,
-                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
+                                        cloudinaryWidthPx: 400,
+                                        errorWidget: const Icon(Icons.broken_image, color: Colors.grey),
                                       ),
                                     )
                                   else if (file != null)

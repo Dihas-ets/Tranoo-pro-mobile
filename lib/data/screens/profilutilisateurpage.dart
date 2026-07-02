@@ -18,6 +18,10 @@ import 'package:tranoo_pro/languesentreprise.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
 import 'package:tranoo_pro/providers/locale_provider.dart';
 import 'package:tranoo_pro/utils/locale_helper.dart';
+import 'package:tranoo_pro/utils/local_data_cache.dart';
+import 'package:tranoo_pro/utils/pro_image_utils.dart';
+import 'package:tranoo_pro/widgets/delayed_loader.dart';
+import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/services/subscription_access_service.dart';
 import 'package:tranoo_pro/widgets/profile_location_tile.dart';
 
@@ -70,8 +74,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
   @override
   void initState() {
     super.initState();
-    fetchUser();
-    _loadWallet();
+    _loadProfileData();
     
     // Initialiser l'animation d'alerte
     _alertController = AnimationController(
@@ -85,6 +88,25 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
         curve: Curves.easeInOut,
       ),
     );
+  }
+
+  Future<void> _loadProfileData() async {
+    final cached = await LocalDataCache.readJsonMapStale('profile_me');
+    if (cached != null && mounted) {
+      setState(() {
+        userData = cached;
+        loading = false;
+      });
+      final photo = cached['photo']?.toString();
+      if (photo != null && photo.isNotEmpty && mounted) {
+        precacheProImages(
+          context,
+          [photo],
+          cloudinaryWidthPx: 200,
+        );
+      }
+    }
+    await Future.wait<void>([fetchUser(), _loadWallet()]);
   }
 
   Future<void> _loadSubscriptionData() async {
@@ -184,8 +206,12 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
         ),
       );
       final response = await dio.get('/protected/me');
+      final profile = response.data['user'] as Map<String, dynamic>?;
+      if (profile != null) {
+        await LocalDataCache.writeJsonMap('profile_me', profile);
+      }
       setState(() {
-        userData = response.data['user'];
+        userData = profile;
         loading = false;
         errorMsg = null;
       });
@@ -417,7 +443,12 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return Center(child: CircularProgressIndicator());
+    if (loading && userData == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SkeletonPresets.proSellerProfile(),
+      );
+    }
     if (errorMsg != null) return Center(child: Text(errorMsg!));
     if (userData == null) {
       return Center(child: Text(l10n.noUserData));
@@ -608,7 +639,14 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
 
   Widget _buildSubscriptionSection() {
     if (_subscriptionLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: SkeletonBox(
+          width: double.infinity,
+          height: 100,
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      );
     }
     final status = _subscriptionStatus;
     final warning = status?.showExpiryWarning == true;
