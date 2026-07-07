@@ -11,6 +11,7 @@ import 'seller_subscription_page.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 import 'package:tranoo_pro/utils/article_list_sort.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
+import 'package:tranoo_pro/utils/payment_debug_logger.dart';
 import 'package:tranoo_pro/widgets/video_preview_placeholder.dart';
 import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
@@ -359,6 +360,7 @@ class _PieceState extends State<Piece>
   }
 
   Future<void> _openSubscriptionPage() async {
+    PaymentDebugLogger.step('PIECE', 'Navigation vers SellerSubscriptionPage');
     await Navigator.push(
       context,
       MaterialPageRoute(

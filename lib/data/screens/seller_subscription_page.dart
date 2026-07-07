@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:feexpay_flutter/feexpay_flutter.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:random_string/random_string.dart';
-import 'package:dio/dio.dart';
-import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/services/subscription_access_service.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
-import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
-import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
+import 'package:tranoo_pro/utils/payment_debug_logger.dart';
+import 'package:tranoo_pro/widgets/feexpay_v2_payment_screen.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
+
+const _kLogTag = 'SELLER_SUBSCRIPTION';
 
 class SellerSubscriptionPage extends StatefulWidget {
   final bool forTransitaire;
@@ -32,16 +29,12 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
 
   final SubscriptionAccessService _subscriptionService =
       SubscriptionAccessService();
-  final UserService _userService = UserService();
   SellerAccessStatus? _status;
   bool _loading = true;
   bool _subscribing = false;
   String? _error;
   int _selectedMonths = 1;
   List<Map<String, dynamic>> _subscriptionHistory = [];
-
-  final String _fpToken = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
-  final String _fpShopId = dotenv.env['ID_USER_FEEXPAY'] ?? '';
 
   @override
   void initState() {
@@ -96,11 +89,11 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       _error = null;
     });
     try {
-      if (_fpToken.isEmpty || _fpShopId.isEmpty) {
-        throw Exception('Configuration FeexPay manquante');
+      final monthlyPrice = _status?.monthlyPriceFcfa ?? 0;
+      if (monthlyPrice <= 0) {
+        throw Exception('Prix mensuel indisponible. Réessayez plus tard.');
       }
 
-      final monthlyPrice = _status?.monthlyPriceFcfa ?? 0;
       final total = _selectedMonths * monthlyPrice;
       final remainingDays =
           _status?.paidPlanEndsAt?.difference(DateTime.now()).inDays;
@@ -110,91 +103,65 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
           remainingDays != null &&
           remainingDays >= 0 &&
           remainingDays <= 10;
-      final amount = (hasDiscount ? (total * 0.9) : total).toStringAsFixed(0);
+      final amount = hasDiscount ? (total * 0.9) : total.toDouble();
       final transKey = randomAlphaNumeric(15);
+      final description = widget.forTransitaire
+          ? 'Paiement abonnement transitaire ($_selectedMonths mois)'
+          : 'Paiement abonnement vendeur ($_selectedMonths mois)';
 
-      FeexPayCallbackState.clearPendingAtNewCheckout();
-      final result = await Navigator.push(
+      PaymentDebugLogger.step(_kLogTag, 'Ouverture FeexPay v2', {
+        'amount': amount,
+        'months': _selectedMonths,
+        'transKey': transKey,
+      });
+
+      final result = await openFeexPayV2Payment(
         context,
-        MaterialPageRoute(
-          builder: (context) => ChoicePage(
-            token: _fpToken,
-            id: _fpShopId,
-            amount: amount,
-            redirecturl: '/subscription-success',
-            errorredirecturl: '/subscription-error',
-            trans_key: transKey,
+        amount: amount,
+        description: description,
+        customId: transKey,
+        paymentType: 'subscription',
+        duree: '$_selectedMonths mois',
+      );
+
+      if (result == null || result.cancelled) {
+        if (!mounted) return;
+        setState(() {
+          _error = result?.errorMessage ?? 'Paiement annulé.';
+        });
+        return;
+      }
+      if (!result.success) {
+        PaymentDebugLogger.blocked(
+          _kLogTag,
+          'Paiement abonnement non confirmé',
+          result.errorMessage,
+        );
+        if (!mounted) return;
+        setState(() {
+          _error = result.errorMessage ??
+              'Paiement annulé ou non confirmé.';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.subscriptionPaymentFailed),
+            backgroundColor: Colors.redAccent,
           ),
-        ),
-      );
-
-      final user = FirebaseAuth.instance.currentUser;
-      final idToken = await user?.getIdToken();
-      if (idToken == null) {
-        throw Exception('Utilisateur non connecté');
-      }
-
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: _userService.dio.options.baseUrl,
-          headers: {
-            'Authorization': 'Bearer $idToken',
-            'Content-Type': 'application/json',
-          },
-        ),
-      );
-
-      final cb = FeexPayCallbackState.takeLatest();
-      final callbackHint = result is Map && result['successHint'] == true;
-      String? feexId = extractFeexPayTransactionId(result) ?? cb.transactionId;
-      bool isSuccess = feexPayReturnIndicatesSuccess(result) ||
-          cb.success == true ||
-          callbackHint;
-      if (feexId != null && feexId.isNotEmpty) {
-        try {
-          final st = await dio.get('/payments/feexpay/public/status/$feexId');
-          if (st.statusCode == 200 && st.data is Map) {
-            final s = (st.data['status'] ?? '').toString().toLowerCase();
-            final verified = s.contains('success') ||
-                s.contains('successful') ||
-                s.contains('paid') ||
-                s.contains('ok') ||
-                s.contains('completed') ||
-                s.contains('approved');
-            isSuccess = isSuccess || verified;
-          }
-        } catch (_) {}
-      }
-
-      if (!isSuccess) {
+        );
         return;
       }
 
-      await dio.post(
-        '/payments/feexpay/flutter/record',
-        data: {
-          'transKey': transKey,
-          'amount': num.parse(amount),
-          'description': widget.forTransitaire
-              ? 'Paiement abonnement transitaire ($_selectedMonths mois)'
-              : 'Paiement abonnement vendeur ($_selectedMonths mois)',
-          'type': 'subscription',
-          'status': 'success',
-          'duree': '$_selectedMonths mois',
-          if (feexId != null && feexId.isNotEmpty) 'id_transaction': feexId,
-          if (feexId != null && feexId.isNotEmpty) 'ref': feexId,
-          if (feexId != null && feexId.isNotEmpty) 'reference': feexId,
-        },
+      PaymentDebugLogger.log(
+        _kLogTag,
+        'Abonnement payé via v2 tx=${result.transactionId}',
       );
 
-      await _subscriptionService.activateMonthlySubscription(
-        months: _selectedMonths,
-      );
       await _loadStatus();
       widget.onSubscriptionChanged?.call();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.subscriptionPaymentSuccess),
+        SnackBar(
+          content: Text(l10n.subscriptionPaymentSuccess),
           backgroundColor: Colors.green,
         ),
       );
@@ -206,13 +173,19 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
           (route) => false,
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      PaymentDebugLogger.blocked(
+        _kLogTag,
+        'Exception pendant le flux abonnement',
+        '$e\n$st',
+      );
       if (!mounted) return;
       setState(() {
-        _error = 'Erreur lors de l\'activation de l\'abonnement.';
+        _error = 'Erreur lors de l\'activation de l\'abonnement: $e';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.subscriptionPaymentFailed),
+        SnackBar(
+          content: Text(l10n.subscriptionPaymentFailed),
           backgroundColor: Colors.redAccent,
         ),
       );

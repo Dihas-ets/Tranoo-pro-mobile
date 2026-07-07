@@ -54,3 +54,7 @@ key.properties
 
 # Environment variables
 .env
+.env.*
+.env.prod
+*.env.prod
+.env.local

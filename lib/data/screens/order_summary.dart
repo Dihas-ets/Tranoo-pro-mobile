@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:feexpay_flutter/feexpay_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:random_string/random_string.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
@@ -11,8 +9,8 @@ import '../../services/cart_service.dart';
 import '../../services/user_service.dart';
 import 'map_picker_screen.dart';
 import 'avant_home.dart';
-import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
-import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
+import 'package:tranoo_pro/utils/payment_debug_logger.dart';
+import 'package:tranoo_pro/widgets/feexpay_v2_payment_screen.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 enum PaymentMethod { cash, online }
@@ -510,64 +508,24 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
     setState(() => _isProcessing = true);
 
     try {
-      final token = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
-      final idUser = dotenv.env['ID_USER_FEEXPAY'] ?? '';
-
-      if (token.isEmpty || idUser.isEmpty) {
-        throw Exception('Configuration FeexPay manquante');
-      }
-
-      FeexPayCallbackState.clearPendingAtNewCheckout();
-      final result = await Navigator.push(
+      final result = await openFeexPayV2Payment(
         context,
-        MaterialPageRoute(
-          builder:
-              (context) => ChoicePage(
-                token: token,
-                id: idUser,
-                amount: total.toStringAsFixed(0),
-                redirecturl: '/cart-payment-success',
-                errorredirecturl: '/cart-payment-error',
-                trans_key: _transKey,
-              ),
-        ),
+        amount: total,
+        description: 'Paiement commande Tranoo Pro',
+        customId: _transKey,
+        paymentType: 'achat',
       );
 
       if (!mounted) return;
 
-      final cb = FeexPayCallbackState.takeLatest();
-      final callbackHint = result is Map && result['successHint'] == true;
-      final txId = extractFeexPayTransactionId(result) ??
-          cb.transactionId;
-      var paid = feexPayReturnIndicatesSuccess(result) ||
-          cb.success == true ||
-          callbackHint;
-      if (txId != null && txId.isNotEmpty) {
-        try {
-          final probe = Dio();
-          final st = await probe.get(
-            '${UserService().dio.options.baseUrl}/payments/feexpay/public/status/$txId',
-          );
-          if (st.statusCode == 200 && st.data is Map) {
-            final s = (st.data['status'] ?? '').toString().toLowerCase();
-            paid = paid ||
-                s.contains('success') ||
-                s.contains('successful') ||
-                s.contains('paid') ||
-                s.contains('ok') ||
-                s.contains('completed') ||
-                s.contains('approved');
-          }
-        } catch (e) {
-          developer.log('[ORDER_ONLINE] public/status: $e', name: 'OrderSummary');
-        }
-      }
-
-      if (!paid) {
+      if (result == null || !result.success) {
+        PaymentDebugLogger.blocked(
+          'ORDER_CART',
+          'Paiement panier non confirmé',
+          result?.errorMessage,
+        );
         return;
       }
-
-      await _recordCartFeexPayOnline(total, txId);
 
       await _saveOrderToDatabase(total, cart, 'online');
       await cart.clear();

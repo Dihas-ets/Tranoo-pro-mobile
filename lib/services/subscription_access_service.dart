@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:developer' as developer;
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/payment_debug_logger.dart';
 
 class SellerAccessStatus {
   final bool freeTrialActive;
@@ -255,10 +256,25 @@ class SubscriptionAccessService {
       ),
     );
 
-    await dio.post(
-      '/subscription/subscribe',
-      data: {'plan': 'monthly', 'months': months},
-    );
+    try {
+      final response = await dio.post(
+        '/subscription/subscribe',
+        data: {'plan': 'monthly', 'months': months},
+      );
+      PaymentDebugLogger.api(
+        'POST',
+        '/subscription/subscribe',
+        status: response.statusCode,
+        body: response.data,
+      );
+    } catch (e) {
+      PaymentDebugLogger.api(
+        'POST',
+        '/subscription/subscribe',
+        error: e,
+      );
+      rethrow;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getSubscriptionHistory({int limit = 20}) async {

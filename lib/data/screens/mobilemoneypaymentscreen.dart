@@ -4,16 +4,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:developer';
 import 'package:tranoo_pro/services/user_service.dart';
-import 'package:feexpay_flutter/feexpay_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:random_string/random_string.dart';
 import 'package:tranoo_pro/data/screens/succes6.dart';
-import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
-import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
+import 'package:tranoo_pro/utils/payment_debug_logger.dart';
+import 'package:tranoo_pro/widgets/feexpay_v2_payment_screen.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
-
-final fpToken = dotenv.env['FP_TOKEN_FEEXPAY'] ?? '';
-final idUser = dotenv.env['ID_USER_FEEXPAY'] ?? '';
 
 class MobileMoneyPaymentScreen extends StatefulWidget {
   final String pubId;
@@ -72,8 +67,8 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Paiement Mobile Money',
+        title: Text(
+          l10n.mobileMoneyPayment,
           style: TextStyle(
             color: Colors.black,
             fontSize: 16,
@@ -113,8 +108,8 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                                   color: Colors.white,
                                 ),
                                 const SizedBox(height: 12),
-                                const Text(
-                                  'Paiement Mobile Money',
+                                Text(
+                                  l10n.mobileMoneyPayment,
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 24,
@@ -123,7 +118,7 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  pubData!['description'] ?? 'Publicité pour votre article',
+                                  pubData!['description'] ?? l10n.adForYourListing,
                                   style: const TextStyle(
                                     color: Colors.white70,
                                     fontSize: 14,
@@ -136,8 +131,8 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                           const SizedBox(height: 24),
 
                           // Détails de la publicité
-                          const Text(
-                            'Détails de votre publicité',
+                          Text(
+                            l10n.adDetailsTitle,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -147,18 +142,18 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                           
                           _buildDetailItem(
                             Icons.star,
-                            'Type',
-                            pubData!['typePub'] ?? 'N/A',
+                            l10n.typeLabel,
+                            pubData!['typePub'] ?? l10n.unknown,
                           ),
                           _buildDetailItem(
                             Icons.schedule,
-                            'Durée',
-                            pubData!['duree'] ?? 'N/A',
+                            l10n.durationLabel,
+                            pubData!['duree'] ?? l10n.unknown,
                           ),
                           _buildDetailItem(
                             Icons.payment,
-                            'Moyen de paiement',
-                            'Mobile Money',
+                            l10n.paymentMethod,
+                            l10n.mobileMoney,
                           ),
                           
                           const SizedBox(height: 24),
@@ -174,8 +169,8 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                             ),
                             child: Column(
                               children: [
-                                const Text(
-                                  'Montant à payer',
+                                Text(
+                                  l10n.amountToPay,
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -183,15 +178,17 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  '${pubData!['prix'] ?? 0} FCFA',
+                                  l10n.valueAmountFcfa(
+                                    '${pubData!['prix'] ?? 0}',
+                                  ),
                                   style: const TextStyle(
                                     fontSize: 32,
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF00A86B),
                                   ),
                                 ),
-                                const Text(
-                                  'via Mobile Money',
+                                Text(
+                                  l10n.viaMobileMoney,
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey,
@@ -204,8 +201,8 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                           const SizedBox(height: 16),
                           
                           // Opérateurs supportés
-                          const Text(
-                            'Opérateurs supportés',
+                          Text(
+                            l10n.supportedOperators,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -224,8 +221,8 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                           const SizedBox(height: 16),
                           
                           // Note
-                          const Text(
-                            'Après paiement, votre publicité sera soumise à validation admin avant publication.',
+                          Text(
+                            l10n.afterPaymentAdValidationNote,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey,
@@ -258,7 +255,7 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
                               strokeWidth: 2,
                             )
                           : Text(
-                              'Payer ${pubData!['prix'] ?? 0} FCFA',
+                              '${l10n.pay} ${l10n.valueAmountFcfa('${pubData!['prix'] ?? 0}')}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
@@ -359,75 +356,45 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        throw Exception('Utilisateur non connecté');
+        throw Exception(l10n.userNotLoggedIn);
       }
 
-      if (fpToken.isEmpty || idUser.isEmpty) {
-        throw Exception('Configuration FeexPay manquante');
+      final amountNum = num.tryParse(pubData!['prix']?.toString() ?? '0') ?? 0;
+      if (amountNum <= 0) {
+        throw Exception(l10n.invalidAmount);
       }
 
-      final amount = pubData!['prix']?.toString() ?? '0';
-
-      FeexPayCallbackState.clearPendingAtNewCheckout();
-      // Navigation vers FeexPay avec le package officiel
-      final result = await Navigator.push(
+      final result = await openFeexPayV2Payment(
         context,
-        MaterialPageRoute(
-          builder: (context) => ChoicePage(
-            token: fpToken,
-            id: idUser,
-            amount: amount,
-            redirecturl: '/payment-success',
-            errorredirecturl: '/payment-error',
-            trans_key: transKey,
-          ),
-        ),
+        amount: amountNum.toDouble(),
+        description: l10n.adPaymentMobileDescription(widget.pubId),
+        customId: transKey,
+        paymentType: 'publicite',
+        publiciteId: widget.pubId,
       );
 
-      final cb = FeexPayCallbackState.takeLatest();
-      final callbackHint = result is Map && result['successHint'] == true;
-      String? txId = extractFeexPayTransactionId(result) ?? cb.transactionId;
-      var success = feexPayReturnIndicatesSuccess(result) ||
-          cb.success == true ||
-          callbackHint;
-      if (txId != null && txId.isNotEmpty) {
-        try {
-          final st = await http.get(
-            Uri.parse('${getBaseUrl()}/payments/feexpay/public/status/$txId'),
-          );
-          if (st.statusCode == 200) {
-            final body = jsonDecode(st.body) as Map<String, dynamic>;
-            final s = (body['status'] ?? '').toString().toLowerCase();
-            success = success ||
-                s.contains('success') ||
-                s.contains('successful') ||
-                s.contains('paid') ||
-                s.contains('ok') ||
-                s.contains('completed') ||
-                s.contains('approved');
-          }
-        } catch (e) {
-          log('[MobileMoneyPayment] public/status: $e');
+      if (result == null || !result.success) {
+        PaymentDebugLogger.blocked(
+          'MOBILE_MONEY_PUB',
+          'Paiement pub non confirmé',
+          result?.errorMessage,
+        );
+        if (mounted) {
+          setState(() {
+            errorMessage = result?.errorMessage ?? l10n.paymentFailed;
+          });
         }
-      }
-
-      log(
-        '[MobileMoneyPayment] ChoicePage result=$result txId=$txId success=$success transKey=$transKey pubId=${widget.pubId}',
-      );
-
-      if (!success) {
         return;
       }
 
-      final amountNum = num.tryParse(amount) ?? 0;
-      await _recordPubFeexPay(amountNum, idTransaction: txId);
       await _updatePubStatus();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.adPaidSuccess),
+          SnackBar(
+            content: Text(l10n.adPaidSuccess),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
         await Future.delayed(const Duration(seconds: 1));
@@ -454,7 +421,7 @@ class _MobileMoneyPaymentScreenState extends State<MobileMoneyPaymentScreen> {
       final payload = <String, dynamic>{
         'transKey': transKey,
         'amount': amount,
-        'description': 'Paiement publicité (mobile money) ${widget.pubId}',
+        'description': l10n.adPaymentMobileDescription(widget.pubId),
         'type': 'publicite',
         'status': 'success',
         'publiciteId': widget.pubId,

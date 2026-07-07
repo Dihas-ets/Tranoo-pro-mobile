@@ -7,24 +7,10 @@ import 'marque.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import '../../services/user_service.dart';
-import 'package:feexpay_flutter/feexpay_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:random_string/random_string.dart';
 import 'package:http/http.dart' as http;
-import 'package:tranoo_pro/utils/feexpay_result_utils.dart';
-import 'package:tranoo_pro/utils/feexpay_callback_state.dart';
-
-String get _fpToken {
-  final a = (dotenv.env['FP_TOKEN_FEEXPAY'] ?? '').trim();
-  if (a.isNotEmpty) return a;
-  return (dotenv.env['FEEXPAY_API_TOKEN'] ?? '').trim();
-}
-
-String get _idUser {
-  final a = (dotenv.env['ID_USER_FEEXPAY'] ?? '').trim();
-  if (a.isNotEmpty) return a;
-  return (dotenv.env['FEEXPAY_SHOP_ID'] ?? '').trim();
-}
+import 'package:tranoo_pro/utils/payment_debug_logger.dart';
+import 'package:tranoo_pro/widgets/feexpay_v2_payment_screen.dart';
 
 const String _kVerificationSuccessRoute = '/verification-success';
 const String _kVerificationErrorRoute = '/verification-error';
@@ -341,82 +327,48 @@ class _VerificationPaymentScreenState extends State<VerificationPaymentScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
-      if (_fpToken.isEmpty || _idUser.isEmpty) {
-        throw Exception(
-          'Configuration FeexPay manquante (FP_TOKEN_FEEXPAY / ID_USER_FEEXPAY)',
-        );
-      }
-
-      FeexPayCallbackState.clearPendingAtNewCheckout();
-      final result = await Navigator.push(
+      final result = await openFeexPayV2Payment(
         context,
-        MaterialPageRoute(
-          builder: (context) => ChoicePage(
-            token: _fpToken,
-            id: _idUser,
-            amount: _verificationPrice.toString(),
-            redirecturl: _kVerificationSuccessRoute,
-            errorredirecturl: _kVerificationErrorRoute,
-            trans_key: transKey,
-          ),
-        ),
+        amount: _verificationPrice.toDouble(),
+        description: 'Frais vérification documents',
+        customId: transKey,
+        paymentType: 'verification',
       );
 
       if (!mounted) return;
-      final cb = FeexPayCallbackState.takeLatest();
-      final callbackHint = result is Map && result['successHint'] == true;
-      var paid = feexPayReturnIndicatesSuccess(result) ||
-          cb.success == true ||
-          callbackHint;
-      var txId = extractFeexPayTransactionId(result) ?? cb.transactionId;
-      if (!paid && txId != null && txId.isNotEmpty) {
-        try {
-          final url = Uri.parse(
-            '${getBaseUrl()}/payments/feexpay/public/status/$txId',
-          );
-          final r = await http.get(url);
-          if (r.statusCode == 200) {
-            final body = jsonDecode(r.body) as Map<String, dynamic>;
-            final st = (body['status'] ?? '').toString().toLowerCase();
-            paid = st.contains('success') ||
-                st.contains('successful') ||
-                st.contains('paid') ||
-                st.contains('ok') ||
-                st.contains('completed') ||
-                st.contains('approved');
-          }
-        } catch (e) {
-          debugPrint('[verification_payment] public/status fallback: $e');
-        }
+
+      if (result == null || !result.success) {
+        PaymentDebugLogger.blocked(
+          'VERIFICATION_PAYMENT',
+          'Paiement vérification non confirmé',
+          result?.errorMessage,
+        );
+        setState(() {
+          errorMessage =
+              result?.errorMessage ??
+              'Paiement annulé ou non confirmé. Réessayez si besoin.';
+        });
+        return;
       }
-      if (paid) {
-        await _recordVerificationFeexPayFlutter(txId);
-        try {
-          await _processVerificationRequest();
-        } catch (e) {
-          debugPrint('[VerificationPayment] verification/request: $e');
-        }
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Paiement reçu. Votre demande de vérification est en cours de traitement.',
-            ),
-            backgroundColor: Color(0xFF00A86B),
+
+      try {
+        await _processVerificationRequest();
+      } catch (e) {
+        debugPrint('[VerificationPayment] verification/request: $e');
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Paiement reçu. Votre demande de vérification est en cours de traitement.',
           ),
-        );
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const Marque()),
-          (route) => false,
-        );
-      } else {
-        if (mounted) {
-          setState(() {
-            errorMessage =
-                'Paiement annulé ou non confirmé. Réessayez si besoin.';
-          });
-        }
-      }
+          backgroundColor: Color(0xFF00A86B),
+        ),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const Marque()),
+        (route) => false,
+      );
     } catch (e) {
       debugPrint('[VerificationPayment] erreur flux: $e');
       if (mounted) {

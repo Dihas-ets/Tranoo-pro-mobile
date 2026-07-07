@@ -16,7 +16,7 @@ class PaymentForm extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text('Formulaire de Paiement pour $pieceName')),
+      appBar: AppBar(title: Text(l10n.paymentFormFor(pieceName))),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
