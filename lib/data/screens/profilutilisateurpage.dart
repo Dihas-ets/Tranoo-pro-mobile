@@ -146,7 +146,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
       _subscriptionHistoryLoading = true;
     });
     try {
-      final history = await _subscriptionService.getSubscriptionHistory(limit: 10);
+      final history = await _subscriptionService.getSubscriptionHistory(limit: 50);
       if (!mounted) return;
       setState(() {
         _subscriptionHistory = history;
@@ -465,13 +465,19 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
         foregroundColor: Colors.black,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 15),
-            ProfileLocationTile(onUpdated: fetchUser),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            10,
+            10,
+            10,
+            MediaQuery.of(context).padding.bottom + 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 15),
+              ProfileLocationTile(userData: userData, onUpdated: fetchUser),
             // Profile card dynamique
             Container(
               padding: const EdgeInsets.all(16),
@@ -634,6 +640,67 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
           ],
         ),
       ),
+    ),
+    );
+  }
+
+  Widget _buildSubscriptionHistoryTile(Map<String, dynamic> tx) {
+    final amount = tx['amount']?.toString() ?? '--';
+    final status = tx['status']?.toString() ?? '--';
+    final createdAt = _formatDateShort(tx['createdAt']);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFEDEDED)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.receipt_long, color: Color(0xFFF8BF13)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$amount FCFA - $status',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Text(
+            createdAt,
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullSubscriptionHistory() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Historique des abonnements'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _subscriptionHistory.isEmpty
+              ? const Text(
+                  'Aucun paiement d\'abonnement pour le moment.',
+                  style: TextStyle(color: Colors.grey),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _subscriptionHistory.length,
+                  itemBuilder: (context, index) =>
+                      _buildSubscriptionHistoryTile(_subscriptionHistory[index]),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
     );
   }
 
@@ -694,7 +761,8 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
             ),
           ],
           const SizedBox(height: 12),
-          Text(l10n.historyLast10,
+          const Text(
+            'Historique (5 derniers)',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
@@ -708,37 +776,17 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
               'Aucun paiement d\'abonnement pour le moment.',
               style: TextStyle(color: Colors.grey),
             )
-          else
-            ..._subscriptionHistory.map((tx) {
-              final amount = tx['amount']?.toString() ?? '--';
-              final status = tx['status']?.toString() ?? '--';
-              final createdAt = _formatDateShort(tx['createdAt']);
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFEDEDED)),
+          else ...[
+            ..._subscriptionHistory.take(5).map(_buildSubscriptionHistoryTile),
+            if (_subscriptionHistory.length > 5)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _showFullSubscriptionHistory,
+                  child: const Text('Voir plus'),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.receipt_long, color: Color(0xFFF8BF13)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '$amount FCFA - $status',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Text(
-                      createdAt,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              );
-            }),
+              ),
+          ],
         ],
       ),
     );

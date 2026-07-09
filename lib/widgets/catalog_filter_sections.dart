@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/utils/catalog_filter_options.dart';
-import 'package:tranoo_pro/utils/motomarks_config.dart';
+import 'package:tranoo_pro/widgets/catalog_filter_brand_logo.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 
 const Color _kFilterSelected = Color(0xFFF8BF13);
@@ -47,30 +47,13 @@ class CatalogFilterImage extends StatelessWidget {
     final svgUrl = option.networkSvgUrl;
 
     if (!isLocation) {
-      final logoUrl = motomarksBrandLogoUrl(
-        option.normalizedKey,
-        displayWidth: width,
+      return CatalogFilterBrandLogo(
+        normalizedKey: option.normalizedKey,
+        label: option.label,
+        networkSvgUrl: svgUrl,
+        width: width,
+        height: boxHeight,
       );
-      if (logoUrl != null) {
-        return SizedBox(
-          width: width,
-          height: boxHeight,
-          child: Image.network(
-            logoUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) {
-              if (svgUrl != null && svgUrl.isNotEmpty) {
-                return _networkSvg(svgUrl, boxHeight);
-              }
-              return _letterFallback();
-            },
-          ),
-        );
-      }
-      if (svgUrl != null && svgUrl.isNotEmpty) {
-        return _networkSvg(svgUrl, boxHeight);
-      }
-      return _letterFallback();
     }
 
     if (svgUrl != null && svgUrl.isNotEmpty) {

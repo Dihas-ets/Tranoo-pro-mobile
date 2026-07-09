@@ -80,7 +80,8 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
             ? root['settings'] as Map<String, dynamic>
             : root;
         final value = data['pricePerKm'];
-        final parsed = value is num ? value.toDouble() : double.tryParse('$value');
+        final parsed =
+            value is num ? value.toDouble() : double.tryParse('$value');
         if (parsed != null && parsed >= 0) {
           _pricePerKm = parsed;
         }
@@ -125,7 +126,8 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
     if (_deliveryLatitude == null || _deliveryLongitude == null) return;
     await _loadDeliveryPricePerKm();
     await _loadSupplierCoordsIfNeeded(cart);
-    if (_supplierLatitude == null || _supplierLongitude == null || !mounted) return;
+    if (_supplierLatitude == null || _supplierLongitude == null || !mounted)
+      return;
 
     final km = _haversineKm(
       _supplierLatitude!,
@@ -270,14 +272,13 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed:
-                            () => setState(() => _method = PaymentMethod.cash),
+                        onPressed: () =>
+                            setState(() => _method = PaymentMethod.cash),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color:
-                                _method == PaymentMethod.cash
-                                    ? Colors.amber
-                                    : Colors.grey.shade300,
+                            color: _method == PaymentMethod.cash
+                                ? Colors.amber
+                                : Colors.grey.shade300,
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -288,15 +289,13 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed:
-                            () =>
-                                setState(() => _method = PaymentMethod.online),
+                        onPressed: () =>
+                            setState(() => _method = PaymentMethod.online),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color:
-                                _method == PaymentMethod.online
-                                    ? Colors.amber
-                                    : Colors.grey.shade300,
+                            color: _method == PaymentMethod.online
+                                ? Colors.amber
+                                : Colors.grey.shade300,
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -311,21 +310,20 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed:
-                        cart.items.isEmpty || _isProcessing
-                            ? null
-                            : () async {
-                              if (_method == PaymentMethod.cash) {
-                                // Confirmer commande espèces
-                                final confirmed = await _confirmCashOrder();
-                                if (confirmed && mounted) {
-                                  await _processCashOrder(total, cart);
-                                }
-                                return;
+                    onPressed: cart.items.isEmpty || _isProcessing
+                        ? null
+                        : () async {
+                            if (_method == PaymentMethod.cash) {
+                              // Confirmer commande espèces
+                              final confirmed = await _confirmCashOrder();
+                              if (confirmed && mounted) {
+                                await _processCashOrder(total, cart);
                               }
-                              // Auto-redirection directe vers FeexPay
-                              await _processOnlinePayment(total, cart);
-                            },
+                              return;
+                            }
+                            // Auto-redirection directe vers FeexPay
+                            await _processOnlinePayment(total, cart);
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
@@ -334,17 +332,17 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child:
-                        _isProcessing
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                            : Text(l10n.orderCommandTotal(total.toStringAsFixed(0))),
+                    child: _isProcessing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            l10n.orderCommandTotal(total.toStringAsFixed(0))),
                   ),
                 ),
               ],
@@ -396,75 +394,74 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
   Future<bool> _confirmCashOrder() async {
     return await showDialog<bool>(
           context: context,
-          builder:
-              (context) => AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.money,
-                        color: Colors.amber,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Paiement à la livraison',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                content: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Vous avez choisi le paiement à la livraison.',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Vous serez facturé lors de la réception de votre commande.',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: Text(l10n.cancel),
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Confirmer la commande',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  child: const Icon(
+                    Icons.money,
+                    color: Colors.amber,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Paiement à la livraison',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Vous avez choisi le paiement à la livraison.',
+                  style: TextStyle(fontSize: 16),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Vous serez facturé lors de la réception de votre commande.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(l10n.cancel),
               ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Confirmer la commande',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ) ??
         false;
   }
@@ -527,6 +524,7 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
         return;
       }
 
+      await _recordCartFeexPayOnline(total, result.transactionId);
       await _saveOrderToDatabase(total, cart, 'online');
       await cart.clear();
       await _showSuccessModal();
@@ -578,13 +576,15 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
         body['ref'] = tid;
         body['reference'] = tid;
       }
-      final res = await dio.post('/payments/feexpay/flutter/record', data: body);
+      final res =
+          await dio.post('/payments/feexpay/flutter/record', data: body);
       developer.log(
         '[ORDER_ONLINE] recordFeexPayFlutter status=${res.statusCode} data=${res.data}',
         name: 'OrderSummary',
       );
     } catch (e) {
-      developer.log('[ORDER_ONLINE] recordFeexPayFlutter error: $e', name: 'OrderSummary');
+      developer.log('[ORDER_ONLINE] recordFeexPayFlutter error: $e',
+          name: 'OrderSummary');
     }
   }
 
@@ -608,18 +608,17 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
     );
 
     final orderData = {
-      'items':
-          cart.items
-              .map(
-                (item) => {
-                  'articleId': item.articleId,
-                  'title': item.title,
-                  'quantity': item.quantity,
-                  'unitPrice': item.unitPrice,
-                  'totalPrice': item.totalPrice,
-                },
-              )
-              .toList(),
+      'items': cart.items
+          .map(
+            (item) => {
+              'articleId': item.articleId,
+              'title': item.title,
+              'quantity': item.quantity,
+              'unitPrice': item.unitPrice,
+              'totalPrice': item.totalPrice,
+            },
+          )
+          .toList(),
       'subtotal': cart.subtotal,
       'deliveryFee': _deliveryFee,
       'discount': _discount,
@@ -649,116 +648,115 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 48,
+              ),
             ),
-            contentPadding: const EdgeInsets.all(24),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
-                    size: 48,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Commande confirmée !',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Votre commande a été enregistrée avec succès.',
-                  style: TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                  ),
-                  child: Column(
+            const SizedBox(height: 20),
+            const Text(
+              'Commande confirmée !',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Votre commande a été enregistrée avec succès.',
+              style: TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.local_shipping,
-                            color: Colors.blue,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Livraison prévue',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          ),
-                        ],
+                      const Icon(
+                        Icons.local_shipping,
+                        color: Colors.blue,
+                        size: 20,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(width: 8),
                       const Text(
-                        'Entre 3 et 7 jours ouvrables',
-                        style: TextStyle(fontSize: 14, color: Colors.blue),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.notifications,
-                            color: Colors.amber,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Vous recevrez une notification',
-                            style: TextStyle(fontSize: 12, color: Colors.amber),
-                          ),
-                        ],
+                        'Livraison prévue',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Entre 3 et 7 jours ouvrables',
+                    style: TextStyle(fontSize: 14, color: Colors.blue),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.notifications,
+                        color: Colors.amber,
+                        size: 20,
                       ),
-                    ),
-                    child: const Text(
-                      'Retour à l\'accueil',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Vous recevrez une notification',
+                        style: TextStyle(fontSize: 12, color: Colors.amber),
                       ),
-                    ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-              ],
+                child: const Text(
+                  'Retour à l\'accueil',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -23,7 +23,9 @@ import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/services/seller_profile_locations.dart';
 import 'package:tranoo_pro/widgets/country_location_field.dart';
 import 'package:tranoo_pro/utils/location_geocode_helper.dart';
+import 'package:tranoo_pro/services/seller_gain_pricing_service.dart';
 import 'package:tranoo_pro/widgets/cached_media_image.dart';
+import 'package:tranoo_pro/widgets/seller_price_gain_dialog.dart';
 
 class CreateSellPage extends StatefulWidget {
   final String? alertNotificationId;
@@ -62,6 +64,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
   final TextEditingController _distanceController = TextEditingController();
   final TextEditingController _siegesController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+  int _tranooGainFcfa = SellerGainPricingService.defaultGainVoiture;
   String? _selectedCondition; // Gardé en String pour "Nouveau" et "Occasion"
   String? _selectedModel; // Modèle
   String? _selectedMarques;
@@ -209,6 +212,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
   @override
   void initState() {
     super.initState();
+    _loadSellerGainPricing();
     final init = widget.initialData;
     if (widget.editMode && init != null) {
       _titleController.text = (init['titre'] ?? '').toString();
@@ -264,6 +268,24 @@ class _CreateSellPageState extends State<CreateSellPage> {
     } else {
       _loadVehicleLocationFromProfile();
     }
+  }
+
+  Future<void> _loadSellerGainPricing() async {
+    final gain = await SellerGainPricingService.fetchGainForVehicle(
+      SellerVehicleType.car,
+    );
+    if (!mounted) return;
+    setState(() => _tranooGainFcfa = gain);
+  }
+
+  Future<void> _openPriceDialog() async {
+    await showSellerPriceGainDialog(
+      context: context,
+      controller: _priceController,
+      tranooGainFcfa: _tranooGainFcfa,
+      vehicleLabel: 'voiture',
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadVehicleLocationFromProfile() async {
@@ -1867,6 +1889,8 @@ class _CreateSellPageState extends State<CreateSellPage> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _priceController,
+                          readOnly: true,
+                          onTap: _openPriceDialog,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),

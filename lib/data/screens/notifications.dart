@@ -14,6 +14,7 @@ import 'create_sell2.dart';
 import 'cars_info.dart';
 import 'mastervacpage.dart';
 import 'package:tranoo_pro/widgets/notification_list_ui.dart';
+import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 import 'package:tranoo_pro/utils/notification_i18n.dart';
 import 'package:tranoo_pro/utils/locale_helper.dart';
@@ -270,12 +271,12 @@ class VerificationDetailPage extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: 10),
                   child: CachedMediaImage(
-                      url: stampUrl,
-                      height: 53,
-                      width: 53,
-                      fit: BoxFit.contain,
-                      cloudinaryWidthPx: 106,
-                      errorWidget: Container(
+                    url: stampUrl,
+                    height: 53,
+                    width: 53,
+                    fit: BoxFit.contain,
+                    cloudinaryWidthPx: 106,
+                    errorWidget: Container(
                       height: 53,
                       width: 53,
                       color: Colors.grey[300],
@@ -285,16 +286,16 @@ class VerificationDetailPage extends StatelessWidget {
                 ),
               if (signatureUrl != null)
                 CachedMediaImage(
-                    url: signatureUrl,
-                    height: 39,
-                    fit: BoxFit.contain,
-                    cloudinaryWidthPx: 200,
-                    errorWidget: Container(
+                  url: signatureUrl,
                   height: 39,
-                  width: 100,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.edit, color: Colors.blueGrey),
-                ),
+                  fit: BoxFit.contain,
+                  cloudinaryWidthPx: 200,
+                  errorWidget: Container(
+                    height: 39,
+                    width: 100,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.edit, color: Colors.blueGrey),
+                  ),
                 ),
             ]),
             const SizedBox(height: 16),
@@ -412,9 +413,25 @@ class NotificationProvider with ChangeNotifier {
     final map = Map<String, dynamic>.from(notif);
     map['date'] = map['date'] is DateTime
         ? map['date']
-        : (map['createdAt'] != null
-            ? DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now()
-            : DateTime.now());
+        : (map['date'] != null
+            ? DateTime.tryParse(map['date'].toString()) ??
+                (map['createdAt'] != null
+                    ? DateTime.tryParse(map['createdAt'].toString()) ??
+                        DateTime.now()
+                    : DateTime.now())
+            : (map['createdAt'] != null
+                ? DateTime.tryParse(map['createdAt'].toString()) ??
+                    DateTime.now()
+                : DateTime.now()));
+    return map;
+  }
+
+  Map<String, dynamic> _serializeNotificationForCache(Map<String, dynamic> notif) {
+    final map = Map<String, dynamic>.from(notif);
+    final date = map['date'];
+    if (date is DateTime) {
+      map['date'] = date.toIso8601String();
+    }
     return map;
   }
 
@@ -423,7 +440,8 @@ class NotificationProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadNotificationsFromAPI(String token, {bool silent = false}) async {
+  Future<void> loadNotificationsFromAPI(String token,
+      {bool silent = false}) async {
     final hasData = _notifications.isNotEmpty;
     if (!silent && !hasData) {
       loading = true;
@@ -457,7 +475,11 @@ class NotificationProvider with ChangeNotifier {
         }
         await LocalDataCache.writeJsonList(
           _cacheKey,
-          _notifications.map((n) => Map<String, dynamic>.from(n)).toList(),
+          _notifications
+              .map((n) => _serializeNotificationForCache(
+                    Map<String, dynamic>.from(n),
+                  ))
+              .toList(),
         );
         notifyListeners();
       } else {
@@ -580,7 +602,6 @@ class Notifications extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return ChangeNotifierProvider(
       create: (_) => NotificationProvider(),
       child: NotificationsBody(openNotificationId: openNotificationId),
@@ -654,7 +675,10 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     if (user != null) {
       user.getIdToken().then((token) {
         if (token != null) {
-          provider.loadNotificationsFromAPI(token, silent: provider.notifications.isNotEmpty).then((_) {
+          provider
+              .loadNotificationsFromAPI(token,
+                  silent: provider.notifications.isNotEmpty)
+              .then((_) {
             if (!mounted) return;
             _syncUnreadCountWithHeader(provider);
             _openPendingNotificationIfNeeded(provider, token);
@@ -815,11 +839,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           ? SkeletonPresets.notificationList()
           : provider.notifications.isEmpty
               ? Center(
-                  child: Text(l10n.noNotifications,
+                  child: Text(
+                    l10n.noNotifications,
                     style: const TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 )
-              : RefreshIndicator(
+              : PagePullRefresh(
+                  refreshSkeleton: SkeletonPresets.notificationList(),
                   onRefresh: () async {
                     final user = FirebaseAuth.instance.currentUser;
                     if (user != null) {
@@ -855,17 +881,6 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           final isVerification =
               _safeGetString(notif, 'type') == 'verification';
           final isUnread = !(notif['isRead'] ?? false);
-          final notifData = (notif['data'] is Map)
-              ? Map<String, dynamic>.from(notif['data'])
-              : <String, dynamic>{};
-          final requestType = (notifData['requestType'] ?? '').toString();
-          final isAlert = _safeGetString(notif, 'type') == 'alerte' ||
-              requestType == 'vehicle_search' ||
-              requestType == 'piece_search';
-          final isProposalNotification =
-              (notifData['action'] ?? '').toString() == 'view_proposal';
-          final proposalThumb = (notifData['thumbnailUrl'] ?? '').toString();
-          final proposalTitle = (notifData['articleTitle'] ?? '').toString();
           final notifId = (_safeGetString(notif, '_id') ?? '').toString();
           final isSelected =
               notifId.isNotEmpty && _selectedNotificationIds.contains(notifId);
@@ -887,8 +902,7 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (ctx) =>
-                      VerificationDetailPage(notification: notif),
+                  builder: (ctx) => VerificationDetailPage(notification: notif),
                 ),
               );
             } else {
@@ -961,7 +975,8 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       final piece = (data['pieceName'] ?? '').toString().trim();
       if (piece.isNotEmpty) parts.add(piece);
     } else {
-      final budget = (data['budget'] ?? data['budgetMax'] ?? '').toString().trim();
+      final budget =
+          (data['budget'] ?? data['budgetMax'] ?? '').toString().trim();
       if (budget.isNotEmpty) parts.add('Budget $budget FCFA');
     }
     if (parts.isNotEmpty) return parts.join(' · ');
@@ -976,38 +991,6 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     return _safeGetString(notif, 'type') == 'alerte' ||
         requestType == 'vehicle_search' ||
         requestType == 'piece_search';
-  }
-
-  Widget _alertThumbnail(String? url, {bool isPiece = false}) {
-    const w = 112.0;
-    const h = 63.0;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: url != null && url.isNotEmpty
-          ? CachedMediaImage(
-              url: url,
-              width: w,
-              height: h,
-              fit: BoxFit.cover,
-              cloudinaryWidthPx: (w * 2).toInt(),
-              errorWidget: _alertThumbnailPlaceholder(isPiece),
-            )
-          : _alertThumbnailPlaceholder(isPiece),
-    );
-  }
-
-  Widget _alertThumbnailPlaceholder(bool isPiece) {
-    return Container(
-      width: 112,
-      height: 63,
-      color: Colors.grey[200],
-      alignment: Alignment.center,
-      child: Icon(
-        isPiece ? Icons.build_outlined : Icons.directions_car_outlined,
-        color: Colors.grey[500],
-        size: 32,
-      ),
-    );
   }
 
   Widget _buildUnifiedNotificationListItem({
@@ -1170,13 +1153,15 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       if (response.statusCode != 200) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible de charger la proposition.')),
+          const SnackBar(
+              content: Text('Impossible de charger la proposition.')),
         );
         return;
       }
 
       final article = jsonDecode(response.body);
-      final articleType = (article['type'] ?? typeHint ?? '').toString().toLowerCase();
+      final articleType =
+          (article['type'] ?? typeHint ?? '').toString().toLowerCase();
 
       if (!mounted) return;
       if (articleType == 'piece') {
@@ -1190,13 +1175,17 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               year: (article['annee'] ?? '').toString(),
               description: (article['description'] ?? '').toString(),
               company: (article['entreprise'] ?? '').toString(),
-              location: (article['lieu'] ?? article['localisation'] ?? '').toString(),
+              location:
+                  (article['lieu'] ?? article['localisation'] ?? '').toString(),
               price: (article['prix'] ?? '').toString(),
               fuelType: article['typeMoteur']?.toString(),
               model: article['modele']?.toString(),
-              pieceType: (article['pieceType'] ?? article['condition'])?.toString(),
+              pieceType:
+                  (article['pieceType'] ?? article['condition'])?.toString(),
               images: (article['photos'] is List)
-                  ? (article['photos'] as List).map((e) => e?.toString()).toList()
+                  ? (article['photos'] as List)
+                      .map((e) => e?.toString())
+                      .toList()
                   : const [],
               video: article['video']?.toString(),
               fournisseur: (article['fournisseur'] is Map)
@@ -1258,64 +1247,54 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     Map<String, dynamic> notification,
     NotificationProvider provider,
     String token,
-  ) async {
+  ) {
     try {
-      if (!(notification['isRead'] ?? false)) {
-        final notificationId = _safeGetString(notification, '_id');
-        if (notificationId != null) {
-          await provider.markNotificationAsRead(notificationId, token);
-          if (mounted) {
-            _syncUnreadCountWithHeader(provider);
-          }
+      final notificationId = _safeGetString(notification, '_id');
+      if (!(notification['isRead'] ?? false) && notificationId != null) {
+        provider.markNotificationAsRead(notificationId, token);
+        if (mounted) {
+          _syncUnreadCountWithHeader(provider);
         }
+      }
+
+      final isVerification =
+          _safeGetString(notification, 'type') == 'verification';
+      final isPromo = _safeGetString(notification, 'type') == 'promotion';
+      final dataMap = (notification['data'] is Map)
+          ? Map<String, dynamic>.from(notification['data'])
+          : <String, dynamic>{};
+      final requestType = (dataMap['requestType'] ?? '').toString();
+      final isAlert = _safeGetString(notification, 'type') == 'alerte' ||
+          requestType == 'vehicle_search' ||
+          requestType == 'piece_search';
+      final images = getNotifImages(notification);
+      final stampUrl = getStampUrl(notification);
+      final signatureUrl = getSignatureUrl(notification);
+      final bodyHtml = _safeGetString(notification, 'bodyHtml') ??
+          resolveNotificationMessage(
+            notification,
+            _localeCode,
+            fallback: _safeGetString(notification, 'message') ?? '-',
+          );
+
+      Widget detailContent;
+
+      if (isVerification) {
+        detailContent = _buildVerificationContent(context, notification,
+            provider, token, images, stampUrl, signatureUrl, bodyHtml);
+      } else if (isAlert) {
+        detailContent = _buildAlertContent(notification, bodyHtml);
+      } else if (isPromo) {
+        detailContent = _buildPromoContent(notification, images, bodyHtml);
+      } else {
+        detailContent = _buildStandardContent(notification, bodyHtml);
       }
 
       showDialog(
         context: context,
-        builder: (context) {
-          final isVerification =
-              _safeGetString(notification, 'type') == 'verification';
-          final isPromo = _safeGetString(notification, 'type') == 'promotion';
-          final dataMap = (notification['data'] is Map)
-              ? Map<String, dynamic>.from(notification['data'])
-              : <String, dynamic>{};
-          final requestType = (dataMap['requestType'] ?? '').toString();
-          final isAlert = _safeGetString(notification, 'type') == 'alerte' ||
-              requestType == 'vehicle_search' ||
-              requestType == 'piece_search';
-          final images = getNotifImages(notification);
-          final stampUrl = getStampUrl(notification);
-          final signatureUrl = getSignatureUrl(notification);
-          final bodyHtml = _safeGetString(notification, 'bodyHtml') ??
-              resolveNotificationMessage(
-                notification,
-                _localeCode,
-                fallback: _safeGetString(notification, 'message') ?? '-',
-              );
-
-          Widget detailContent;
-
-          if (isVerification) {
-            detailContent = _buildVerificationContent(context, notification,
-                provider, token, images, stampUrl, signatureUrl, bodyHtml);
-          } else if (isAlert) {
-            detailContent = _buildAlertContent(notification, bodyHtml);
-          } else if (isPromo) {
-            detailContent = _buildPromoContent(notification, images, bodyHtml);
-          } else {
-            detailContent = _buildStandardContent(notification, bodyHtml);
-          }
-
-          return Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: detailContent,
-            ),
-          );
-        },
+        barrierDismissible: true,
+        barrierColor: Colors.black54,
+        builder: (ctx) => wrapNotificationDetailDialog(ctx, detailContent),
       );
     } catch (e) {
       print('Erreur _showNotificationDetail: $e');
@@ -1454,7 +1433,8 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber,
                 ),
-                child: Text(l10n.validate,
+                child: Text(
+                  l10n.validate,
                   style: TextStyle(color: Colors.black),
                 ),
               ),
@@ -1495,13 +1475,13 @@ class _NotificationsBodyState extends State<NotificationsBody> {
   }
 
   String? _alertBudgetValue(Map<String, dynamic> dataMap) {
-    final budget = (dataMap['budget'] ?? dataMap['budgetMax'] ?? '')
-        .toString()
-        .trim();
+    final budget =
+        (dataMap['budget'] ?? dataMap['budgetMax'] ?? '').toString().trim();
     return budget.isNotEmpty ? budget : null;
   }
 
-  Widget _buildAlertContent(Map<String, dynamic> notification, String bodyHtml) {
+  Widget _buildAlertContent(
+      Map<String, dynamic> notification, String bodyHtml) {
     final dataMap = _notifDataMap(notification);
     final requestType = (dataMap['requestType'] ?? '').toString();
     final isPiece = requestType == 'piece_search';
@@ -1754,81 +1734,50 @@ class _NotificationsBodyState extends State<NotificationsBody> {
 
   Widget _buildPromoContent(
       Map<String, dynamic> notification, List<String> images, String bodyHtml) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.yellow[400]!,
-            Colors.orange[400]!,
-            Colors.yellow[300]!,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(17),
+    return buildMonochromeNotificationDetail(
+      title: resolveNotificationTitle(
+        notification,
+        _localeCode,
+        fallback: _safeGetString(notification, 'title') ?? '',
       ),
-      padding: const EdgeInsets.all(17),
-      child: Column(
+      dateStr: notification['date'] is DateTime
+          ? _formatDate(notification['date'] as DateTime)
+          : null,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            '🎉 Promotion spéciale',
-            style: TextStyle(
-              color: Colors.yellow[900],
-              fontWeight: FontWeight.bold,
-              fontSize: 19,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            resolveNotificationTitle(
-              notification,
-              _localeCode,
-              fallback: _safeGetString(notification, 'title') ?? '',
-            ),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 21,
-              color: Colors.orange[900],
-            ),
-          ),
-          const SizedBox(height: 8),
           Html(
             data: bodyHtml,
             style: {
               '.': Style(
-                color: Colors.orange[900],
+                color: Colors.black87,
                 fontSize: FontSize(15),
               ),
             },
           ),
           if (images.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 13),
+              padding: const EdgeInsets.only(top: 12),
               child: Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: VerificationDetailPage._safeMapImages(images),
               ),
             ),
-          if (_safeGetString(notification, 'ctaLabel') != null &&
-              _safeGetString(notification, 'ctaUrl') != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 15),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange[700],
-                ),
-                onPressed: () {
-                  // Ouvrir le lien promo
-                },
-                child: Text(
-                  _safeGetString(notification, 'ctaLabel')!,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
         ],
       ),
+      action: (_safeGetString(notification, 'ctaLabel') != null &&
+              _safeGetString(notification, 'ctaUrl') != null)
+          ? SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: monochromeNotificationButtonStyle(),
+                onPressed: () {},
+                child: Text(_safeGetString(notification, 'ctaLabel')!),
+              ),
+            )
+          : null,
     );
   }
 
@@ -1838,56 +1787,44 @@ class _NotificationsBodyState extends State<NotificationsBody> {
         ? Map<String, dynamic>.from(notification['data'])
         : <String, dynamic>{};
     final action = (dataMap['action'] ?? '').toString();
-    final targetArticleId =
-        (dataMap['targetArticleId'] ?? _safeGetString(notification, 'relatedId') ?? '')
-            .toString();
+    final targetArticleId = (dataMap['targetArticleId'] ??
+            _safeGetString(notification, 'relatedId') ??
+            '')
+        .toString();
     final targetType = (dataMap['targetType'] ?? '').toString();
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.blue[50],
-        borderRadius: BorderRadius.circular(12),
+    return buildMonochromeNotificationDetail(
+      title: resolveNotificationTitle(
+        notification,
+        _localeCode,
+        fallback: _safeGetString(notification, 'title') ?? '',
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            resolveNotificationTitle(
-              notification,
-              _localeCode,
-              fallback: _safeGetString(notification, 'title') ?? '',
-            ),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.blue[800],
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Html(
-            data: bodyHtml,
-            style: {
-              '.': Style(color: Colors.blue[900], fontSize: FontSize(15)),
-            },
-          ),
-          if (action == 'view_proposal' && targetArticleId.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _openProposalArticle(
-                  context,
-                  articleId: targetArticleId,
-                  typeHint: targetType,
-                );
-              },
-              icon: const Icon(Icons.visibility),
-              label: const Text('Voir la proposition'),
-            ),
-          ],
-        ],
+      dateStr: notification['date'] is DateTime
+          ? _formatDate(notification['date'] as DateTime)
+          : null,
+      body: Html(
+        data: bodyHtml,
+        style: {
+          '.': Style(color: Colors.black87, fontSize: FontSize(15)),
+        },
       ),
+      action: action == 'view_proposal' && targetArticleId.isNotEmpty
+          ? SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: monochromeNotificationButtonStyle(),
+                onPressed: () {
+                  Navigator.of(context, rootNavigator: true).pop();
+                  _openProposalArticle(
+                    context,
+                    articleId: targetArticleId,
+                    typeHint: targetType,
+                  );
+                },
+                icon: const Icon(Icons.visibility, size: 18),
+                label: const Text('Voir la proposition'),
+              ),
+            )
+          : null,
     );
   }
 }

@@ -16,6 +16,8 @@ import 'package:tranoo_pro/services/seller_profile_locations.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/utils/cloudinary_upload.dart';
+import 'package:tranoo_pro/services/seller_gain_pricing_service.dart';
+import 'package:tranoo_pro/widgets/seller_price_gain_dialog.dart';
 
 import 'moto_info.dart';
 import 'movie.dart';
@@ -60,6 +62,7 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
 
   // 3. Informations commerciales
   final _prixController = TextEditingController();
+  int _tranooGainFcfa = SellerGainPricingService.defaultGainMoto;
   String _selectedDevise = 'XOF';
   String? _selectedDisponibilite;
   bool _garantieConstructeur = false;
@@ -122,6 +125,7 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
   @override
   void initState() {
     super.initState();
+    _loadSellerGainPricing();
     final init = widget.initialData;
     if (widget.editMode && init != null) {
       _hydrateFromInitialData();
@@ -146,6 +150,24 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
     } else {
       _loadLocationsFromProfile();
     }
+  }
+
+  Future<void> _loadSellerGainPricing() async {
+    final gain = await SellerGainPricingService.fetchGainForVehicle(
+      SellerVehicleType.moto,
+    );
+    if (!mounted) return;
+    setState(() => _tranooGainFcfa = gain);
+  }
+
+  Future<void> _openPriceDialog() async {
+    await showSellerPriceGainDialog(
+      context: context,
+      controller: _prixController,
+      tranooGainFcfa: _tranooGainFcfa,
+      vehicleLabel: 'moto',
+    );
+    if (mounted) setState(() {});
   }
 
   void _hydrateFromInitialData() {
@@ -518,6 +540,8 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
               _buildTextField(
                 controller: _prixController,
                 hint: l10n.priceFcfaExample,
+                readOnly: true,
+                onTap: _openPriceDialog,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -554,12 +578,16 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
     TextInputType? keyboardType,
     int maxLines = 1,
     List<TextInputFormatter>? inputFormatters,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
       inputFormatters: inputFormatters,
+      readOnly: readOnly,
+      onTap: onTap,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,

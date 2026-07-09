@@ -1,7 +1,11 @@
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:random_string/random_string.dart';
 import 'package:tranoo_pro/services/subscription_access_service.dart';
+import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/data/screens/avant_home.dart';
+import 'package:tranoo_pro/data/screens/piece.dart';
 import 'package:tranoo_pro/utils/payment_debug_logger.dart';
 import 'package:tranoo_pro/widgets/feexpay_v2_payment_screen.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
@@ -139,8 +143,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         );
         if (!mounted) return;
         setState(() {
-          _error = result.errorMessage ??
-              'Paiement annulé ou non confirmé.';
+          _error = result.errorMessage ?? 'Paiement annulé ou non confirmé.';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -156,6 +159,15 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
         'Abonnement payé via v2 tx=${result.transactionId}',
       );
 
+      await _recordSubscriptionPayment(
+        transKey: transKey,
+        amount: amount.round(),
+        description: description,
+        txId: result.transactionId,
+      );
+      await _subscriptionService.activateMonthlySubscription(
+        months: _selectedMonths,
+      );
       await _loadStatus();
       widget.onSubscriptionChanged?.call();
       if (!mounted) return;
@@ -167,12 +179,11 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
       );
       await Future.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
-      if (widget.blockerMode) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const AvantHome()),
-          (route) => false,
-        );
-      }
+      final target = widget.forTransitaire ? const AvantHome() : const Piece();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => target),
+        (route) => false,
+      );
     } catch (e, st) {
       PaymentDebugLogger.blocked(
         _kLogTag,
@@ -198,11 +209,66 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
     }
   }
 
+  Future<void> _recordSubscriptionPayment({
+    required String transKey,
+    required int amount,
+    required String description,
+    String? txId,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('Utilisateur non connecté');
+    }
+
+    final token = await user.getIdToken();
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: UserService().dio.options.baseUrl,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+
+    final body = <String, dynamic>{
+      'transKey': transKey,
+      'amount': amount,
+      'description': description,
+      'type': 'subscription',
+      'status': 'success',
+      'duree': '$_selectedMonths mois',
+    };
+
+    final tid = txId?.trim();
+    if (tid != null && tid.isNotEmpty) {
+      body['id_transaction'] = tid;
+      body['ref'] = tid;
+      body['reference'] = tid;
+    }
+
+    final res = await dio.post('/payments/feexpay/flutter/record', data: body);
+    PaymentDebugLogger.log(
+      _kLogTag,
+      'recordFeexPayFlutter status=${res.statusCode} tx=${tid ?? "(aucun)"}',
+    );
+  }
+
   String _formatDate(DateTime? date) {
     if (date == null) return '--';
     final months = [
-      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+      'janvier',
+      'février',
+      'mars',
+      'avril',
+      'mai',
+      'juin',
+      'juillet',
+      'août',
+      'septembre',
+      'octobre',
+      'novembre',
+      'décembre'
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
@@ -212,8 +278,18 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
     final dt = DateTime.tryParse(raw.toString());
     if (dt == null) return '--';
     final months = [
-      'janv', 'févr', 'mars', 'avr', 'mai', 'juin',
-      'juil', 'août', 'sept', 'oct', 'nov', 'déc'
+      'janv',
+      'févr',
+      'mars',
+      'avr',
+      'mai',
+      'juin',
+      'juil',
+      'août',
+      'sept',
+      'oct',
+      'nov',
+      'déc'
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -224,7 +300,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
     final status = _status;
     final monthlyPrice = status?.monthlyPriceFcfa ?? 0;
     final totalPrice = _selectedMonths * monthlyPrice;
-    final remainingDays = status?.paidPlanEndsAt?.difference(DateTime.now()).inDays;
+    final remainingDays =
+        status?.paidPlanEndsAt?.difference(DateTime.now()).inDays;
     final hasDiscount = status != null &&
         status.paidPlanActive &&
         status.currentSubscriptionMonths >= 6 &&
@@ -268,7 +345,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.amber.shade200, width: 1),
+                      border:
+                          Border.all(color: Colors.amber.shade200, width: 1),
                     ),
                     padding: const EdgeInsets.all(20),
                     child: Column(
@@ -391,10 +469,12 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                           child: Column(
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Plan Pro',
@@ -492,7 +572,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade50,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey.shade300),
+                                  border:
+                                      Border.all(color: Colors.grey.shade300),
                                 ),
                                 child: Row(
                                   children: [
@@ -518,7 +599,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                           onTap: () {
                                             setState(() {
                                               _selectedMonths =
-                                                  (_selectedMonths + 1).clamp(1, 12);
+                                                  (_selectedMonths + 1)
+                                                      .clamp(1, 12);
                                             });
                                           },
                                           child: const Padding(
@@ -533,7 +615,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                           onTap: () {
                                             setState(() {
                                               _selectedMonths =
-                                                  (_selectedMonths - 1).clamp(1, 12);
+                                                  (_selectedMonths - 1)
+                                                      .clamp(1, 12);
                                             });
                                           },
                                           child: const Padding(
@@ -596,7 +679,8 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(l10n.total,
+                                        Text(
+                                          l10n.total,
                                           style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w600,
@@ -846,7 +930,7 @@ class _SellerSubscriptionPageState extends State<SellerSubscriptionPage> {
                                   _formatDateShort(tx['createdAt']);
                               final isSuccess =
                                   statusTx.toLowerCase().contains('success') ||
-                                  statusTx.toLowerCase().contains('paid');
+                                      statusTx.toLowerCase().contains('paid');
 
                               return Padding(
                                 padding: const EdgeInsets.symmetric(

@@ -76,11 +76,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         ),
       ),
-      body:
-          pubData == null
-              ? const Center(child: CircularProgressIndicator())
-              : SafeArea(
-                child: Padding(
+      body: pubData == null
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,7 +110,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    pubData!['typePub'] ?? l10n.advertisingLabel,
+                                    pubData!['typePub'] ??
+                                        l10n.advertisingLabel,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 24,
@@ -134,8 +134,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             const SizedBox(height: 24),
 
                             // Détails de la publicité
-                          Text(
-                            l10n.adDetailsTitle,
+                            Text(
+                              l10n.adDetailsTitle,
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -202,8 +202,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             const SizedBox(height: 16),
 
                             // Note
-                          Text(
-                            l10n.afterPaymentAdValidationNote,
+                            Text(
+                              l10n.afterPaymentAdValidationNote,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -230,19 +230,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           ),
                           elevation: 0,
                         ),
-                        child:
-                            isLoading
-                                ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                )
-                                : Text(
-                                  '${l10n.pay} ${l10n.valueAmountFcfa('${pubData!['prix'] ?? 0}')}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                  ),
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              )
+                            : Text(
+                                '${l10n.pay} ${l10n.valueAmountFcfa('${pubData!['prix'] ?? 0}')}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
                                 ),
+                              ),
                       ),
                     ),
 
@@ -263,7 +262,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ],
                 ),
               ),
-              ),
+            ),
     );
   }
 
@@ -345,6 +344,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
         return;
       }
 
+      await _recordPublicitePayment(
+        amountNum,
+        idTransaction: result.transactionId,
+      );
       await _updatePubStatus();
       if (mounted) {
         Navigator.pushAndRemoveUntil(

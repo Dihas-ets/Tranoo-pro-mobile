@@ -16,17 +16,58 @@ class CapturedProfileLocation {
     required this.address,
     required this.city,
   });
+
+  static CapturedProfileLocation? fromUserMap(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final adresse = (data['adresse'] ?? '').toString().trim();
+    final ville = (data['ville'] ?? '').toString().trim();
+    double? lat;
+    double? lng;
+    final loc = data['location'];
+    if (loc is Map && loc['coordinates'] is List) {
+      final coords = loc['coordinates'] as List;
+      if (coords.length >= 2) {
+        lng = (coords[0] as num?)?.toDouble();
+        lat = (coords[1] as num?)?.toDouble();
+      }
+    }
+    final fp = data['fournisseurProfil'];
+    Map<String, dynamic> fournisseur = {};
+    if (fp is Map) fournisseur = Map<String, dynamic>.from(fp);
+    final fAddr =
+        (fournisseur['adresseTexte'] ?? adresse).toString().trim();
+    final fVille = (fournisseur['ville'] ?? ville).toString().trim();
+    final fLat = fournisseur['latitude'];
+    final fLng = fournisseur['longitude'];
+    final resolvedLat = fLat is num
+        ? fLat.toDouble()
+        : lat ?? double.tryParse('$fLat');
+    final resolvedLng = fLng is num
+        ? fLng.toDouble()
+        : lng ?? double.tryParse('$fLng');
+    final hasCoords = resolvedLat != null && resolvedLng != null;
+    final hasText = fAddr.isNotEmpty || fVille.isNotEmpty;
+    if (!hasCoords && !hasText) return null;
+    return CapturedProfileLocation(
+      latitude: resolvedLat ?? 0,
+      longitude: resolvedLng ?? 0,
+      address: fAddr,
+      city: fVille,
+    );
+  }
 }
 
 /// Capture la position actuelle pour le profil (inscription vendeur / transitaire).
 class RegistrationLocationSection extends StatefulWidget {
   final String userRole;
   final ValueChanged<CapturedProfileLocation?> onChanged;
+  final bool showIntro;
 
   const RegistrationLocationSection({
     super.key,
     required this.userRole,
     required this.onChanged,
+    this.showIntro = true,
   });
 
   @override
@@ -105,16 +146,18 @@ class _RegistrationLocationSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.yourCurrentPosition,
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Utilisée pour vos annonces et la localisation fournisseur. '
-          'Vous pourrez la mettre à jour dans votre profil.',
-          style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.35),
-        ),
-        const SizedBox(height: 12),
+        if (widget.showIntro) ...[
+          Text(l10n.yourCurrentPosition,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Utilisée pour vos annonces et la localisation fournisseur. '
+            'Vous pourrez la mettre à jour dans votre profil.',
+            style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.35),
+          ),
+          const SizedBox(height: 12),
+        ],
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(

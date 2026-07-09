@@ -39,6 +39,7 @@ String? _firstNonEmptyFromArgsMap(dynamic args, Iterable<String> keys) {
 final RegExp _feexFullUuid = RegExp(
   r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
 );
+final RegExp _feexAgRef = RegExp(r'\bAG_[A-Za-z0-9_]+\b');
 
 String? _feexIdFromRawArguments(dynamic args) {
   if (args == null) return null;
@@ -48,12 +49,16 @@ String? _feexIdFromRawArguments(dynamic args) {
     final t = args.trim();
     if (t.isEmpty) return null;
     if (_feexFullUuid.hasMatch(t)) return t;
-    final trn = RegExp(r'\bTRN-[A-Z0-9-]+\b', caseSensitive: false).firstMatch(t);
+    final trn =
+        RegExp(r'\bTRN-[A-Z0-9-]+\b', caseSensitive: false).firstMatch(t);
     if (trn != null) return trn.group(0);
+    final ag = _feexAgRef.firstMatch(t);
+    if (ag != null) return ag.group(0);
     if (t.startsWith('{') && t.endsWith('}')) {
       try {
         final m = jsonDecode(t);
-        if (m is Map) return _firstNonEmptyFromArgsMap(m, _feexPayTransactionIdKeys);
+        if (m is Map)
+          return _firstNonEmptyFromArgsMap(m, _feexPayTransactionIdKeys);
       } catch (_) {}
     }
   }
@@ -134,6 +139,20 @@ String? feexIdFromRouteSettings(RouteSettings? settings) {
   return null;
 }
 
+/// Ferme la route callback puis [ChoicePage] pour que [openFeexPayV2Payment] reprenne.
+void _popFeexPayCallbackChain(
+  BuildContext context,
+  Map<String, dynamic> payload,
+) {
+  final nav = Navigator.of(context, rootNavigator: true);
+  nav.pop(payload);
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (nav.canPop()) {
+      nav.pop(payload);
+    }
+  });
+}
+
 /// Route enregistrée pour les `redirecturl` / `errorredirecturl` de FeexPay (ChoicePage).
 class FeexPayChoiceCallbackPage extends StatefulWidget {
   final bool success;
@@ -177,7 +196,7 @@ class _FeexPayChoiceCallbackPageState extends State<FeexPayChoiceCallbackPage> {
         if (feexId != null && feexId.isNotEmpty) 'reference': feexId,
       };
       developer.log('[FEEPAY_CALLBACK] pop payload=$payload feexId=$feexId');
-      Navigator.of(context).pop(payload);
+      _popFeexPayCallbackChain(context, payload);
     });
   }
 
