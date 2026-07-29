@@ -653,6 +653,15 @@ class _MarqueState extends State<Marque>
   void initState() {
     super.initState();
 
+    // Réinitialiser les variables globales partagées au démarrage de la page
+    // pour éviter l'affichage gris si on revient sur la page après une navigation
+    isLoadingVoitures = true;
+    isLoadingMotos = true;
+    voituresRecommandees = [];
+    motosRecommandees = [];
+    errorVoitures = null;
+    errorMotos = null;
+
     // Initialisation des indices des onglets selon le rôle
     final isTransitaire = _userService.currentRole == UserRole.transitaire;
     final isVendeur = _userService.currentRole == UserRole.vendeur;

@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:confetti/confetti.dart';
+import 'create_sell.dart'; // Édition/republication d'un article vendu
 import 'une.dart' as pub_page; // Import pour la page de demande de pub avec préfixe
 import 'dart:developer';
 import 'verification_payment.dart'; // Import pour la page de vérification de paiement
@@ -188,6 +189,7 @@ class _CarsinfoState extends State<CarsInfo> {
   late ConfettiController _confettiController;
   bool _isOnline = false;
   bool _isPublishing = false;
+  bool _isSold = false; // true quand le statut article est 'vendu'
   int _verificationPrice = 20000;
   double _slideConfirmOffset = 0;
   bool _markingTraite = false;
@@ -303,6 +305,7 @@ class _CarsinfoState extends State<CarsInfo> {
         if (!mounted) return;
         setState(() {
           _isOnline = _articlePublishedStatut(statut);
+          _isSold = statut == 'vendu';
         });
       }
     } catch (_) {}
@@ -2137,52 +2140,79 @@ class _CarsinfoState extends State<CarsInfo> {
             ),
           ),
           const SizedBox(height: 12),
-          // Bouton "Faire une pub" pour les vendeurs
+          // Bouton secondaire : "Modifier et republier" si vendu, sinon "Boostez vos ventes"
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                log('[DEBUG] Bouton Faire une pub cliqué');
-                _trackDemoEvent('campaign_initiated', page: 'cars_info.dart');
-                // Ouvrir la page de demande de pub avec les infos de l'article
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => pub_page.Une(
-                      articleId: widget.id, // Utiliser l'ID réel de l'article
-                      articleType: 'voiture',
-                      isStandalone: false,
-                      articleTitle: widget.titre,
-                      articleYear: widget.annee,
-                      articleLocation: widget.lieu,
-                      articlePrice: widget.prix,
-                      articleDescription: widget.description,
-                      articleCompany: widget.entreprise,
-                      articleModel: widget.modele,
-                      articleFuelType: widget.carburant,
-                      articlePieceType: widget.condition,
-                      articleImages: widget.images,
-                      articleVideo: _primaryVideo,
+            child: _isSold
+                ? ElevatedButton.icon(
+                    icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),
+                    label: const Text(
+                      'Modifier et republier ce véhicule',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A73E8),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CreateSellPage(
+                            editArticleId: widget.id,
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : ElevatedButton(
+                    onPressed: () {
+                      _trackDemoEvent('campaign_initiated', page: 'cars_info.dart');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => pub_page.Une(
+                            articleId: widget.id,
+                            articleType: 'voiture',
+                            isStandalone: false,
+                            articleTitle: widget.titre,
+                            articleYear: widget.annee,
+                            articleLocation: widget.lieu,
+                            articlePrice: widget.prix,
+                            articleDescription: widget.description,
+                            articleCompany: widget.entreprise,
+                            articleModel: widget.modele,
+                            articleFuelType: widget.carburant,
+                            articlePieceType: widget.condition,
+                            articleImages: widget.images,
+                            articleVideo: _primaryVideo,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Boostez vos ventes',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Boostez vos ventes',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
           ),
           ConfettiWidget(
             confettiController: _confettiController,

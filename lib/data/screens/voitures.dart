@@ -832,6 +832,14 @@ class _VoituresPageState extends State<VoituresPage>
                                                               bg = const Color(0xFFFFF8E1);
                                                               fg = const Color(0xFFB45309);
                                                               label = 'En attente';
+                                                            } else if (status == 'vendu') {
+                                                              bg = const Color(0xFFE3F2FD);
+                                                              fg = const Color(0xFF1565C0);
+                                                              label = 'Vendu';
+                                                            } else if (status == 'non_vendu') {
+                                                              bg = const Color(0xFFF3E5F5);
+                                                              fg = const Color(0xFF6A1B9A);
+                                                              label = 'Non vendu';
                                                             } else {
                                                               bg = const Color(0xFFFFEBEE);
                                                               fg = const Color(0xFFC62828);

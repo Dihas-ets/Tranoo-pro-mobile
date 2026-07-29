@@ -408,6 +408,8 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
   late List<TransitaireGalleryItem> _galleryItems;
   double _ratingAverage = 0;
   int _reviewCount = 0;
+  // Header collapsible — masqué par défaut pour donner plus d'espace aux grilles
+  bool _headerExpanded = false;
 
   @override
   void initState() {
@@ -497,16 +499,18 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
       children: [
         Column(
           children: [
-            _ProfileCoverHeader(
+            // ─── Header collapsible ──────────────────────────────────────
+            _CollapsibleProfileHeader(
               photoUrl: photo,
               initials: initials,
               name: name,
               subtitle: subtitle,
               location: location,
               premium: subscribed,
-              showRating: true,
               rating: rating,
               reviewCount: _reviewCount,
+              expanded: _headerExpanded,
+              onToggle: () => setState(() => _headerExpanded = !_headerExpanded),
             ),
             _ProfileTabBar(controller: _tabController, l10n: l10n),
             Expanded(
@@ -575,6 +579,236 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+// ─── Header collapsible ──────────────────────────────────────────────────────
+/// Version compacte par défaut (photo + nom sur une ligne) avec flèche pour
+/// déplier les détails complets (subtitle, location, rating, badge abonné).
+class _CollapsibleProfileHeader extends StatelessWidget {
+  final String? photoUrl;
+  final String initials;
+  final String name;
+  final String subtitle;
+  final String location;
+  final bool premium;
+  final double rating;
+  final int reviewCount;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  const _CollapsibleProfileHeader({
+    required this.photoUrl,
+    required this.initials,
+    required this.name,
+    required this.subtitle,
+    required this.location,
+    required this.premium,
+    required this.rating,
+    required this.reviewCount,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  Widget _coverBackground() {
+    if (photoUrl == null) {
+      return Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF2A3F6B), kTransitaireNavy],
+          ),
+        ),
+      );
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        CachedMediaImage(
+          url: photoUrl!,
+          fit: BoxFit.cover,
+          cloudinaryWidthPx: 800,
+        ),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.08),
+                Colors.black.withOpacity(0.45),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── Bande cover (toujours visible, plus petite quand collapsed)
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          height: expanded ? 100 : 72,
+          width: double.infinity,
+          child: _coverBackground(),
+        ),
+
+        // ── Zone blanche sous la cover
+        Container(
+          color: Colors.white,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Ligne avatar + nom + flèche (toujours visible)
+              GestureDetector(
+                onTap: onToggle,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                  child: Row(
+                    children: [
+                      // Avatar (petit en collapsed)
+                      GestureDetector(
+                        onTap: () => _showProfilePhotoZoom(
+                          context,
+                          photoUrl: photoUrl,
+                          initials: initials,
+                        ),
+                        child: TransitaireProfileAvatar(
+                          photoUrl: photoUrl,
+                          initials: initials,
+                          premium: premium,
+                          radius: expanded ? 28 : 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: kTransitaireNavy,
+                              ),
+                            ),
+                            if (!expanded && subtitle.isNotEmpty)
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Flèche toggle
+                      AnimatedRotation(
+                        turns: expanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 250),
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: kTransitaireNavy.withOpacity(0.6),
+                          size: 24,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Détails dépliables
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 250),
+                crossFadeState: expanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                firstChild: const SizedBox(height: 4, width: double.infinity),
+                secondChild: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (subtitle.isNotEmpty)
+                        Text(
+                          subtitle,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      if (location.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.place_outlined,
+                                size: 14, color: Colors.grey.shade500),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                location,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (rating > 0) ...[
+                        const SizedBox(height: 8),
+                        TransitaireStarRating(rating: rating),
+                      ] else if (premium) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: kTransitaireAmber.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Abonné Tranoo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTransitaireNavy,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              // Séparateur
+              Divider(height: 1, color: Colors.grey.shade200),
+            ],
+          ),
+        ),
       ],
     );
   }

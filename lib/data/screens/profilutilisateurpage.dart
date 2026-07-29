@@ -8,6 +8,8 @@ import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/profile.dart';
 import 'package:tranoo_pro/data/screens/create_sell_moto.dart';
 import 'package:tranoo_pro/data/screens/create_sell2.dart';
+import 'package:tranoo_pro/services/subscription_access_service.dart';
+import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:tranoo_pro/services/user_service.dart';
@@ -814,6 +816,88 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
     );
   }
 
+  String _formatDateForSub(DateTime? date) {
+    if (date == null) return '--';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Future<void> _handleSellPieceWithSubscription() async {
+    final subscriptionService = SubscriptionAccessService();
+    SellerAccessStatus status;
+    try {
+      status = await subscriptionService.getSellerAccessStatus();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible de vérifier l\'abonnement.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    if (status.canCreateArticle) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => CreateSellPage2()),
+      );
+      return;
+    }
+
+    final subtitle = status.freeTrialActive && !status.paidPlanActive
+        ? 'Vous êtes dans le ${status.currentPlanLabel}. Fin de l\'essai: ${_formatDateForSub(status.freeTrialEndsAt)}.'
+        : 'Votre essai gratuit est terminé. Activez un abonnement pour publier des pièces.';
+
+    final goSubscribe = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Row(
+          children: [
+            Icon(Icons.workspace_premium, color: Color(0xFFF8BF13)),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text('Abonnement requis', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Plan actuel: ${status.currentPlanLabel}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text(subtitle),
+            const SizedBox(height: 10),
+            Text('Tarif Plan Pro: ${status.monthlyPriceFcfa} FCFA / mois',
+                style: const TextStyle(color: Color(0xFFB45309))),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Fermer'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF8BF13),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Voir abonnement'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (goSubscribe == true) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SellerSubscriptionPage()),
+      );
+    }
+  }
+
   Widget _buildAccountOptions() {
     final vendeurType = (userData?['vendeurType'] ?? '')
         .toString()
@@ -874,12 +958,7 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
               title: l10n.sellMyPart,
               subtitle: l10n.becomeSellerSubtitle,
               icon: Icons.build,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => CreateSellPage2()),
-                );
-              },
+              onTap: () => _handleSellPieceWithSubscription(),
             ),
           _buildListTile(
             title: l10n.accountDeletion,

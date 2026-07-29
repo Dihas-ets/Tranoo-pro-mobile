@@ -20,6 +20,14 @@ class ChatService {
   Function(String)? onUserOnline;
   Function(String)? onUserOffline;
 
+  // Callback transit missions (mis à jour en temps réel)
+  Function(Map<String, dynamic>)? onTransitUpdate;
+
+  /// Désabonne le callback transit (à appeler dans dispose())
+  void offTransitUpdate(Function(Map<String, dynamic>) fn) {
+    if (onTransitUpdate == fn) onTransitUpdate = null;
+  }
+
   // Initialiser la connexion WebSocket
   Future<void> initializeSocket() async {
     if (_socket != null) return;
@@ -89,6 +97,14 @@ class ChatService {
       print('[ChatService] Utilisateur hors ligne: $data');
       if (onUserOffline != null) {
         onUserOffline!(data['userId']);
+      }
+    });
+
+    // Écouter les mises à jour de missions de transit
+    _socket!.on('transit-mission-update', (data) {
+      print('[ChatService] Transit mission update: $data');
+      if (onTransitUpdate != null && data is Map) {
+        onTransitUpdate!(Map<String, dynamic>.from(data));
       }
     });
   }
