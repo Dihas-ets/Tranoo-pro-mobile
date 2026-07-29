@@ -634,6 +634,8 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
             const SizedBox(height: 20),
             _buildSubscriptionSection(),
             const SizedBox(height: 20),
+            _buildSalesHistorySection(),
+            const SizedBox(height: 20),
             Text(l10n.more,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
@@ -700,6 +702,224 @@ class ProfilUtilisateurPageState extends State<ProfilUtilisateurPage>
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Historique des ventes ───────────────────────────────────────────────
+
+  List<Map<String, dynamic>> _salesHistory = [];
+  bool _salesLoading = false;
+  bool _salesLoaded = false;
+  bool _salesExpanded = false;
+
+  Future<void> _loadSalesHistory() async {
+    if (_salesLoading || _salesLoaded) return;
+    setState(() => _salesLoading = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final token = await user.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: getBaseUrl(),
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      final resp = await dio.get('/articles', queryParameters: {
+        'type': 'voiture',
+        'vendu': 'true',
+      });
+      final data = resp.data;
+      if (data is List && mounted) {
+        setState(() {
+          _salesHistory = data
+              .where((a) => a is Map)
+              .map((a) => Map<String, dynamic>.from(a as Map))
+              .toList();
+          _salesLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _salesLoaded = true);
+    } finally {
+      if (mounted) setState(() => _salesLoading = false);
+    }
+  }
+
+  Widget _buildSalesHistorySection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // En-tête cliquable
+          GestureDetector(
+            onTap: () {
+              setState(() => _salesExpanded = !_salesExpanded);
+              if (!_salesLoaded) _loadSalesHistory();
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, color: Color(0xFF2563EB), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Historique des ventes',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (_salesLoaded && _salesHistory.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDBEAFE),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_salesHistory.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D4ED8),
+                      ),
+                    ),
+                  ),
+                AnimatedRotation(
+                  turns: _salesExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded,
+                      color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          // Contenu dépliable
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 250),
+            crossFadeState: _salesExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: _salesLoading
+                ? const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : _salesHistory.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.only(top: 12),
+                        child: Text(
+                          'Aucune vente pour le moment.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          const SizedBox(height: 12),
+                          ..._salesHistory.map((article) {
+                            final titre = (article['titre'] ?? '').toString();
+                            final prix = article['prix'];
+                            final dateAchat = article['dateAchat'];
+                            final photo = (article['photos'] as List?)
+                                ?.whereType<String>()
+                                .firstOrNull;
+                            final dateLabel = dateAchat != null
+                                ? (() {
+                                    final dt = DateTime.tryParse(dateAchat.toString());
+                                    if (dt == null) return '—';
+                                    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                                  })()
+                                : '—';
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F9FF),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFBAE6FD)),
+                              ),
+                              child: Row(
+                                children: [
+                                  if (photo != null)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Image.network(
+                                        photo,
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            Container(
+                                              width: 48,
+                                              height: 48,
+                                              color: Colors.grey.shade200,
+                                              child: const Icon(Icons.directions_car, size: 24, color: Colors.grey),
+                                            ),
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(Icons.directions_car, size: 24, color: Colors.grey),
+                                    ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          titre,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (prix != null) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${prix.toString()} F CFA',
+                                            style: const TextStyle(
+                                              color: Color(0xFF2563EB),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    dateLabel,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
           ),
         ],
       ),

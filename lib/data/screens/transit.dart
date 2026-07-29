@@ -296,17 +296,13 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
             ),
           ),
           Expanded(
-            child: RefreshIndicator(
-              color: kTransitaireAmber,
-              onRefresh: _loadMissions,
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildMissionList(enCours, 'en_cours'),
-                  _buildMissionList(transferer, 'transferer'),
-                  _buildMissionList(traite, 'traite'),
-                ],
-              ),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildMissionList(enCours, 'en_cours'),
+                _buildMissionList(transferer, 'transferer'),
+                _buildMissionList(traite, 'traite'),
+              ],
             ),
           ),
         ],
@@ -320,20 +316,27 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
       return const Center(child: CircularProgressIndicator());
     }
     if (list.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.5,
-            child: Center(child: Text(l10n.noArticlesInCategory)),
-          ),
-        ],
+      return RefreshIndicator(
+        color: kTransitaireAmber,
+        onRefresh: _loadMissions,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(child: Text(l10n.noArticlesInCategory)),
+            ),
+          ],
+        ),
       );
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: list.length,
+    return RefreshIndicator(
+      color: kTransitaireAmber,
+      onRefresh: _loadMissions,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: list.length,
       itemBuilder: (context, index) {
         final item = _mapMission(list[index]);
         return Card(
@@ -390,7 +393,8 @@ class _TransitState extends State<Transit> with SingleTickerProviderStateMixin {
           ),
         );
       },
-    );
+    ),// ListView.builder
+    );// RefreshIndicator
   }
 
   Widget _buildThumb(String? image) {

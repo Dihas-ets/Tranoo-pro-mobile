@@ -352,7 +352,12 @@ class _AvantHomeState extends State<AvantHome>
         if (user == null) {
           return const Scaffold(
             backgroundColor: Colors.white,
-            body: SizedBox.shrink(),
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFFF8BF13),
+                strokeWidth: 2.5,
+              ),
+            ),
           );
         }
 

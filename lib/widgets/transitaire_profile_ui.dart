@@ -585,8 +585,9 @@ class _TransitaireProfileViewState extends State<TransitaireProfileView>
 }
 
 // ─── Header collapsible ──────────────────────────────────────────────────────
-/// Version compacte par défaut (photo + nom sur une ligne) avec flèche pour
-/// déplier les détails complets (subtitle, location, rating, badge abonné).
+/// La photo de profil reste toujours centrée au-dessus de la zone blanche
+/// (même comportement qu'avant). Seuls les détails (subtitle, location, rating)
+/// se replient via la flèche, libérant de l'espace pour les onglets en dessous.
 class _CollapsibleProfileHeader extends StatelessWidget {
   final String? photoUrl;
   final String initials;
@@ -631,6 +632,15 @@ class _CollapsibleProfileHeader extends StatelessWidget {
           url: photoUrl!,
           fit: BoxFit.cover,
           cloudinaryWidthPx: 800,
+          errorWidget: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF2A3F6B), kTransitaireNavy],
+              ),
+            ),
+          ),
         ),
         Container(
           decoration: BoxDecoration(
@@ -639,7 +649,7 @@ class _CollapsibleProfileHeader extends StatelessWidget {
               end: Alignment.bottomCenter,
               colors: [
                 Colors.black.withOpacity(0.08),
-                Colors.black.withOpacity(0.45),
+                Colors.black.withOpacity(0.3),
               ],
             ),
           ),
@@ -650,163 +660,160 @@ class _CollapsibleProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    // La cover est toujours visible (132px), la photo de profil est
+    // toujours centrée (positionnée à cheval sur cover/blanc).
+    // Seule la zone blanche en dessous (nom + détails) est collapsible.
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        // ── Bande cover (toujours visible, plus petite quand collapsed)
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
-          height: expanded ? 100 : 72,
-          width: double.infinity,
-          child: _coverBackground(),
-        ),
-
-        // ── Zone blanche sous la cover
-        Container(
-          color: Colors.white,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Ligne avatar + nom + flèche (toujours visible)
-              GestureDetector(
-                onTap: onToggle,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                  child: Row(
-                    children: [
-                      // Avatar (petit en collapsed)
-                      GestureDetector(
-                        onTap: () => _showProfilePhotoZoom(
-                          context,
-                          photoUrl: photoUrl,
-                          initials: initials,
-                        ),
-                        child: TransitaireProfileAvatar(
-                          photoUrl: photoUrl,
-                          initials: initials,
-                          premium: premium,
-                          radius: expanded ? 28 : 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: kTransitaireNavy,
-                              ),
-                            ),
-                            if (!expanded && subtitle.isNotEmpty)
-                              Text(
-                                subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      // Flèche toggle
-                      AnimatedRotation(
-                        turns: expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 250),
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: kTransitaireNavy.withOpacity(0.6),
-                          size: 24,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── Détails dépliables
-              AnimatedCrossFade(
-                duration: const Duration(milliseconds: 250),
-                crossFadeState: expanded
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                firstChild: const SizedBox(height: 4, width: double.infinity),
-                secondChild: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Cover toujours visible ──────────────────────────────────
+            SizedBox(
+              height: 132,
+              width: double.infinity,
+              child: _coverBackground(),
+            ),
+            // ── Zone blanche sous la cover (collapsible) ─────────────────
+            Transform.translate(
+              offset: const Offset(0, -16),
+              child: ClipPath(
+                clipper: _ConvexTopClipper(),
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.white,
+                  // Padding top 88 pour laisser la place à l'avatar (qui se positionne
+                  // par-dessus via le Positioned ci-dessous — même logique qu'avant)
+                  padding: const EdgeInsets.fromLTRB(20, 88, 20, 0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      if (subtitle.isNotEmpty)
-                        Text(
-                          subtitle,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                          ),
+                      // Nom — toujours visible
+                      Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: kTransitaireNavy,
                         ),
-                      if (location.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.place_outlined,
-                                size: 14, color: Colors.grey.shade500),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                location,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade500,
+                      ),
+                      // Détails collapsibles ─────────────────────────────
+                      AnimatedCrossFade(
+                        duration: const Duration(milliseconds: 250),
+                        crossFadeState: expanded
+                            ? CrossFadeState.showSecond
+                            : CrossFadeState.showFirst,
+                        firstChild: const SizedBox(
+                          width: double.infinity,
+                          height: 8,
+                        ),
+                        secondChild: Padding(
+                          padding: const EdgeInsets.only(top: 4, bottom: 4),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(height: 3),
+                              if (subtitle.isNotEmpty)
+                                Text(
+                                  subtitle,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (rating > 0) ...[
-                        const SizedBox(height: 8),
-                        TransitaireStarRating(rating: rating),
-                      ] else if (premium) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: kTransitaireAmber.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
+                              const SizedBox(height: 6),
+                              if (location.isNotEmpty)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.place_outlined,
+                                        size: 15,
+                                        color: Colors.grey.shade500),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        location,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              if (rating > 0) ...[
+                                const SizedBox(height: 10),
+                                TransitaireStarRating(rating: rating),
+                              ] else if (premium) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: kTransitaireAmber.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text(
+                                    'Abonné Tranoo',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: kTransitaireNavy,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                          child: const Text(
-                            'Abonné Tranoo',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: kTransitaireNavy,
+                        ),
+                      ),
+                      // ── Flèche toggle centrée en bas ─────────────────
+                      GestureDetector(
+                        onTap: onToggle,
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: AnimatedRotation(
+                            turns: expanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 250),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: kTransitaireNavy.withOpacity(0.5),
+                              size: 26,
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
               ),
-
-              // Séparateur
-              Divider(height: 1, color: Colors.grey.shade200),
-            ],
+            ),
+          ],
+        ),
+        // ── Avatar centré à cheval sur cover/blanc — toujours visible ──────
+        Positioned(
+          top: 66,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: () => _showProfilePhotoZoom(
+                context,
+                photoUrl: photoUrl,
+                initials: initials,
+              ),
+              child: TransitaireProfileAvatar(
+                photoUrl: photoUrl,
+                initials: initials,
+                premium: premium,
+              ),
+            ),
           ),
         ),
       ],

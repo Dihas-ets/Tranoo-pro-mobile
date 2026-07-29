@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:typed_data'; // Added for Uint8List
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui' as ui;
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
@@ -425,6 +426,8 @@ class _UneState extends State<Une> {
             _cloudinaryImageUrls[index] = url;
             _uploadedImagesWeb[index] = null;
           });
+          // Vérification dimensions recommandées
+          _checkImageDimensions(bytes);
         }
         setState(() {
           _isUploadingImage[index] = false;
@@ -435,6 +438,10 @@ class _UneState extends State<Une> {
           _isUploadingImage[index] = true;
         });
         final currentFile = _uploadedImages[index];
+        // Vérification dimensions recommandées
+        if (currentFile != null) {
+          _checkImageDimensions(await currentFile.readAsBytes());
+        }
         final url = currentFile != null
             ? await uploadImageToCloudinary(
                 currentFile,
@@ -451,6 +458,64 @@ class _UneState extends State<Une> {
           _isUploadingImage[index] = false;
         });
       }
+    }
+  }
+
+  /// Vérifie que l'image correspond aux dimensions recommandées pour une pub à la une.
+  /// Ratio cible 16:9, min 800×450 px. Affiche un toast si non conforme.
+  Future<void> _checkImageDimensions(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final img = frame.image;
+      final w = img.width;
+      final h = img.height;
+      img.dispose();
+
+      const minW = 800;
+      const minH = 450;
+      const recommendedRatio = 16.0 / 9.0;
+      final ratio = w / h;
+      final ratioDiff = (ratio - recommendedRatio).abs();
+
+      final List<String> warnings = [];
+      if (w < minW || h < minH) {
+        warnings.add('Résolution trop faible (${w}×${h}px — min ${minW}×${minH})');
+      }
+      if (ratioDiff > 0.15) {
+        warnings.add('Ratio non recommandé (actuel ${ratio.toStringAsFixed(2)} — recommandé 16:9)');
+      }
+
+      if (warnings.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFB45309),
+            duration: const Duration(seconds: 4),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '⚠️ Image non conforme',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                ...warnings.map((w) => Text(
+                  '• $w',
+                  style: const TextStyle(fontSize: 12, color: Colors.white),
+                )),
+                const SizedBox(height: 4),
+                const Text(
+                  'Recommandé : 800×450 px minimum, ratio 16:9',
+                  style: TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      // Ne pas bloquer si la vérification échoue
     }
   }
 

@@ -19,7 +19,12 @@ class CapturedProfileLocation {
 
   static CapturedProfileLocation? fromUserMap(Map<String, dynamic>? data) {
     if (data == null) return null;
-    final adresse = (data['adresse'] ?? '').toString().trim();
+    // Chercher l'adresse dans tous les champs possibles (profil user + article)
+    final adresse = [
+      data['adresse'],
+      data['localisation'],
+      data['lieu'],
+    ].map((v) => (v ?? '').toString().trim()).firstWhere((s) => s.isNotEmpty, orElse: () => '');
     final ville = (data['ville'] ?? '').toString().trim();
     double? lat;
     double? lng;
