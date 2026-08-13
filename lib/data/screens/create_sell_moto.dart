@@ -62,7 +62,6 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
 
   // 3. Informations commerciales
   final _prixController = TextEditingController();
-  int _tranooGainFcfa = SellerGainPricingService.defaultGainMoto;
   String _selectedDevise = 'XOF';
   String? _selectedDisponibilite;
   bool _garantieConstructeur = false;
@@ -122,10 +121,12 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
   bool get _isAnyUploading =>
       _isUploadingImage.any((e) => e) || _isUploadingVideo.any((e) => e);
 
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
-    _loadSellerGainPricing();
+    SellerGainPricingService.refreshFromApi();
     final init = widget.initialData;
     if (widget.editMode && init != null) {
       _hydrateFromInitialData();
@@ -152,19 +153,18 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
     }
   }
 
-  Future<void> _loadSellerGainPricing() async {
-    final gain = await SellerGainPricingService.fetchGainForVehicle(
-      SellerVehicleType.moto,
-    );
-    if (!mounted) return;
-    setState(() => _tranooGainFcfa = gain);
-  }
-
   Future<void> _openPriceDialog() async {
     await showSellerPriceGainDialog(
       context: context,
       controller: _prixController,
-      tranooGainFcfa: _tranooGainFcfa,
+      computeTranooGain: (price) => SellerGainPricingService.computeMotoGainFcfa(
+        price,
+        typeMoto: _selectedTypeMoto,
+      ),
+      describeGainRule: (price) => SellerGainPricingService.describeMotoGainRule(
+        price,
+        typeMoto: _selectedTypeMoto,
+      ),
       vehicleLabel: 'moto',
     );
     if (mounted) setState(() {});
@@ -426,6 +426,10 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
   }
 
   Future<void> _onValidate() async {
+    if (widget.editMode) {
+      await _saveEditedMoto();
+      return;
+    }
     if (!_validateForm()) return;
 
     final images =
@@ -475,6 +479,96 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _saveEditedMoto() async {
+    final id = (widget.editArticleId ?? '').toString();
+    if (id.isEmpty) return;
+    if (!_validateForm()) return;
+
+    setState(() => _isSaving = true);
+
+    final images =
+        _cloudinaryImageUrls.whereType<String>().where((e) => e.isNotEmpty).toList();
+    final videos =
+        _cloudinaryVideoUrls.whereType<String>().where((e) => e.isNotEmpty).toList();
+    final marque = _marqueController.text.trim();
+    final modele = _modeleController.text.trim();
+    final titre = '$marque $modele'.trim();
+    final lieu = _effectiveLieu;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+      if (token == null) return;
+
+      final payload = {
+        'type': 'moto',
+        'titre': titre,
+        'description': _descriptionController.text.trim(),
+        'marque': marque,
+        'modele': modele,
+        'annee': _anneeController.text.trim(),
+        'prix': _prixController.text.trim(),
+        'condition': 'Nouveau',
+        'cylindre': _cylindreeController.text.trim(),
+        'lieu': lieu,
+        'localisation': lieu,
+        if (_fournisseurPayload != null) 'fournisseur': _fournisseurPayload,
+        'photos': images,
+        'video': videos.isNotEmpty ? videos.first : null,
+        'entreprise': _entreprise,
+        if (_selectedTypeMoto != null) 'typeMoto': _selectedTypeMoto,
+        if (_selectedTypeMoteur != null) 'typeMoteur': _selectedTypeMoteur,
+        if (_puissanceController.text.trim().isNotEmpty)
+          'puissance': _puissanceController.text.trim(),
+        if (_selectedTransmission != null) 'transmission': _selectedTransmission,
+        if (_selectedDemarrage != null) 'demarrage': _selectedDemarrage,
+        if (_selectedRefroidissement != null)
+          'refroidissement': _selectedRefroidissement,
+        if (_capaciteReservoirController.text.trim().isNotEmpty)
+          'capaciteReservoir': _capaciteReservoirController.text.trim(),
+        if (_autonomieController.text.trim().isNotEmpty)
+          'autonomie': _autonomieController.text.trim(),
+        if (_selectedDisponibilite != null)
+          'disponibilite': _selectedDisponibilite,
+        'garantieConstructeur': _garantieConstructeur,
+        if (_garantieConstructeur) 'dureeGarantie': _dureeGarantieLabel,
+        if (_equipementsSelectionnes.isNotEmpty)
+          'equipements': _equipementsSelectionnes.toList(),
+        'devise': _selectedDevise,
+      };
+
+      final resp = await http.put(
+        Uri.parse('${UserService().dio.options.baseUrl}/articles/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (!mounted) return;
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.changesSaved)),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.saveErrorStatus(resp.statusCode.toString())),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.saveErrorGeneric(e.toString()))),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Widget _buildLabel(String text, {bool required = true}) {
@@ -546,6 +640,14 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
                   decimal: true,
                 ),
                 inputFormatters: decimalOptionalInputFormatters,
+              ),
+              buildSellerNetPreview(
+                priceText: _prixController.text,
+                computeTranooGain: (price) =>
+                    SellerGainPricingService.computeMotoGainFcfa(
+                  price,
+                  typeMoto: _selectedTypeMoto,
+                ),
               ),
             ],
           ),
@@ -1064,14 +1166,20 @@ class _CreateSellMotoPageState extends State<CreateSellMotoPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isAnyUploading ? null : _onValidate,
+                  onPressed: (_isAnyUploading || _isSaving) ? null : _onValidate,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFCC00),
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: Text(
-                    _isAnyUploading ? 'Upload en cours...' : 'Aperçu',
+                    _isSaving
+                        ? 'Sauvegarde...'
+                        : _isAnyUploading
+                            ? 'Upload en cours...'
+                            : widget.editMode
+                                ? 'Sauvegarder'
+                                : 'Aperçu',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,

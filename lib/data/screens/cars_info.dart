@@ -224,6 +224,8 @@ class _CarsinfoState extends State<CarsInfo> {
     } catch (_) {}
   }
 
+  bool _isSpecsExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -315,10 +317,25 @@ class _CarsinfoState extends State<CarsInfo> {
       WhatsappHelper.phoneFromArticleSupplier(fournisseur: widget.fournisseur) ??
       WhatsappHelper.supportDigits;
 
-  Future<void> _openWhatsApp() async {
+  String _buyWhatsAppMessage(AppLocalizations l10n) {
+    final label = WhatsappHelper.articleListingLabel(
+      titre: widget.titre,
+      marque: widget.marque,
+      modele: widget.modele,
+      fallback: l10n.defaultVehicleTitle,
+    );
+    final id = (widget.id ?? '').trim();
+    if (id.isNotEmpty) {
+      return l10n.whatsappCarInterestWithRef(label, id);
+    }
+    return l10n.whatsappCarInterestNoRef(label);
+  }
+
+  Future<void> _openWhatsApp({String? message}) async {
     await WhatsappHelper.openChat(
       context,
       phone: _whatsAppPhone,
+      message: message,
       unavailableMessage: l10n.sellerPhoneUnavailable,
       cannotOpenMessage: l10n.cannotOpenWhatsApp,
     );
@@ -1290,7 +1307,58 @@ class _CarsinfoState extends State<CarsInfo> {
   }
 
   Widget _buildSpecifications(double screenWidth) {
-    return _buildSpecGrid(_buildAllSpecCards());
+    final allCards = _buildAllSpecCards();
+    final hasMore = allCards.length > 4;
+    final visibleCards = (_isSpecsExpanded || !hasMore)
+        ? allCards
+        : allCards.take(4).toList();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildSpecGrid(visibleCards),
+        if (hasMore) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _isSpecsExpanded = !_isSpecsExpanded;
+                });
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isSpecsExpanded ? 'Voir moins' : 'Voir plus',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1B2B4B),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    AnimatedRotation(
+                      turns: _isSpecsExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 220),
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 22,
+                        color: Color(0xFF1B2B4B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   // Map des couleurs
@@ -1659,7 +1727,9 @@ class _CarsinfoState extends State<CarsInfo> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: _openWhatsApp,
+              onPressed: () async {
+                await _openWhatsApp(message: _buyWhatsAppMessage(l10n));
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber,
                 padding: const EdgeInsets.symmetric(vertical: 16),

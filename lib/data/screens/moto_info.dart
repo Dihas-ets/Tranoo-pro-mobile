@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:http/http.dart' as http;
 import 'movie.dart';
@@ -22,6 +22,7 @@ import 'package:tranoo_pro/widgets/spec_info_card.dart';
 import 'package:tranoo_pro/utils/article_view_helper.dart';
 import 'package:tranoo_pro/utils/whatsapp_helper.dart';
 import 'package:tranoo_pro/widgets/cached_media_image.dart';
+import 'connexion_page.dart';
 
 class MotoInfo extends StatefulWidget {
   final String? id;
@@ -205,6 +206,7 @@ class _MotoInfoState extends State<MotoInfo> {
   late ConfettiController _confettiController;
   bool _isOnline = false;
   bool _isPublishing = false;
+  bool _isSpecsExpanded = false;
   int _verificationPrice = 20000;
   String _formatFcfa(int value) {
     final priceStr = value.toString();
@@ -327,10 +329,25 @@ class _MotoInfoState extends State<MotoInfo> {
       WhatsappHelper.phoneFromArticleSupplier(fournisseur: widget.fournisseur) ??
       WhatsappHelper.supportDigits;
 
-  Future<void> _openWhatsApp() async {
+  String _buyWhatsAppMessage(AppLocalizations l10n) {
+    final label = WhatsappHelper.articleListingLabel(
+      titre: widget.titre,
+      marque: widget.marque,
+      modele: widget.modele,
+      fallback: l10n.defaultMotoTitle,
+    );
+    final id = (widget.id ?? '').trim();
+    if (id.isNotEmpty) {
+      return l10n.whatsappMotoInterestWithRef(label, id);
+    }
+    return l10n.whatsappMotoInterestNoRef(label);
+  }
+
+  Future<void> _openWhatsApp({String? message}) async {
     await WhatsappHelper.openChat(
       context,
       phone: _whatsAppPhone,
+      message: message,
       unavailableMessage: l10n.sellerPhoneUnavailable,
       cannotOpenMessage: l10n.cannotOpenWhatsApp,
     );
@@ -951,7 +968,58 @@ class _MotoInfoState extends State<MotoInfo> {
   }
 
   Widget _buildSpecifications(double screenWidth) {
-    return _buildSpecGrid(_buildAllSpecCards());
+    final allCards = _buildAllSpecCards();
+    final hasMore = allCards.length > 4;
+    final visibleCards = (_isSpecsExpanded || !hasMore)
+        ? allCards
+        : allCards.take(4).toList();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildSpecGrid(visibleCards),
+        if (hasMore) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _isSpecsExpanded = !_isSpecsExpanded;
+                });
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isSpecsExpanded ? 'Voir moins' : 'Voir plus',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1B2B4B),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    AnimatedRotation(
+                      turns: _isSpecsExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 220),
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 22,
+                        color: Color(0xFF1B2B4B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   // Map des couleurs
@@ -1140,208 +1208,6 @@ class _MotoInfoState extends State<MotoInfo> {
     final userService = UserService();
     final isVendeur = userService.currentRole == UserRole.vendeur;
 
-    // Nouveaux boutons pour les non-vendeurs (chauffeurs) : vérification + contact WhatsApp
-    if (widget.fromPub == true || !isVendeur) {
-      return Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (!_isEnConsommationChecked && !_isEnTransitChecked) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Veuillez choisir un mode de livraison (En Consommation ou En Transit).',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                if (_selectedCountry == null || _selectedCountry!.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.selectLocationPlease),
-                    ),
-                  );
-                  return;
-                }
-
-                final article = {
-                  '_id': widget.id, // Doit être l'ID Mongo réel
-                  'titre': widget.titre,
-                  'description': widget.description,
-                  'marque': widget.marque,
-                  'modele': widget.modele,
-                  'annee': widget.annee,
-                  'prix': widget.prix,
-                  'condition': widget.condition,
-                  'boiteVitesse': widget.boiteVitesse,
-                  'carburant': widget.carburant,
-                  'climatiseur': widget.climatiseur,
-                  'distance': widget.distance,
-                  'sieges': widget.sieges,
-                  'portes': widget.portes,
-                  'cylindre': widget.cylindre,
-                  'couleur': widget.couleur,
-                  'dedouanement': widget.dedouanement,
-                  'photos': widget.images,
-                  'video': _primaryVideo,
-                  'entreprise': widget.entreprise,
-                  'type': 'moto',
-                  'modeLivraison':
-                      _isEnTransitChecked ? 'transit' : 'consommation',
-                  'paysDestination': _selectedCountry,
-                  'detailsSupplementaires': _detailsController.text.trim(),
-                };
-                log('[PUB][verif] Article payload: $article');
-
-                showDialog(
-                  context: context,
-                  builder: (ctx) {
-                    return AlertDialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      contentPadding: const EdgeInsets.all(20),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Image.asset(
-                            'assets/images/smiley.png',
-                            height: 80,
-                            width: 80,
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Contrôle en cours',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          RichText(
-                            textAlign: TextAlign.center,
-                            text: const TextSpan(
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 14,
-                                height: 1.5,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text:
-                                      'Les vérifications seront effectuées et vous seront envoyées sous ',
-                                ),
-                                TextSpan(
-                                  text: '10 jours',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFFFA000),
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: '. Pour démarrer, veuillez payer les ',
-                                ),
-                                TextSpan(
-                                  text: 'frais de vérification',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF00A86B),
-                                  ),
-                                ),
-                                TextSpan(text: '.'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _verificationPriceLabel,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF00A86B),
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        VerificationPaymentScreen(
-                                      articleId: widget.id.toString(),
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFFCC00),
-                                foregroundColor: Colors.black,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child:
-                                  Text(l10n.payVerificationFees),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Center(
-                child: Text(
-                  'Demander une vérification',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _openWhatsApp,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Acheter cette voiture',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
     if (widget.fromPub == true) {
       // Toujours afficher uniquement le bouton Acheter
       return SizedBox(
@@ -1501,7 +1367,7 @@ class _MotoInfoState extends State<MotoInfo> {
             ),
           ),
           child: const Text(
-            'Acheter cette voiture',
+            'Acheter cette moto',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -1512,157 +1378,22 @@ class _MotoInfoState extends State<MotoInfo> {
       );
     }
     if (!isVendeur) {
-      // Pour les chauffeurs, un seul bouton
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () {
-            if (!_isEnConsommationChecked && !_isEnTransitChecked) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Veuillez choisir un mode de livraison (En Consommation ou En Transit).',
-                  ),
+          onPressed: () async {
+            final firebaseUser = FirebaseAuth.instance.currentUser;
+            if (firebaseUser == null) {
+              if (!mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ConnexionPage(),
                 ),
               );
               return;
             }
-            if (_selectedCountry == null || _selectedCountry!.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.selectLocationPlease)),
-              );
-              return;
-            }
-
-            // Créer l'objet article à partir des propriétés du widget
-            final article = {
-              '_id': widget.id, // Doit être l'ID Mongo réel
-              'titre': widget.titre,
-              'description': widget.description,
-              'marque': widget.marque,
-              'modele': widget.modele,
-              'annee': widget.annee,
-              'prix': widget.prix,
-              'condition': widget.condition,
-              'boiteVitesse': widget.boiteVitesse,
-              'carburant': widget.carburant,
-              'climatiseur': widget.climatiseur,
-              'distance': widget.distance,
-              'sieges': widget.sieges,
-              'portes': widget.portes,
-              'cylindre': widget.cylindre,
-              'couleur': widget.couleur,
-              'dedouanement': widget.dedouanement,
-              'photos': widget.images,
-              'video': _primaryVideo,
-              'entreprise': widget.entreprise,
-              'type': 'moto',
-              // Pré-sélections pour payement
-              'modeLivraison': _isEnTransitChecked ? 'transit' : 'consommation',
-              'paysDestination': _selectedCountry,
-              'detailsSupplementaires': _detailsController.text.trim(),
-            };
-            log('[PUB][standard] Article payload: $article');
-
-            showDialog(
-              context: context,
-              builder: (ctx) {
-                return AlertDialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  contentPadding: const EdgeInsets.all(20),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        'assets/images/smiley.png',
-                        height: 80,
-                        width: 80,
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Contrôle en cours',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      RichText(
-                        textAlign: TextAlign.center,
-                        text: const TextSpan(
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 14,
-                            height: 1.5,
-                          ),
-                          children: [
-                            TextSpan(
-                              text:
-                                  'Les vérifications seront effectuées et vous seront envoyées sous ',
-                            ),
-                            TextSpan(
-                              text: '10 jours',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFFFA000),
-                              ),
-                            ),
-                            TextSpan(
-                              text: '. Pour démarrer, veuillez payer les ',
-                            ),
-                            TextSpan(
-                              text: 'frais de vérification',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF00A86B),
-                              ),
-                            ),
-                            TextSpan(text: '.'),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _verificationPriceLabel,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF00A86B),
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => VerificationPaymentScreen(
-                                  articleId: widget.id.toString(),
-                                ),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFCC00),
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: Text(l10n.payVerificationFees),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
+            await _openWhatsApp(message: _buyWhatsAppMessage(l10n));
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.amber,
@@ -1672,18 +1403,19 @@ class _MotoInfoState extends State<MotoInfo> {
             ),
           ),
           child: const Text(
-            'Acheter cette voiture',
+            'Acheter cette moto',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.black,
             ),
+            textAlign: TextAlign.center,
           ),
         ),
       );
-    } else {
-      // Pour les vendeurs, deux boutons
-      return Column(
+    }
+
+    return Column(
         children: [
           // Bouton principal "Vendre ma voiture"
           SizedBox(
@@ -1831,7 +1563,6 @@ class _MotoInfoState extends State<MotoInfo> {
           ),
         ],
       );
-    }
   }
 }
 

@@ -11,6 +11,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:tranoo_pro/config/backend_config.dart' as config;
+import 'package:tranoo_pro/utils/auth_dialog.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -252,13 +253,18 @@ class _SettingsPageState extends State<SettingsPage> {
         builder: (context, auth, _) {
           return ElevatedButton(
             onPressed: () async {
-              await auth.logout();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ConnexionPage()),
-                  (route) => false,
-                );
+              final confirm = await showLogoutConfirmationDialog(context);
+              if (confirm && context.mounted) {
+                await auth.logout();
+                if (context.mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ConnexionPage(),
+                    ),
+                    (route) => false,
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(

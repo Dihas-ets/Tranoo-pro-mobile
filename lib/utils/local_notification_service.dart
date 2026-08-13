@@ -139,7 +139,11 @@ class LocalNotificationService {
     );
   }
 
-  static Future<void> showNotification(String title, String body) async {
+  static Future<void> showNotification(
+    String title,
+    String body, {
+    String? payload,
+  }) async {
     await initialize();
 
     const androidDetails = AndroidNotificationDetails(
@@ -170,6 +174,7 @@ class LocalNotificationService {
       title: title,
       body: body,
       notificationDetails: details,
+      payload: payload,
     );
   }
 

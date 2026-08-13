@@ -13,6 +13,7 @@ import 'package:tranoo_pro/providers/auth_provider.dart' as local_auth;
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 import 'package:tranoo_pro/data/screens/seller_subscription_page.dart';
+import 'package:tranoo_pro/utils/auth_dialog.dart';
 import 'package:tranoo_pro/utils/local_data_cache.dart';
 
 class ProfilUtilisateur2 extends StatefulWidget {
@@ -323,14 +324,17 @@ class _ProfilUtilisateur2State extends State<ProfilUtilisateur2> {
           );
         },
         onLogout: () async {
-          await Provider.of<local_auth.AuthProvider>(context, listen: false)
-              .logout();
-          if (!context.mounted) return;
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const ConnexionPage()),
-            (route) => false,
-          );
+          final confirm = await showLogoutConfirmationDialog(context);
+          if (confirm && context.mounted) {
+            await Provider.of<local_auth.AuthProvider>(context, listen: false)
+                .logout();
+            if (!context.mounted) return;
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const ConnexionPage()),
+              (route) => false,
+            );
+          }
         },
         onDeleteAccount: _deleteAccount,
         settingsExtra: Container(

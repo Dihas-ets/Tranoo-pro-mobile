@@ -64,7 +64,6 @@ class _CreateSellPageState extends State<CreateSellPage> {
   final TextEditingController _distanceController = TextEditingController();
   final TextEditingController _siegesController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  int _tranooGainFcfa = SellerGainPricingService.defaultGainVoiture;
   String? _selectedCondition; // Gardé en String pour "Nouveau" et "Occasion"
   String? _selectedModel; // Modèle
   String? _selectedMarques;
@@ -212,7 +211,7 @@ class _CreateSellPageState extends State<CreateSellPage> {
   @override
   void initState() {
     super.initState();
-    _loadSellerGainPricing();
+    SellerGainPricingService.refreshFromApi();
     final init = widget.initialData;
     if (widget.editMode && init != null) {
       _titleController.text = (init['titre'] ?? '').toString();
@@ -270,19 +269,12 @@ class _CreateSellPageState extends State<CreateSellPage> {
     }
   }
 
-  Future<void> _loadSellerGainPricing() async {
-    final gain = await SellerGainPricingService.fetchGainForVehicle(
-      SellerVehicleType.car,
-    );
-    if (!mounted) return;
-    setState(() => _tranooGainFcfa = gain);
-  }
-
   Future<void> _openPriceDialog() async {
     await showSellerPriceGainDialog(
       context: context,
       controller: _priceController,
-      tranooGainFcfa: _tranooGainFcfa,
+      computeTranooGain: SellerGainPricingService.computeCarGainFcfa,
+      describeGainRule: SellerGainPricingService.describeCarGainRule,
       vehicleLabel: 'voiture',
     );
     if (mounted) setState(() {});
@@ -1907,6 +1899,11 @@ class _CreateSellPageState extends State<CreateSellPage> {
                               borderSide: BorderSide.none,
                             ),
                           ),
+                        ),
+                        buildSellerNetPreview(
+                          priceText: _priceController.text,
+                          computeTranooGain:
+                              SellerGainPricingService.computeCarGainFcfa,
                         ),
                       ],
                     ),

@@ -273,7 +273,10 @@ void _showProfilePhotoZoom(
 }) {
   showGeneralDialog(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.88),
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (ctx, _, __) => SafeArea(
       child: Stack(
         alignment: Alignment.center,
@@ -660,18 +663,22 @@ class _CollapsibleProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // La cover est toujours visible (132px), la photo de profil est
-    // toujours centrée (positionnée à cheval sur cover/blanc).
-    // Seule la zone blanche en dessous (nom + détails) est collapsible.
+    final double coverHeight = expanded ? 132.0 : 48.0;
+    final double avatarTop = expanded ? 66.0 : 12.0;
+    final double avatarRadius = expanded ? 50.0 : 32.0;
+    final double topPadding = expanded ? 88.0 : 44.0;
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Cover toujours visible ──────────────────────────────────
-            SizedBox(
-              height: 132,
+            // ── Cover (se compresse au clic sur la flèche) ──────────────
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeInOutCubic,
+              height: coverHeight,
               width: double.infinity,
               child: _coverBackground(),
             ),
@@ -680,21 +687,21 @@ class _CollapsibleProfileHeader extends StatelessWidget {
               offset: const Offset(0, -16),
               child: ClipPath(
                 clipper: _ConvexTopClipper(),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeInOutCubic,
                   width: double.infinity,
                   color: Colors.white,
-                  // Padding top 88 pour laisser la place à l'avatar (qui se positionne
-                  // par-dessus via le Positioned ci-dessous — même logique qu'avant)
-                  padding: const EdgeInsets.fromLTRB(20, 88, 20, 0),
+                  padding: EdgeInsets.fromLTRB(20, topPadding, 20, 0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Nom — toujours visible
+                      // Nom
                       Text(
                         name,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 21,
+                        style: TextStyle(
+                          fontSize: expanded ? 21 : 17,
                           fontWeight: FontWeight.w800,
                           color: kTransitaireNavy,
                         ),
@@ -707,7 +714,7 @@ class _CollapsibleProfileHeader extends StatelessWidget {
                             : CrossFadeState.showFirst,
                         firstChild: const SizedBox(
                           width: double.infinity,
-                          height: 8,
+                          height: 4,
                         ),
                         secondChild: Padding(
                           padding: const EdgeInsets.only(top: 4, bottom: 4),
@@ -783,8 +790,8 @@ class _CollapsibleProfileHeader extends StatelessWidget {
                             duration: const Duration(milliseconds: 250),
                             child: Icon(
                               Icons.keyboard_arrow_down_rounded,
-                              color: kTransitaireNavy.withOpacity(0.5),
-                              size: 26,
+                              color: kTransitaireNavy.withOpacity(0.6),
+                              size: 28,
                             ),
                           ),
                         ),
@@ -796,9 +803,11 @@ class _CollapsibleProfileHeader extends StatelessWidget {
             ),
           ],
         ),
-        // ── Avatar centré à cheval sur cover/blanc — toujours visible ──────
-        Positioned(
-          top: 66,
+        // ── Avatar centré se positionnant dynamiquement ──────────────────────
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOutCubic,
+          top: avatarTop,
           left: 0,
           right: 0,
           child: Center(
@@ -811,6 +820,7 @@ class _CollapsibleProfileHeader extends StatelessWidget {
               child: TransitaireProfileAvatar(
                 photoUrl: photoUrl,
                 initials: initials,
+                radius: avatarRadius,
                 premium: premium,
               ),
             ),
@@ -1098,19 +1108,9 @@ class _DetailsTab extends StatelessWidget {
             title: l10n.account,
             items: [
               _SettingsItem(
-                icon: Icons.person_outline,
-                label: l10n.editProfile,
-                onTap: onEditProfile,
-              ),
-              _SettingsItem(
                 icon: Icons.card_membership_outlined,
                 label: l10n.forwarderSubscription,
                 onTap: onOpenSubscription,
-              ),
-              _SettingsItem(
-                icon: Icons.history,
-                label: l10n.transitHistoryTitle,
-                onTap: onOpenHistory,
               ),
               _SettingsItem(
                 icon: Icons.notifications_outlined,

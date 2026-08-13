@@ -1713,6 +1713,33 @@
       }
     }
   },
+  "whatsappCarInterestWithRef": "Bonjour Tranoo, je souhaite acheter la voiture « {title} » (réf. {articleId}).",
+  "@whatsappCarInterestWithRef": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "articleId": { "type": "String" }
+    }
+  },
+  "whatsappCarInterestNoRef": "Bonjour Tranoo, je souhaite acheter la voiture « {title} ».",
+  "@whatsappCarInterestNoRef": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "whatsappMotoInterestWithRef": "Bonjour Tranoo, je souhaite acheter la moto « {title} » (réf. {articleId}).",
+  "@whatsappMotoInterestWithRef": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "articleId": { "type": "String" }
+    }
+  },
+  "whatsappMotoInterestNoRef": "Bonjour Tranoo, je souhaite acheter la moto « {title} ».",
+  "@whatsappMotoInterestNoRef": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "defaultMotoTitle": "cette moto",
   "defaultVehicleTitle": "véhicule",
   "cannotLoadOrders": "Impossible de charger vos commandes",
   "noOrdersYetHint": "Vous n'avez pas encore passé de commande",
@@ -2226,6 +2253,7 @@
   "cannotOpenDocument": "Impossible d'ouvrir le document",
   "featureNoLongerAvailable": "Cette fonctionnalité n'est plus disponible",
   "articleNotFound": "Article introuvable",
+  "articleNoLongerOnline": "Cette annonce n'est plus en ligne.",
   "sessionExpiredReconnect": "Session expirée. Reconnectez-vous.",
   "cannotLoadProposal": "Impossible de charger la proposition.",
   "searchDetails": "Détails de la recherche",

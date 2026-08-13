@@ -1713,6 +1713,33 @@
       }
     }
   },
+  "whatsappCarInterestWithRef": "مرحباً Tranoo، أرغب في شراء السيارة « {title} » (مرجع {articleId}).",
+  "@whatsappCarInterestWithRef": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "articleId": { "type": "String" }
+    }
+  },
+  "whatsappCarInterestNoRef": "مرحباً Tranoo، أرغب في شراء السيارة « {title} ».",
+  "@whatsappCarInterestNoRef": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "whatsappMotoInterestWithRef": "مرحباً Tranoo، أرغب في شراء الدراجة « {title} » (مرجع {articleId}).",
+  "@whatsappMotoInterestWithRef": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "articleId": { "type": "String" }
+    }
+  },
+  "whatsappMotoInterestNoRef": "مرحباً Tranoo، أرغب في شراء الدراجة « {title} ».",
+  "@whatsappMotoInterestNoRef": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "defaultMotoTitle": "هذه الدراجة",
   "defaultVehicleTitle": "مركبة",
   "cannotLoadOrders": "تعذر تحميل طلباتك",
   "noOrdersYetHint": "لم تقم بأي طلب بعد",
@@ -2226,6 +2253,7 @@
   "cannotOpenDocument": "تعذر فتح المستند",
   "featureNoLongerAvailable": "هذه الميزة لم تعد متاحة",
   "articleNotFound": "المنتج غير موجود",
+  "articleNoLongerOnline": "هذا الإعلان لم يعد متاحاً.",
   "sessionExpiredReconnect": "انتهت الجلسة. سجّل الدخول مجدداً.",
   "cannotLoadProposal": "تعذر تحميل العرض.",
   "searchDetails": "تفاصيل البحث",

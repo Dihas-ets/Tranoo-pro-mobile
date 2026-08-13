@@ -3440,6 +3440,29 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String whatsappCarInterestWithRef(String title, String articleId) {
+    return 'مرحباً Tranoo، أرغب في شراء السيارة « $title » (مرجع $articleId).';
+  }
+
+  @override
+  String whatsappCarInterestNoRef(String title) {
+    return 'مرحباً Tranoo، أرغب في شراء السيارة « $title ».';
+  }
+
+  @override
+  String whatsappMotoInterestWithRef(String title, String articleId) {
+    return 'مرحباً Tranoo، أرغب في شراء الدراجة « $title » (مرجع $articleId).';
+  }
+
+  @override
+  String whatsappMotoInterestNoRef(String title) {
+    return 'مرحباً Tranoo، أرغب في شراء الدراجة « $title ».';
+  }
+
+  @override
+  String get defaultMotoTitle => 'هذه الدراجة';
+
+  @override
   String get defaultVehicleTitle => 'مركبة';
 
   @override
@@ -4210,6 +4233,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get articleNotFound => 'المنتج غير موجود';
+
+  @override
+  String get articleNoLongerOnline => 'هذا الإعلان لم يعد متاحاً.';
 
   @override
   String get sessionExpiredReconnect => 'انتهت الجلسة. سجّل الدخول مجدداً.';

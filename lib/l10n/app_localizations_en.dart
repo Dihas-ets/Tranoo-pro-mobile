@@ -3470,6 +3470,29 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String whatsappCarInterestWithRef(String title, String articleId) {
+    return 'Hello Tranoo, I would like to buy the car \"$title\" (ref. $articleId).';
+  }
+
+  @override
+  String whatsappCarInterestNoRef(String title) {
+    return 'Hello Tranoo, I would like to buy the car \"$title\".';
+  }
+
+  @override
+  String whatsappMotoInterestWithRef(String title, String articleId) {
+    return 'Hello Tranoo, I would like to buy the motorcycle \"$title\" (ref. $articleId).';
+  }
+
+  @override
+  String whatsappMotoInterestNoRef(String title) {
+    return 'Hello Tranoo, I would like to buy the motorcycle \"$title\".';
+  }
+
+  @override
+  String get defaultMotoTitle => 'this motorcycle';
+
+  @override
   String get defaultVehicleTitle => 'vehicle';
 
   @override
@@ -4242,6 +4265,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get articleNotFound => 'Item not found';
+
+  @override
+  String get articleNoLongerOnline => 'This listing is no longer online.';
 
   @override
   String get sessionExpiredReconnect => 'Session expired. Sign in again.';

@@ -30,6 +30,7 @@ import 'package:tranoo_pro/utils/feexpay_choice_callback_page.dart';
 import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
 import 'package:tranoo_pro/services/alert_launch_bootstrap.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
+import 'package:tranoo_pro/utils/notification_tap_router.dart';
 import 'package:tranoo_pro/services/alert_message_utils.dart';
 // import 'package:flutter/services.dart';
 import 'package:tranoo_pro/config/backend_config.dart';
@@ -151,7 +152,9 @@ class NotificationService {
             _openAlertNotificationFromTap(initialMessage);
           });
         } else {
-          _handleNotificationTap(initialMessage);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _handleNotificationTap(initialMessage);
+          });
         }
       }
 
@@ -230,68 +233,43 @@ class NotificationService {
         LocalNotificationService.showNotification(
           push.title,
           push.body,
+          payload: 'fcm:${jsonEncode(message.data)}',
         );
       }
     }
   }
 
   void _openAlertNotificationFromTap(RemoteMessage message) {
-    final notificationId = message.data['notificationId']?.toString();
-    if (notificationId == null || notificationId.isEmpty) {
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const Notifications()),
-      );
+    final type = (message.data['type'] ?? '').toString();
+    final action = (message.data['action'] ?? '').toString();
+    if (type == 'proposition_alerte' ||
+        action == 'view_proposal' ||
+        action == 'view_article') {
+      _handleNotificationTap(message);
       return;
     }
+    final notificationId = message.data['notificationId']?.toString();
     navigatorKey.currentState?.push(
       MaterialPageRoute(
-        builder: (_) => Notifications(openNotificationId: notificationId),
+        builder: (_) => Notifications(
+          openNotificationId:
+              (notificationId != null && notificationId.isNotEmpty)
+                  ? notificationId
+                  : null,
+        ),
       ),
     );
   }
 
   void _handleNotificationTap(RemoteMessage message) {
-    // Navigation vers une page spécifique selon le type de notification
     _logger.info(
       'Gestion du tap sur notification: ${message.notification?.title}',
     );
-
-    // Navigation selon le type de notification
-    if (message.data.containsKey('type')) {
-      switch (message.data['type']) {
-        case 'tricycle':
-          // Ouvrir la page chauffeur tricycle, avec le contact concerné
-          final contactId = message.data['contactId'];
-          _logger.info(
-              'Navigation vers ChauffeurTricycleHome pour contact $contactId');
-          NotificationService.navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (context) =>
-                  ChauffeurTricycleHomePage(initialContactId: contactId),
-            ),
-          );
-          break;
-        case 'publicite':
-          _logger.info('Navigation vers publicités');
-          break;
-        case 'article':
-          _logger.info('Navigation vers articles');
-          break;
-        case 'system':
-          _logger.info('Notification système: ${message.notification?.body}');
-          break;
-        case 'alerte':
-          _openAlertNotificationFromTap(message);
-          break;
-        default:
-          if (AlertIncomingCallService.isAlertMessage(message)) {
-            _openAlertNotificationFromTap(message);
-          } else {
-            _logger.info('Navigation par défaut');
-          }
-          break;
-      }
-    }
+    NotificationTapRouter.openFromRemoteMessage(
+      NotificationService.navigatorKey.currentContext,
+      message,
+      navigatorKey: NotificationService.navigatorKey,
+    );
   }
 }
 
@@ -573,30 +551,25 @@ class SplashFlow extends StatefulWidget {
 class _SplashFlowState extends State<SplashFlow> {
   bool _showApp = false;
   Widget? _destination;
-  bool _transitioning = false;
 
   @override
   void initState() {
     super.initState();
-    // Filet : si la vidéo ne signale jamais la fin (bug codec Samsung, etc.)
-    Future.delayed(const Duration(seconds: 14), () {
-      if (!mounted || _showApp) return;
-      _goToApp();
-    });
+    _goToApp();
   }
 
   Future<void> _goToApp() async {
-    if (_transitioning || !mounted) return;
-    _transitioning = true;
     try {
       final dest = await AppBootstrap.resolveEntryWidget(context);
       if (!mounted) return;
+      FlutterNativeSplash.remove();
       setState(() {
         _destination = dest;
         _showApp = true;
       });
     } catch (_) {
       if (!mounted) return;
+      FlutterNativeSplash.remove();
       setState(() {
         _destination = AppBootstrap.fallbackEntry();
         _showApp = true;
@@ -609,7 +582,19 @@ class _SplashFlowState extends State<SplashFlow> {
     if (_showApp) {
       return _destination ?? AppBootstrap.fallbackEntry();
     }
-    return VideoSplashScreen(onFinished: _goToApp);
+    return const Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: Color(0xFF1B2B4B),
+          ),
+        ),
+      ),
+    );
   }
 }
 

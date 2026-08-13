@@ -28,6 +28,7 @@ import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
 import 'package:tranoo_pro/data/screens/profil3.dart';
 import 'package:tranoo_pro/data/screens/settings_type_vendeur_page.dart';
 import 'package:tranoo_pro/services/user_service.dart';
+import 'package:tranoo_pro/utils/auth_dialog.dart';
 import 'package:tranoo_pro/utils/page_refresh_registry.dart';
 import 'package:tranoo_pro/main.dart' show NotificationService;
 import 'package:tranoo_pro/widgets/alert_incoming_call_overlay.dart';
@@ -640,10 +641,19 @@ class _AvantHomeState extends State<AvantHome>
                                   context,
                                   text: l10n.logout,
                                   onTap: () async {
+                                    Navigator.pop(context);
+                                    final confirm =
+                                        await showLogoutConfirmationDialog(
+                                      context,
+                                    );
+                                    if (confirm != true || !context.mounted) {
+                                      return;
+                                    }
                                     await Provider.of<myauth.AuthProvider>(
                                       context,
                                       listen: false,
                                     ).logout();
+                                    if (!context.mounted) return;
                                     Navigator.pushAndRemoveUntil(
                                       context,
                                       MaterialPageRoute(

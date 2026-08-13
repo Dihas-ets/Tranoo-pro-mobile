@@ -11,8 +11,6 @@ import '../../services/user_service.dart';
 import '../../providers/counter_provider.dart';
 import 'create_sell.dart';
 import 'create_sell2.dart';
-import 'cars_info.dart';
-import 'mastervacpage.dart';
 import 'package:tranoo_pro/widgets/notification_list_ui.dart';
 import 'package:tranoo_pro/widgets/page_pull_refresh.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
@@ -21,6 +19,7 @@ import 'package:tranoo_pro/utils/locale_helper.dart';
 import 'package:tranoo_pro/utils/local_data_cache.dart';
 import 'package:tranoo_pro/widgets/cached_media_image.dart';
 import 'package:tranoo_pro/widgets/skeleton/app_skeleton.dart';
+import 'package:tranoo_pro/utils/notification_tap_router.dart';
 
 // --------- HELPERS SÉCURISÉS ----------
 List<String> getNotifImages(Map notif) {
@@ -705,10 +704,47 @@ class _NotificationsBodyState extends State<NotificationsBody> {
       }
     }
     if (target == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      _showNotificationDetail(context, target!, provider, token);
+      await _dispatchNotificationTap(target!, provider, token);
     });
+  }
+
+  Future<void> _dispatchNotificationTap(
+    Map<String, dynamic> notif,
+    NotificationProvider provider,
+    String token,
+  ) async {
+    final type = (_safeGetString(notif, 'type') ?? '').toLowerCase();
+    if (type == 'verification') {
+      final notificationId = _safeGetString(notif, '_id');
+      if (notificationId != null) {
+        await provider.markNotificationAsRead(notificationId, token);
+        if (mounted) _syncUnreadCountWithHeader(provider);
+      }
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => VerificationDetailPage(notification: notif),
+        ),
+      );
+      return;
+    }
+    final data = NotificationTapRouter.dataFromNotification(notif);
+    if (NotificationTapRouter.opensArticleDetail(data) ||
+        (type == 'publicite' &&
+            NotificationTapRouter.articleIdFrom(data) != null)) {
+      final id = _safeGetString(notif, '_id');
+      if (id != null) {
+        await provider.markNotificationAsRead(id, token);
+        if (mounted) _syncUnreadCountWithHeader(provider);
+      }
+      if (!mounted) return;
+      await NotificationTapRouter.openFromNotification(context, notif);
+      return;
+    }
+    _showNotificationDetail(context, notif, provider, token);
   }
 
   Future<void> _handleAlertMenuAction({
@@ -878,8 +914,6 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           }
 
           final notif = provider.notifications[index];
-          final isVerification =
-              _safeGetString(notif, 'type') == 'verification';
           final isUnread = !(notif['isRead'] ?? false);
           final notifId = (_safeGetString(notif, '_id') ?? '').toString();
           final isSelected =
@@ -890,30 +924,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
               if (notifId.isNotEmpty) _toggleSelection(notifId);
               return;
             }
-            if (isVerification) {
-              final token = await user?.getIdToken();
-              final notificationId = _safeGetString(notif, '_id');
-              if (token != null && notificationId != null) {
-                await provider.markNotificationAsRead(notificationId, token);
-                if (mounted) {
-                  _syncUnreadCountWithHeader(provider);
-                }
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (ctx) => VerificationDetailPage(notification: notif),
-                ),
-              );
-            } else {
-              final token = await user?.getIdToken();
-              if (token != null) {
-                _showNotificationDetail(context, notif, provider, token);
-                if (mounted) {
-                  _syncUnreadCountWithHeader(provider);
-                }
-              }
-            }
+            final token = await user?.getIdToken();
+            if (token == null || !mounted) return;
+            await _dispatchNotificationTap(notif, provider, token);
           }
 
           return _buildUnifiedNotificationListItem(
@@ -1131,115 +1144,11 @@ class _NotificationsBodyState extends State<NotificationsBody> {
     required String articleId,
     String? typeHint,
   }) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      final token = await user?.getIdToken();
-      if (token == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.sessionExpiredReconnect)),
-        );
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('${getBaseUrl()}/articles/$articleId'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode != 200) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Impossible de charger la proposition.')),
-        );
-        return;
-      }
-
-      final article = jsonDecode(response.body);
-      final articleType =
-          (article['type'] ?? typeHint ?? '').toString().toLowerCase();
-
-      if (!mounted) return;
-      if (articleType == 'piece') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MastervacPage(
-              id: article['_id']?.toString(),
-              isAcheteur: true,
-              title: (article['titre'] ?? '').toString(),
-              year: (article['annee'] ?? '').toString(),
-              description: (article['description'] ?? '').toString(),
-              company: (article['entreprise'] ?? '').toString(),
-              location:
-                  (article['lieu'] ?? article['localisation'] ?? '').toString(),
-              price: (article['prix'] ?? '').toString(),
-              fuelType: article['typeMoteur']?.toString(),
-              model: article['modele']?.toString(),
-              pieceType:
-                  (article['pieceType'] ?? article['condition'])?.toString(),
-              images: (article['photos'] is List)
-                  ? (article['photos'] as List)
-                      .map((e) => e?.toString())
-                      .toList()
-                  : const [],
-              video: article['video']?.toString(),
-              fournisseur: (article['fournisseur'] is Map)
-                  ? Map<String, dynamic>.from(article['fournisseur'])
-                  : null,
-              vendeur: article['vendeur'] is Map
-                  ? Map<String, dynamic>.from(article['vendeur'] as Map)
-                  : null,
-            ),
-          ),
-        );
-      } else {
-        final photos = (article['photos'] is List)
-            ? (article['photos'] as List)
-                .map((e) => e?.toString() ?? '')
-                .where((e) => e.isNotEmpty)
-                .toList()
-            : <String>[];
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CarsInfo(
-              id: article['_id']?.toString(),
-              titre: article['titre']?.toString(),
-              description: article['description']?.toString(),
-              marque: article['marque']?.toString(),
-              modele: article['modele']?.toString(),
-              annee: article['annee']?.toString(),
-              prix: article['prix']?.toString(),
-              condition: article['condition']?.toString(),
-              boiteVitesse: article['boiteVitesse']?.toString(),
-              carburant: article['carburant']?.toString(),
-              climatiseur: article['climatiseur']?.toString(),
-              distance: article['distance']?.toString(),
-              sieges: article['sieges']?.toString(),
-              portes: article['portes']?.toString(),
-              cylindre: article['cylindre']?.toString(),
-              couleur: article['couleur']?.toString(),
-              dedouanement: article['dedouanement'] == true,
-              lieu: (article['lieu'] ?? article['localisation'])?.toString(),
-              images: photos,
-              videos: const [],
-              video: article['video']?.toString(),
-              entreprise: article['entreprise']?.toString(),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de l\'ouverture: $e')),
-      );
-    }
+    await NotificationTapRouter.openArticleDetails(
+      context,
+      articleId: articleId,
+      typeHint: typeHint,
+    );
   }
 
   void _showNotificationDetail(
@@ -1807,7 +1716,8 @@ class _NotificationsBodyState extends State<NotificationsBody> {
           '.': Style(color: Colors.black87, fontSize: FontSize(15)),
         },
       ),
-      action: action == 'view_proposal' && targetArticleId.isNotEmpty
+      action: (action == 'view_proposal' || action == 'view_article') &&
+              targetArticleId.isNotEmpty
           ? SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -1821,7 +1731,9 @@ class _NotificationsBodyState extends State<NotificationsBody> {
                   );
                 },
                 icon: const Icon(Icons.visibility, size: 18),
-                label: const Text('Voir la proposition'),
+                label: Text(action == 'view_article'
+                    ? 'Voir l\'annonce'
+                    : 'Voir la proposition'),
               ),
             )
           : null,
