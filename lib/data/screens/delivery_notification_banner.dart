@@ -6,6 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
+// =============================================================================
+// CODE MORT — bannière notif livraison livreur interne
+// -----------------------------------------------------------------------------
+// Gelé avec LivreurHomePage. Livraison via Livro. Ne pas supprimer.
+// =============================================================================
+
 class DeliveryNotificationBanner extends StatefulWidget {
   final Map<String, dynamic> delivery;
   final bool isOnline;

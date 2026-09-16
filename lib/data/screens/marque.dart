@@ -663,32 +663,7 @@ class _MarqueState extends State<Marque>
     errorMotos = null;
 
     // Initialisation des indices des onglets selon le rôle
-    final isTransitaire = _userService.currentRole == UserRole.transitaire;
-    final isVendeur = _userService.currentRole == UserRole.vendeur;
-    if (isVendeur) {
-      _marqueTabIndex = isTransitaire ? 1 : 0;
-      _statusOnlineTabIndex = isTransitaire ? 2 : 1;
-      _statusRejectedTabIndex = isTransitaire ? 3 : 2;
-      _statistiquesTabIndex = isTransitaire ? 4 : 3;
-      _tabController =
-          TabController(length: isTransitaire ? 5 : 4, vsync: this);
-    } else {
-      _typeTabIndex = isTransitaire ? 1 : 0;
-      _marqueTabIndex = isTransitaire ? 2 : 1;
-      _localisationTabIndex = isTransitaire ? 3 : 2;
-      _budgetTabIndex = isTransitaire ? 4 : 3;
-      _tabController =
-          TabController(length: isTransitaire ? 5 : 4, vsync: this);
-    }
-
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging &&
-          _userService.currentRole == UserRole.vendeur &&
-          _tabController.index == _statistiquesTabIndex) {
-        _loadSellerMarqueStats();
-      }
-      setState(() {});
-    });
+    _initTabControllerForCurrentRole();
 
     _pageController = PageController(
       initialPage: 0,
@@ -699,6 +674,71 @@ class _MarqueState extends State<Marque>
     _startCarouselTimer();
     _loadMarqueInitialData();
     _loadVehicleClickStats();
+
+    // Si le rôle n'était pas encore hydraté à l'init, recharger dès qu'il arrive
+    // (évite skeleton / catalogue public figés après connexion vendeur).
+    _userService.addListener(_onUserServiceChanged);
+  }
+
+  UserRole? _roleAtInit;
+
+  void _initTabControllerForCurrentRole() {
+    final isTransitaire = _userService.currentRole == UserRole.transitaire;
+    final isVendeur = _userService.currentRole == UserRole.vendeur;
+    _roleAtInit = _userService.currentRole;
+    if (isVendeur) {
+      _marqueTabIndex = isTransitaire ? 1 : 0;
+      _statusOnlineTabIndex = isTransitaire ? 2 : 1;
+      _statusRejectedTabIndex = isTransitaire ? 3 : 2;
+      _statistiquesTabIndex = isTransitaire ? 4 : 3;
+      // Indices acheteur non utilisés — valeurs sentinelles sûres.
+      _typeTabIndex = -1;
+      _localisationTabIndex = -1;
+      _budgetTabIndex = -1;
+      _enAttenteTabIndex = -1;
+      _tabController =
+          TabController(length: isTransitaire ? 5 : 4, vsync: this);
+    } else {
+      _typeTabIndex = isTransitaire ? 1 : 0;
+      _marqueTabIndex = isTransitaire ? 2 : 1;
+      _localisationTabIndex = isTransitaire ? 3 : 2;
+      _budgetTabIndex = isTransitaire ? 4 : 3;
+      _statistiquesTabIndex = -1;
+      _statusOnlineTabIndex = -1;
+      _statusRejectedTabIndex = -1;
+      _enAttenteTabIndex = -1;
+      _tabController =
+          TabController(length: isTransitaire ? 5 : 4, vsync: this);
+    }
+
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging &&
+          _userService.currentRole == UserRole.vendeur &&
+          _statistiquesTabIndex >= 0 &&
+          _tabController.index == _statistiquesTabIndex) {
+        _loadSellerMarqueStats();
+      }
+      setState(() {});
+    });
+  }
+
+  void _onUserServiceChanged() {
+    if (!mounted) return;
+    final role = _userService.currentRole;
+    if (role == _roleAtInit) return;
+    // Rôle hydraté après le premier frame (login) : reconstruire onglets + data.
+    _tabController.dispose();
+    _initTabControllerForCurrentRole();
+    setState(() {
+      isLoadingVoitures = true;
+      isLoadingMotos = true;
+      isLoadingPieces = true;
+      isLoadingPubs = true;
+      voituresRecommandees = [];
+      motosRecommandees = [];
+      articlesPieces = [];
+    });
+    _loadMarqueInitialData();
   }
 
   Future<void> _loadSellerMarqueStats() async {
@@ -1486,6 +1526,7 @@ class _MarqueState extends State<Marque>
 
   @override
   void dispose() {
+    _userService.removeListener(_onUserServiceChanged);
     _carouselTimer?.cancel();
     _tabController.dispose();
     _pageController.dispose();

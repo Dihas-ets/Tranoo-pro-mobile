@@ -21,7 +21,8 @@ import 'package:tranoo_pro/providers/counter_provider.dart';
 import 'connexion_page.dart';
 import 'package:tranoo_pro/data/screens/second_page.dart';
 import 'package:tranoo_pro/data/screens/une.dart';
-import 'package:tranoo_pro/data/screens/livreur_home.dart';
+// CODE MORT — interface livreur (livraison désormais via Livro, pas Tranoo Pro).
+// import 'package:tranoo_pro/data/screens/livreur_home.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_home.dart';
 import 'package:tranoo_pro/data/screens/profilutilisateurpage.dart';
 import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
@@ -210,11 +211,24 @@ class _AvantHomeState extends State<AvantHome>
     final role = (user?['role'] ?? user?['typeUtilisateur'] ?? user?['type'])
         ?.toString()
         .toLowerCase();
-    if (role == 'livreur') return _pagesLivreur;
+    final roleKey = _roleKeyForUser(user);
+    // CODE MORT — UI livreur désactivée (livraison gérée par Livro).
+    // if (role == 'livreur') return _pagesLivreur;
+    // Anciens comptes livreur : fallback accueil standard (pas d'UI dédiée).
+    if (role == 'livreur') {
+      return [
+        Marque(key: ValueKey('home_marque_$roleKey')),
+        const Profil3(),
+      ];
+    }
     if (role == 'chauffeur') return _pagesChauffeur;
     if (role == 'transitaire') return _pagesTransitaire;
-    if (role == 'vendeur') return _buildVendeurPages();
-    return [const Marque(), const Profil3()];
+    if (role == 'vendeur') return _buildVendeurPages(roleKey);
+    // ValueKey : force un nouvel State Marque au login (évite skeleton / tabs figés).
+    return [
+      Marque(key: ValueKey('home_marque_$roleKey')),
+      const Profil3(),
+    ];
   }
 
   List<Widget> _resolveTabPages(Map<String, dynamic>? user) {
@@ -235,10 +249,11 @@ class _AvantHomeState extends State<AvantHome>
     const Profile(),
   ];
 
-  final List<Widget> _pagesLivreur = [
-    const LivreurHomePage(),
-    const Profile(),
-  ];
+  // CODE MORT — tabs livreur (LivreurHomePage).
+  // final List<Widget> _pagesLivreur = [
+  //   const LivreurHomePage(),
+  //   const Profile(),
+  // ];
 
   final List<Widget> _pagesTransitaire = [
     const TransitaireHome(),
@@ -247,10 +262,10 @@ class _AvantHomeState extends State<AvantHome>
     const ProfilUtilisateur2(),
   ];
 
-  List<Widget> _buildVendeurPages() {
+  List<Widget> _buildVendeurPages(String roleKey) {
     final userService = UserService();
     final pages = <Widget>[
-      Marque(),
+      Marque(key: ValueKey('home_marque_$roleKey')),
       const Une(isStandalone: true),
     ];
     if (userService.peutVendreVehicules) {
@@ -706,6 +721,8 @@ class _AvantHomeState extends State<AvantHome>
                                 label: l10n.profile,
                               ),
                             ]
+                          // CODE MORT — bottom nav historique LivreurHomePage (2 tabs Accueil/Profil
+                          // dédiés livreur). Conservé en fallback générique pour anciens comptes.
                           : role == 'livreur'
                               ? [
                                   BottomNavigationBarItem(

@@ -4,6 +4,13 @@ import 'package:http/http.dart' as http;
 import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
+// =============================================================================
+// CODE MORT — écrans flux livraison livreur interne
+// -----------------------------------------------------------------------------
+// Gelé avec DeliveryMapScreen / LivreurHomePage. Livraison via Livro.
+// Ne pas supprimer.
+// =============================================================================
+
 List<dynamic> _piecesForPickup(Map<String, dynamic> delivery, int? pickupIndex) {
   final pickups = delivery['pickups'];
   if (pickupIndex != null && pickups is List && pickupIndex >= 0 && pickupIndex < pickups.length) {

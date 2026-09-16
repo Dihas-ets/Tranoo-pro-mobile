@@ -11,6 +11,12 @@ import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/osm_map_widget.dart';
 // url_launcher n'est pas nécessaire ici : la navigation est gérée par `OsmMapWidget.openNavigation`.
 
+// =============================================================================
+// CODE MORT — suivi GPS livreur interne Tranoo Pro (SuiviGpsPage)
+// -----------------------------------------------------------------------------
+// Gelé avec l'UI livreur. Livraison via Livro. Ne pas supprimer.
+// =============================================================================
+
 class SuiviGpsPage extends StatefulWidget {
   const SuiviGpsPage({super.key});
 

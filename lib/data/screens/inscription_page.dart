@@ -80,7 +80,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
     'Transitaire',
     'Vendeur',
     'Chauffeur',
-    'Livreur',
+    // CODE MORT — inscription livreur désactivée (livraison via Livro).
+    // 'Livreur',
   ];
   final TextEditingController _entrepriseController = TextEditingController();
   bool _isLoading = false;
@@ -568,7 +569,9 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     },
                   ),
                 ],
-                if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
+                // CODE MORT — champs véhicule aussi pour 'Livreur' (rôle retiré de la liste).
+                // if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
+                if (selectedRole == 'Chauffeur') ...[
                   SizedBox(height: screenHeight * 0.02),
                   Container(
                     width: double.infinity,
@@ -712,8 +715,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
                             );
                             return;
                           }
-                          if ((selectedRole == 'Livreur' ||
-                                  selectedRole == 'Chauffeur') &&
+                          // CODE MORT : selectedRole == 'Livreur' || ...
+                          if (selectedRole == 'Chauffeur' &&
                               (_immatriculationController.text.trim().isEmpty ||
                                   _vehiculeTypeController.text.trim().isEmpty ||
                                   _vehiculeMarqueController.text
@@ -952,8 +955,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   return;
                                 }
 
-                                if ((selectedRole == 'Livreur' ||
-                                        selectedRole == 'Chauffeur') &&
+                                // CODE MORT : selectedRole == 'Livreur' || ...
+                                if (selectedRole == 'Chauffeur' &&
                                     (_immatriculationController.text
                                             .trim()
                                             .isEmpty ||
@@ -1092,30 +1095,25 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     fournisseurProfil: fournisseurProfil,
                                     referralCode: pendingReferral,
                                     // captchaToken: captchaToken,
+                                    // CODE MORT : aussi pour 'Livreur' (rôle retiré).
                                     vehiculeImmatriculation:
-                                        (selectedRole == 'Livreur' ||
-                                                selectedRole == 'Chauffeur')
+                                        selectedRole == 'Chauffeur'
                                             ? _immatriculationController.text
                                                 .trim()
                                             : null,
-                                    vehiculeType: (selectedRole == 'Livreur' ||
-                                            selectedRole == 'Chauffeur')
+                                    vehiculeType: selectedRole == 'Chauffeur'
                                         ? _vehiculeTypeController.text.trim()
                                         : null,
-                                    vehiculeMarque: (selectedRole == 'Livreur' ||
-                                            selectedRole == 'Chauffeur')
+                                    vehiculeMarque: selectedRole == 'Chauffeur'
                                         ? _vehiculeMarqueController.text.trim()
                                         : null,
-                                    vehiculeModele: (selectedRole == 'Livreur' ||
-                                            selectedRole == 'Chauffeur')
+                                    vehiculeModele: selectedRole == 'Chauffeur'
                                         ? _vehiculeModeleController.text.trim()
                                         : null,
-                                    vehiculeAnnee: (selectedRole == 'Livreur' ||
-                                            selectedRole == 'Chauffeur')
+                                    vehiculeAnnee: selectedRole == 'Chauffeur'
                                         ? _vehiculeAnneeController.text.trim()
                                         : null,
-                                    vehiculeCouleur: (selectedRole == 'Livreur' ||
-                                            selectedRole == 'Chauffeur')
+                                    vehiculeCouleur: selectedRole == 'Chauffeur'
                                         ? _vehiculeCouleurController.text.trim()
                                         : null,
                                   );

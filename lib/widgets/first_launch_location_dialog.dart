@@ -245,9 +245,8 @@ class FirstLaunchLocationDialog extends StatelessWidget {
   }
 
   Future<bool> _needsBackgroundPermission() async {
-    // Pour l'instant, on suppose que l'utilisateur pourrait avoir un rôle
-    // nécessitant la localisation en arrière-plan
-    // Cette logique pourra être affinée plus tard selon le rôle réel
-    return true;
+    // First-launch: When In Use only. Background is requested later for
+    // livreur/chauffeur when those flows actually need continuous tracking.
+    return false;
   }
 }

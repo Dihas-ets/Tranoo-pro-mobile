@@ -10,6 +10,7 @@ enum UserRole {
   transitaire, 
   chauffeur, 
   agentCommercial, 
+  // CODE MORT — rôle livreur interne (UI / inscription gelées ; livraison via Livro).
   livreur 
 }
 

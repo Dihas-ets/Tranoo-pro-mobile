@@ -48,17 +48,24 @@
 		<!-- ===== Permissions confidentialité iOS ===== -->
 		<!-- Accès à la galerie (lecture) -->
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Tranoo a besoin d'accéder à votre galerie pour que vous puissiez ajouter des photos et vidéos à vos annonces et vérifications.</string>
+		<string>Tranoo Pro a besoin d'accéder à votre galerie pour que vous puissiez ajouter des photos et vidéos à vos annonces et vérifications.</string>
 		<!-- Enregistrement dans la galerie (si applicable) -->
 		<key>NSPhotoLibraryAddUsageDescription</key>
-		<string>Tranoo a besoin d'enregistrer des photos ou vidéos dans votre galerie lorsque vous les sauvegardez depuis l'application.</string>
+		<string>Tranoo Pro a besoin d'enregistrer des photos ou vidéos dans votre galerie lorsque vous les sauvegardez depuis l'application.</string>
 		<!-- Accès à la caméra -->
 		<key>NSCameraUsageDescription</key>
-		<string>Tranoo a besoin d'accéder à votre appareil photo pour prendre des photos de vos véhicules et documents.</string>
+		<string>Tranoo Pro a besoin d'accéder à votre appareil photo pour prendre des photos de vos véhicules et documents.</string>
+		<!-- Localisation (inscription, annonces, suivi missions) -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Tranoo Pro a besoin de votre position pour enregistrer la localisation de votre activité, afficher vos annonces et optimiser les services locaux.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Tranoo Pro utilise votre position en arrière-plan pour le suivi continu des missions (livraison / transport) même lorsque l'application n'est pas au premier plan.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>Tranoo Pro utilise votre position en arrière-plan pour le suivi continu des missions (livraison / transport) même lorsque l'application n'est pas au premier plan.</string>
 		<!-- Tracking publicitaire (NON utilisé actuellement) -->
 		<!--
 	<key>NSUserTrackingUsageDescription</key>
-	<string>Tranoo utilise cet identifiant pour améliorer les performances de l'application et mesurer l'efficacité des campagnes.</string>
+	<string>Tranoo Pro utilise cet identifiant pour améliorer les performances de l'application et mesurer l'efficacité des campagnes.</string>
 	-->
 		<key>UIStatusBarHidden</key>
 		<true/>

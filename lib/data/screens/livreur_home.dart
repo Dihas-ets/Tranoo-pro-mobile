@@ -18,6 +18,14 @@ import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
 import 'dart:async';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
+// =============================================================================
+// CODE MORT — interface livreur Tranoo Pro (LivreurHomePage)
+// -----------------------------------------------------------------------------
+// La livraison est désormais gérée par Livro (SDK externe), plus par les
+// livreurs internes Tranoo Pro. Ne pas supprimer : conservé pour référence /
+// rollback. Entrées désactivées : inscription rôle Livreur, tabs AvantHome.
+// =============================================================================
+
 class LivreurHomePage extends StatefulWidget {
   const LivreurHomePage({super.key});
 

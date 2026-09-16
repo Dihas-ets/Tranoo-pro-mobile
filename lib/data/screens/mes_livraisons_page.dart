@@ -8,6 +8,12 @@ import 'package:tranoo_pro/config/backend_config.dart';
 import 'package:tranoo_pro/data/screens/delivery_map_screen.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 
+// =============================================================================
+// CODE MORT — livraisons livreur interne Tranoo Pro (MesLivraisonsPage)
+// -----------------------------------------------------------------------------
+// Gelé avec LivreurHomePage. Livraison via Livro. Ne pas supprimer.
+// =============================================================================
+
 class MesLivraisonsPage extends StatefulWidget {
   const MesLivraisonsPage({super.key});
 

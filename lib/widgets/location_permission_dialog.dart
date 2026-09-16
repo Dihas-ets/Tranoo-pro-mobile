@@ -124,34 +124,37 @@ class LocationPermissionDialog extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Avertissement sur l'arrière-plan
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.orange[700],
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'La localisation est utilisée même lorsque l\'application est en arrière-plan pour assurer un suivi continu.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.orange[700],
-                          ),
+            // Avertissement arrière-plan uniquement pour rôles qui en ont besoin
+            if (['livreur', 'chauffeur'].contains(userRole.toLowerCase())) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.orange[700],
+                      size: 20,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'La localisation peut être utilisée en arrière-plan pour assurer un suivi continu de vos missions.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.orange[700],
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+            ] else
+              const SizedBox(height: 24),
 
             // Boutons
             Row(

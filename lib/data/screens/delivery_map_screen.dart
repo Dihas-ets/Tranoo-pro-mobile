@@ -13,6 +13,12 @@ import 'package:tranoo_pro/data/screens/delivery_flow_screens.dart';
 import 'package:tranoo_pro/data/screens/osm_map_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// =============================================================================
+// CODE MORT — carte livraison livreur interne (DeliveryMapScreen)
+// -----------------------------------------------------------------------------
+// Gelé avec l'UI livreur Tranoo Pro. Livraison via Livro. Ne pas supprimer.
+// =============================================================================
+
 /// Écran cartographie après acceptation d'une livraison.
 /// Carte avec destination fournisseur, overlay rabattable avec 2 onglets :
 /// - Colis & Fournisseur (récupération)

@@ -20,7 +20,7 @@ android {
         applicationId "tech.dihas.tramoo_pro"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion 36
-        versionCode 32
+        versionCode 33
         versionName "1.1.1"
         multiDexEnabled true
     }
