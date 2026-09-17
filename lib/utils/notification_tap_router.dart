@@ -12,7 +12,6 @@ import 'package:tranoo_pro/data/screens/moto_info.dart';
 import 'package:tranoo_pro/data/screens/notifications.dart';
 import 'package:tranoo_pro/data/screens/transit.dart';
 import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
-import 'package:tranoo_pro/data/screens/wallet_screen.dart';
 import 'package:tranoo_pro/services/user_service.dart';
 import 'package:tranoo_pro/widgets/transitaire_profile_ui.dart';
 
@@ -214,7 +213,8 @@ class NotificationTapRouter {
         push(MesFacturesPage());
         return;
       case 'delivery':
-        push(const WalletScreen());
+        // No Livro / delivery UI in Pro — open notifications list.
+        push(Notifications(openNotificationId: data['notificationId']));
         return;
       case 'transit_selection':
       case 'transit_transfer':

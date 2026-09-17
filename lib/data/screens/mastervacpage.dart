@@ -5,10 +5,8 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:tranoo_pro/l10n/app_localizations.dart';
 // import 'payement.dart'; // Plus utilisé
 import 'package:tranoo_pro/services/user_service.dart'; // Importez UserService pour gérer les rôles
-import 'package:tranoo_pro/services/cart_service.dart';
 import 'package:tranoo_pro/utils/amount_display.dart';
 import 'package:tranoo_pro/widgets/spec_info_card.dart';
-import 'cart_page.dart';
 import 'package:tranoo_pro/utils/role_redirect.dart';
 // import 'package:tranoo_pro/data/screens/paymentscreen.dart';
 import 'package:http/http.dart' as http;
@@ -92,7 +90,6 @@ class _MastervacPageState extends State<MastervacPage> {
   // SUPPRIME la liste statique _images
 
   TextEditingController detailsController = TextEditingController();
-  // Champs de livraison/lieu supprimés - gérés dans OrderSummaryPage
   late ConfettiController _confettiController;
   bool _isOnline = false;
   String? _sellerPhone;
@@ -647,7 +644,6 @@ class _MastervacPageState extends State<MastervacPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     if (widget.editMode) {
       return _buildEditScaffold();
     }
@@ -674,55 +670,6 @@ class _MastervacPageState extends State<MastervacPage> {
         icon: const Icon(Icons.arrow_back, color: Colors.black),
         onPressed: () => Navigator.pop(context),
       ),
-      actions: [
-        // Icône Panier avec compteur
-        AnimatedBuilder(
-          animation: CartService(),
-          builder: (context, _) {
-            final qty = CartService().totalQuantity;
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.shopping_cart_outlined,
-                    color: Colors.black,
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartPage()),
-                    );
-                  },
-                ),
-                if (qty > 0)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.amber,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        qty.toString(),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ],
     );
   }
 
@@ -1061,146 +1008,12 @@ class _MastervacPageState extends State<MastervacPage> {
   Widget _buildActionButton() {
     final userService = UserService();
     final isVendeur = userService.currentRole == UserRole.vendeur;
-    if (widget.fromPub == true) {
-      // Toujours afficher uniquement le bouton Acheter
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.amber,
-            padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          onPressed: () async {
-            // Ajout au panier (sans validation des champs de livraison)
-            final firstImage = widget.images.whereType<String>().firstWhere(
-                  (e) => e.startsWith('http'),
-                  orElse: () => '',
-                );
-            await CartService().addOrIncrement(
-              CartItem(
-                articleId: (widget.id ?? '').toString(),
-                title: widget.title,
-                imageUrl: firstImage.isEmpty ? null : firstImage,
-                priceLabel: formatFcfaDots(widget.price),
-                pieceType: widget.pieceType,
-                model: widget.model,
-                fuelType: widget.fuelType,
-                quantity: 1,
-              ),
-            );
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Text(l10n.addedToCart),
-                  ],
-                ),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-                action: SnackBarAction(
-                  label: 'Voir le panier',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartPage()),
-                    );
-                  },
-                ),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            );
-          },
-          child: Text(l10n.addToCart,
-            style: TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ),
-      );
+    // Buyer cart/checkout is on Tranoo client — Pro keeps product view + seller CTAs only.
+    if (widget.fromPub == true || !isVendeur) {
+      return const SizedBox.shrink();
     }
-    if (!isVendeur) {
-      // Chauffeur : bouton acheter
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.amber,
-            padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          onPressed: () async {
-            // Ajout au panier (sans validation des champs de livraison)
-            final firstImage = widget.images.whereType<String>().firstWhere(
-                  (e) => e.startsWith('http'),
-                  orElse: () => '',
-                );
-            await CartService().addOrIncrement(
-              CartItem(
-                articleId: (widget.id ?? '').toString(),
-                title: widget.title,
-                imageUrl: firstImage.isEmpty ? null : firstImage,
-                priceLabel: formatFcfaDots(widget.price),
-                pieceType: widget.pieceType,
-                model: widget.model,
-                fuelType: widget.fuelType,
-                quantity: 1,
-              ),
-            );
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Text(l10n.addedToCart),
-                  ],
-                ),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-                action: SnackBarAction(
-                  label: 'Voir le panier',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartPage()),
-                    );
-                  },
-                ),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            );
-          },
-          child: Text(l10n.addToCart,
-            style: TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ),
-      );
-    } else {
-      // Vendeur : boutons vendre + pub
-      return Column(
+    // Vendeur : boutons vendre + pub
+    return Column(
         children: [
           SizedBox(
             width: double.infinity,
@@ -1371,6 +1184,5 @@ class _MastervacPageState extends State<MastervacPage> {
           ),
         ],
       );
-    }
   }
 }

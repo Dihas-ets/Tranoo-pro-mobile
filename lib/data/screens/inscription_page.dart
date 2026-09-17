@@ -36,7 +36,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
       TextEditingController();
   final TextEditingController _referralController = TextEditingController();
   CapturedProfileLocation? _profileLocation;
-  // Contrôleurs pour les champs véhicule (livreur/chauffeur)
+  // Contrôleurs pour les champs véhicule (chauffeur)
   final TextEditingController _immatriculationController = TextEditingController();
   final TextEditingController _vehiculeTypeController = TextEditingController();
   final TextEditingController _vehiculeMarqueController = TextEditingController();
@@ -80,8 +80,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
     'Transitaire',
     'Vendeur',
     'Chauffeur',
-    // CODE MORT — inscription livreur désactivée (livraison via Livro).
-    // 'Livreur',
   ];
   final TextEditingController _entrepriseController = TextEditingController();
   bool _isLoading = false;
@@ -569,8 +567,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                     },
                   ),
                 ],
-                // CODE MORT — champs véhicule aussi pour 'Livreur' (rôle retiré de la liste).
-                // if (selectedRole == 'Livreur' || selectedRole == 'Chauffeur') ...[
                 if (selectedRole == 'Chauffeur') ...[
                   SizedBox(height: screenHeight * 0.02),
                   Container(
@@ -715,7 +711,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                             );
                             return;
                           }
-                          // CODE MORT : selectedRole == 'Livreur' || ...
                           if (selectedRole == 'Chauffeur' &&
                               (_immatriculationController.text.trim().isEmpty ||
                                   _vehiculeTypeController.text.trim().isEmpty ||
@@ -955,7 +950,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                   return;
                                 }
 
-                                // CODE MORT : selectedRole == 'Livreur' || ...
                                 if (selectedRole == 'Chauffeur' &&
                                     (_immatriculationController.text
                                             .trim()
@@ -1095,7 +1089,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                                     fournisseurProfil: fournisseurProfil,
                                     referralCode: pendingReferral,
                                     // captchaToken: captchaToken,
-                                    // CODE MORT : aussi pour 'Livreur' (rôle retiré).
                                     vehiculeImmatriculation:
                                         selectedRole == 'Chauffeur'
                                             ? _immatriculationController.text

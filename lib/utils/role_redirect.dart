@@ -10,8 +10,7 @@ enum UserRole {
   transitaire, 
   chauffeur, 
   agentCommercial, 
-  // CODE MORT — rôle livreur interne (UI / inscription gelées ; livraison via Livro).
-  livreur 
+  livreur, // legacy accounts only (no dedicated UI / inscription)
 }
 
 UserRole? stringToUserRole(String? role) {

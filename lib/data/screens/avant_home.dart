@@ -21,8 +21,6 @@ import 'package:tranoo_pro/providers/counter_provider.dart';
 import 'connexion_page.dart';
 import 'package:tranoo_pro/data/screens/second_page.dart';
 import 'package:tranoo_pro/data/screens/une.dart';
-// CODE MORT — interface livreur (livraison désormais via Livro, pas Tranoo Pro).
-// import 'package:tranoo_pro/data/screens/livreur_home.dart';
 import 'package:tranoo_pro/data/screens/chauffeur_home.dart';
 import 'package:tranoo_pro/data/screens/profilutilisateurpage.dart';
 import 'package:tranoo_pro/data/screens/profil_utilisateur2.dart';
@@ -212,9 +210,7 @@ class _AvantHomeState extends State<AvantHome>
         ?.toString()
         .toLowerCase();
     final roleKey = _roleKeyForUser(user);
-    // CODE MORT — UI livreur désactivée (livraison gérée par Livro).
-    // if (role == 'livreur') return _pagesLivreur;
-    // Anciens comptes livreur : fallback accueil standard (pas d'UI dédiée).
+    // Legacy livreur accounts: Accueil + Profil (no dedicated livreur UI).
     if (role == 'livreur') {
       return [
         Marque(key: ValueKey('home_marque_$roleKey')),
@@ -248,12 +244,6 @@ class _AvantHomeState extends State<AvantHome>
     const ChauffeurHomePage(),
     const Profile(),
   ];
-
-  // CODE MORT — tabs livreur (LivreurHomePage).
-  // final List<Widget> _pagesLivreur = [
-  //   const LivreurHomePage(),
-  //   const Profile(),
-  // ];
 
   final List<Widget> _pagesTransitaire = [
     const TransitaireHome(),
@@ -721,8 +711,6 @@ class _AvantHomeState extends State<AvantHome>
                                 label: l10n.profile,
                               ),
                             ]
-                          // CODE MORT — bottom nav historique LivreurHomePage (2 tabs Accueil/Profil
-                          // dédiés livreur). Conservé en fallback générique pour anciens comptes.
                           : role == 'livreur'
                               ? [
                                   BottomNavigationBarItem(

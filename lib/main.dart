@@ -39,7 +39,6 @@ import 'package:tranoo_pro/firebase_options.dart';
 import 'package:tranoo_pro/providers/auth_provider.dart' as myauth;
 import 'package:tranoo_pro/providers/counter_provider.dart';
 import 'package:tranoo_pro/data/screens/tricycle/chauffeur_tricycle_home.dart';
-import 'package:tranoo_pro/services/cart_service.dart';
 import 'package:tranoo_pro/data/screens/reset/forgot_password_page.dart';
 import 'package:tranoo_pro/data/screens/reset/verify_code_page.dart';
 import 'package:tranoo_pro/data/screens/reset/create_new_password_page.dart';
@@ -345,7 +344,6 @@ void main() async {
           }
         }),
         ChangeNotifierProvider(create: (_) => CounterProvider()),
-        ChangeNotifierProvider(create: (_) => CartService()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],
       child: const MyApp(),
