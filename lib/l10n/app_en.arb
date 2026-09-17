@@ -559,8 +559,6 @@
   "noCharacteristicsProvided": "- No characteristics provided",
   "proposeOffer": "Propose an offer",
   "myCart": "My Cart",
-  "cartEmpty": "Your cart is empty",
-  "cartEmptyHint": "Add items to start shopping",
   "checkout": "Place order",
   "carsOnline": "Cars online",
   "carDeletedSuccess": "Car deleted successfully!",
@@ -583,7 +581,6 @@
   "noNotifications": "No notifications",
   "markAllRead": "Mark all as read",
   "notificationDetails": "Notification details",
-  "myOrders": "My orders",
   "noOrders": "No orders",
   "orderDetails": "Order details",
   "orderTracking": "Order tracking",
@@ -613,7 +610,6 @@
   "chooseLocation": "Choose location",
   "navigate": "Navigate",
   "termsOfUse": "Terms of use",
-  "livreurHome": "Delivery home",
   "chauffeurHome": "Driver home",
   "myDeliveries": "My deliveries",
   "sellerSubscription": "Seller subscription",
@@ -952,7 +948,6 @@
   "applicationSubmitError": "Error submitting application.",
   "vendreTitle": "Sell",
   "quantity": "Quantity",
-  "addToCart": "Add to cart",
   "buyNow": "Buy now",
   "contactSeller": "Contact seller",
   "views": "Views",
@@ -970,7 +965,6 @@
   "remove": "Remove",
   "subtotal": "Subtotal",
   "shipping": "Shipping",
-  "orderStatus": "Order status",
   "orderDate": "Order date",
   "delivered": "Delivered",
   "cancelled": "Cancelled",
@@ -1608,11 +1602,9 @@
   "driverArrivedTitle": "Your delivery driver has arrived",
   "chooseAnAction": "Choose an action.",
   "orderTotalLabel": "Order total",
-  "deliveryFeesLabel": "Delivery fee",
   "payMyOrder": "Pay my order",
   "returnReasonRequiredTitle": "Return reason (required)",
   "partsOrderPaymentLabel": "Parts order payment",
-  "deliveryFeePaymentLabel": "Delivery fee payment",
   "fileDownloadFailed": "Unable to download the file",
   "tranooDocumentShare": "Tranoo document",
   "refWithId": "Ref. {id}",
@@ -1716,27 +1708,39 @@
   "whatsappCarInterestWithRef": "Hello Tranoo, I would like to buy the car \"{title}\" (ref. {articleId}).",
   "@whatsappCarInterestWithRef": {
     "placeholders": {
-      "title": { "type": "String" },
-      "articleId": { "type": "String" }
+      "title": {
+        "type": "String"
+      },
+      "articleId": {
+        "type": "String"
+      }
     }
   },
   "whatsappCarInterestNoRef": "Hello Tranoo, I would like to buy the car \"{title}\".",
   "@whatsappCarInterestNoRef": {
     "placeholders": {
-      "title": { "type": "String" }
+      "title": {
+        "type": "String"
+      }
     }
   },
   "whatsappMotoInterestWithRef": "Hello Tranoo, I would like to buy the motorcycle \"{title}\" (ref. {articleId}).",
   "@whatsappMotoInterestWithRef": {
     "placeholders": {
-      "title": { "type": "String" },
-      "articleId": { "type": "String" }
+      "title": {
+        "type": "String"
+      },
+      "articleId": {
+        "type": "String"
+      }
     }
   },
   "whatsappMotoInterestNoRef": "Hello Tranoo, I would like to buy the motorcycle \"{title}\".",
   "@whatsappMotoInterestNoRef": {
     "placeholders": {
-      "title": { "type": "String" }
+      "title": {
+        "type": "String"
+      }
     }
   },
   "defaultMotoTitle": "this motorcycle",
@@ -1754,14 +1758,6 @@
       }
     }
   },
-  "orderStatusPending": "Pending",
-  "orderStatusConfirmed": "Confirmed",
-  "orderStatusPreparing": "Preparing",
-  "orderStatusReady": "Ready",
-  "orderStatusDelivering": "Delivering",
-  "orderStatusDelivered": "Delivered",
-  "orderStatusCancelled": "Cancelled",
-  "orderStatusDriverAssigned": "Driver assigned",
   "tranooDelivery": "Tranoo Delivery",
   "driverLabel": "Driver",
   "addressNotSpecified": "Address not specified",
@@ -1816,7 +1812,6 @@
     }
   },
   "availability": "Availability",
-  "deliveryFeeLabel": "Delivery fee",
   "processingOrder": "Processing...",
   "supplierCoordsUnavailable": "Supplier coordinates unavailable to calculate delivery.",
   "invalidCoordinates": "Invalid coordinates",
@@ -2449,7 +2444,9 @@
   "transitaireVerificationBannerRejectedWithMotif": "Reason: {motif}\nFix the issues and resubmit your file.",
   "@transitaireVerificationBannerRejectedWithMotif": {
     "placeholders": {
-      "motif": { "type": "String" }
+      "motif": {
+        "type": "String"
+      }
     }
   },
   "transitaireVerificationBannerRejectedSubtitle": "Fix your file and submit a new request.",

@@ -1284,12 +1284,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get myCart => 'My Cart';
 
   @override
-  String get cartEmpty => 'Your cart is empty';
-
-  @override
-  String get cartEmptyHint => 'Add items to start shopping';
-
-  @override
   String get checkout => 'Place order';
 
   @override
@@ -1354,9 +1348,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationDetails => 'Notification details';
-
-  @override
-  String get myOrders => 'My orders';
 
   @override
   String get noOrders => 'No orders';
@@ -1444,9 +1435,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get termsOfUse => 'Terms of use';
-
-  @override
-  String get livreurHome => 'Delivery home';
 
   @override
   String get chauffeurHome => 'Driver home';
@@ -2063,9 +2051,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quantity => 'Quantity';
 
   @override
-  String get addToCart => 'Add to cart';
-
-  @override
   String get buyNow => 'Buy now';
 
   @override
@@ -2115,9 +2100,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shipping => 'Shipping';
-
-  @override
-  String get orderStatus => 'Order status';
 
   @override
   String get orderDate => 'Order date';
@@ -3334,9 +3316,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get orderTotalLabel => 'Order total';
 
   @override
-  String get deliveryFeesLabel => 'Delivery fee';
-
-  @override
   String get payMyOrder => 'Pay my order';
 
   @override
@@ -3344,9 +3323,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get partsOrderPaymentLabel => 'Parts order payment';
-
-  @override
-  String get deliveryFeePaymentLabel => 'Delivery fee payment';
 
   @override
   String get fileDownloadFailed => 'Unable to download the file';
@@ -3517,30 +3493,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get orderStatusPending => 'Pending';
-
-  @override
-  String get orderStatusConfirmed => 'Confirmed';
-
-  @override
-  String get orderStatusPreparing => 'Preparing';
-
-  @override
-  String get orderStatusReady => 'Ready';
-
-  @override
-  String get orderStatusDelivering => 'Delivering';
-
-  @override
-  String get orderStatusDelivered => 'Delivered';
-
-  @override
-  String get orderStatusCancelled => 'Cancelled';
-
-  @override
-  String get orderStatusDriverAssigned => 'Driver assigned';
-
-  @override
   String get tranooDelivery => 'Tranoo Delivery';
 
   @override
@@ -3626,9 +3578,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get availability => 'Availability';
-
-  @override
-  String get deliveryFeeLabel => 'Delivery fee';
 
   @override
   String get processingOrder => 'Processing...';
